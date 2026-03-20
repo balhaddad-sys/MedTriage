@@ -1,0 +1,70 @@
+<!DOCTYPE html>
+<html lang="en" dir="ltr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, user-scalable=no">
+  <meta name="theme-color" content="#0A0E14">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="description" content="MedEvac - Hospital Patient Evacuation Registry + Clinical Decision Support">
+  <title>MedEvac</title>
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" type="image/svg+xml" href="/icons/icon.svg">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body, #root { height: 100%; width: 100%; overflow: hidden; }
+    body {
+      font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, sans-serif;
+      background: #0A0E14;
+      color: #F0F2F5;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
+      overscroll-behavior: none;
+    }
+    #root { display: flex; flex-direction: column; }
+    .mono { font-family: 'JetBrains Mono', monospace; }
+
+    /* Loading screen */
+    #loading {
+      display: flex; align-items: center; justify-content: center;
+      height: 100vh; background: #0A0E14;
+      flex-direction: column; gap: 16px;
+    }
+    #loading h1 { font-size: 28px; font-weight: 800; letter-spacing: -0.5px; }
+    #loading p { color: #8892A0; font-size: 13px; }
+    .loading-pulse {
+      width: 40px; height: 40px; border-radius: 50%;
+      background: #3B82F6; opacity: 0.6;
+      animation: pulse 1.5s ease-in-out infinite;
+    }
+    @keyframes pulse { 0%,100% { transform: scale(1); opacity: 0.6; } 50% { transform: scale(1.2); opacity: 1; } }
+  </style>
+</head>
+<body>
+  <div id="root">
+    <div id="loading">
+      <div class="loading-pulse"></div>
+      <h1>MedEvac</h1>
+      <p>Loading clinical systems...</p>
+    </div>
+  </div>
+  <script type="module" src="/app.js"></script>
+  <script>
+    // Register service worker
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('/sw.js').catch(() => {});
+      });
+    }
+    // Request persistent storage
+    if (navigator.storage && navigator.storage.persist) {
+      navigator.storage.persist().catch(() => {});
+    }
+  </script>
+</body>
+</html>

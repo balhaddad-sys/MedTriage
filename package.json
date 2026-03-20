@@ -1,0 +1,22 @@
+{
+  "name": "medevac",
+  "version": "3.0.0",
+  "description": "MedEvac v3 - Hospital Patient Evacuation Registry + Clinical Decision Support",
+  "private": true,
+  "scripts": {
+    "dev": "node scripts/dev.mjs",
+    "build": "node scripts/build.mjs",
+    "preview": "npx serve dist",
+    "validate:protocols": "node scripts/validate-protocols.mjs",
+    "verify:calculators": "node scripts/verify-calculators.mjs",
+    "test": "npm run validate:protocols && npm run verify:calculators"
+  },
+  "dependencies": {
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "idb-keyval": "^6.2.1"
+  },
+  "devDependencies": {
+    "esbuild": "^0.24.2"
+  }
+}
