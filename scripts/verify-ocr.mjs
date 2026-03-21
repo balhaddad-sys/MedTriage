@@ -317,4 +317,78 @@ assert.equal(chronicAbdullah.ward, 'Ward 19');
 assert.equal(chronicAbdullah.assignedDoctor, 'Bader');
 assert.match(chronicAbdullah.dx || '', /Urosepsis/i);
 
+// Test 11: Lowercase transliterated patient and doctor names should stay name-like
+const lowercaseNamesSheet = analyzeOcrWords([
+  word('Patient name', 160, 20, 98, 110),
+  word('Diagnosis', 420, 20, 98, 90),
+  word('Assigned Doctor', 650, 20, 98, 135),
+  word('ali hussain', 170, 60, 92, 110),
+  word('CVA left MCA occlusion', 380, 60, 92, 200),
+  word('saleh', 700, 60, 92, 60),
+  word('ahmad alessa', 170, 96, 92, 130),
+  word('Chest infection', 400, 96, 92, 140),
+  word('noura', 700, 96, 92, 60),
+  word('jamal', 170, 132, 92, 90),
+  word('UTI', 420, 132, 92, 40),
+  word('zahra', 700, 132, 92, 60),
+], 900, 220);
+
+assert.equal(lowercaseNamesSheet.strategy, 'table-grid', 'expected lowercase transliterated sheets to stay in table-grid');
+assert.equal(lowercaseNamesSheet.patients.length, 3, 'expected three lowercase transliterated rows');
+
+const aliHussain = lowercaseNamesSheet.patients.find(patient => /ali hussain/i.test(patient.fullName || ''));
+assert.ok(aliHussain, 'expected ali hussain to be recognized as a patient name');
+assert.equal(aliHussain.assignedDoctor, 'saleh');
+assert.match(aliHussain.dx || '', /CVA left MCA occlusion/i);
+assert.ok((aliHussain.fieldConfidence?.fullName || 0) >= 0.85, 'expected ali hussain to carry strong name confidence');
+
+const ahmadAlessa = lowercaseNamesSheet.patients.find(patient => /ahmad alessa/i.test(patient.fullName || ''));
+assert.ok(ahmadAlessa, 'expected ahmad alessa to be recognized as a patient name');
+assert.equal(ahmadAlessa.assignedDoctor, 'noura');
+assert.match(ahmadAlessa.dx || '', /Chest infection/i);
+assert.ok((ahmadAlessa.fieldConfidence?.fullName || 0) >= 0.85, 'expected ahmad alessa to carry strong name confidence');
+
+const jamalPatient = lowercaseNamesSheet.patients.find(patient => /^jamal$/i.test(patient.fullName || ''));
+assert.ok(jamalPatient, 'expected jamal to be recognized as a patient name');
+assert.equal(jamalPatient.assignedDoctor, 'zahra');
+assert.match(jamalPatient.dx || '', /UTI/i);
+assert.ok((jamalPatient.fieldConfidence?.fullName || 0) >= 0.85, 'expected jamal to carry strong name confidence');
+
+// Test 12: Headerless aligned rows should still recover names, diagnoses, doctors, and statuses
+const headerlessAlignedRows = analyzeOcrWords([
+  word('ali hussain', 160, 40, 92, 110),
+  word('CVA left MCA occlusion', 380, 40, 92, 200),
+  word('saleh', 700, 40, 92, 60),
+  word('new', 850, 40, 92, 40),
+  word('ahmad alessa', 160, 76, 92, 130),
+  word('Chest infection', 390, 76, 92, 140),
+  word('noura', 700, 76, 92, 60),
+  word('new', 850, 76, 92, 40),
+  word('jamal', 160, 112, 92, 80),
+  word('UTI', 420, 112, 92, 40),
+  word('zahra', 700, 112, 92, 60),
+  word('chronic', 840, 112, 92, 70),
+], 940, 180);
+
+assert.ok(['schema-columns', 'table-grid'].includes(headerlessAlignedRows.strategy), 'expected aligned headerless rows to resolve structurally');
+assert.equal(headerlessAlignedRows.patients.length, 3, 'expected three patients from headerless aligned rows');
+
+const headerlessAli = headerlessAlignedRows.patients.find(patient => /ali hussain/i.test(patient.fullName || ''));
+assert.ok(headerlessAli, 'expected ali hussain to survive without headers');
+assert.equal(headerlessAli.assignedDoctor, 'saleh');
+assert.equal(headerlessAli.sheetStatus, 'NEW');
+assert.match(headerlessAli.dx || '', /CVA left MCA occlusion/i);
+
+const headerlessAhmad = headerlessAlignedRows.patients.find(patient => /ahmad alessa/i.test(patient.fullName || ''));
+assert.ok(headerlessAhmad, 'expected ahmad alessa to survive without headers');
+assert.equal(headerlessAhmad.assignedDoctor, 'noura');
+assert.equal(headerlessAhmad.sheetStatus, 'NEW');
+assert.match(headerlessAhmad.dx || '', /Chest infection/i);
+
+const headerlessJamal = headerlessAlignedRows.patients.find(patient => /^jamal$/i.test(patient.fullName || ''));
+assert.ok(headerlessJamal, 'expected jamal to survive without headers');
+assert.equal(headerlessJamal.assignedDoctor, 'zahra');
+assert.equal(headerlessJamal.sheetStatus, 'CHRONIC');
+assert.match(headerlessJamal.dx || '', /UTI/i);
+
 console.log('OCR verification passed');

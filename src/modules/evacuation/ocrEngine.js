@@ -1522,7 +1522,9 @@ const EntityRecognizer = {
 
       const corrected = tokens.map(token => {
         const tokenMatch = MedicalVocabulary.correctTerm(token.toUpperCase(), 1);
-        return tokenMatch?.term || token;
+        if (!tokenMatch) return token;
+        if ((tokenMatch.distance || 0) > 0 && stripForLexicon(token).length <= 3) return token;
+        return tokenMatch.term || token;
       }).join(' ');
       const confidence = clamp(0.52 + (average(tokenMatches.map(tokenMatch => tokenMatch.confidence), 0.55) * 0.28) + (Math.min(tokenMatches.length, 3) * 0.05));
       return {
