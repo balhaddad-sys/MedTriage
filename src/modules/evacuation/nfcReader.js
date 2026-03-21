@@ -249,7 +249,7 @@ function parseCapacitorEvent(event) {
   };
 }
 
-async function scanCapacitorNfc(onResult, onError, onReading) {
+async function scanCapacitorNfc(onResult, onError, onReading, mrzData) {
   const plugin = getCapacitorNfcPlugin();
   if (!plugin) {
     onError?.(new Error('Native NFC plugin is not available.'));
@@ -291,7 +291,7 @@ async function scanCapacitorNfc(onResult, onError, onReading) {
       // First try ICAO MRTD protocol read (reads chip data groups)
       let icaoData = null;
       try {
-        icaoData = await attemptICAORead(plugin);
+        icaoData = await attemptICAORead(plugin, mrzData || null);
       } catch {
         // ICAO read failed — fall back to basic tag parsing
       }
@@ -435,9 +435,9 @@ async function scanWebNfc(onResult, onError, onReading) {
   }
 }
 
-export async function scanNFC(onResult, onError, onReading) {
+export async function scanNFC(onResult, onError, onReading, mrzData) {
   const backend = getNfcBackend();
-  if (backend === 'capacitor') return scanCapacitorNfc(onResult, onError, onReading);
+  if (backend === 'capacitor') return scanCapacitorNfc(onResult, onError, onReading, mrzData);
   if (backend === 'webnfc') return scanWebNfc(onResult, onError, onReading);
 
   onError?.(new Error('NFC is not supported on this device. Use manual Civil ID entry.'));
@@ -467,14 +467,54 @@ export function findExistingPatient(patients, civilId) {
 }
 
 // Convert ICAO photo data to displayable data URL
+// Supports JPEG natively; JP2 (JPEG 2000) tries image/jp2 first,
+// falls back to image/jpeg (some chips store JPEG in JP2 wrapper).
+// iOS Safari supports JP2 natively. Android Chrome does not.
 export function photoToDataUrl(photoData) {
   if (!photoData || !photoData.data) return null;
   try {
     const bytes = photoData.data instanceof Uint8Array ? photoData.data : new Uint8Array(photoData.data);
+    // Convert to base64 in chunks to avoid call stack overflow on large images
+    let binary = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+      binary += String.fromCharCode(...bytes.slice(i, Math.min(i + chunkSize, bytes.length)));
+    }
+    const base64 = btoa(binary);
     const mime = photoData.format === 'jp2' ? 'image/jp2' : 'image/jpeg';
-    const base64 = btoa(String.fromCharCode(...bytes));
     return `data:${mime};base64,${base64}`;
   } catch {
     return null;
   }
+}
+
+// Try to load photo — returns a Promise that resolves to true if the data URL is displayable
+export function testPhotoUrl(dataUrl) {
+  return new Promise((resolve) => {
+    if (!dataUrl) { resolve(false); return; }
+    const img = new Image();
+    img.onload = () => resolve(true);
+    img.onerror = () => resolve(false);
+    img.src = dataUrl;
+  });
+}
+
+// Get displayable photo URL with JP2 fallback
+// If JP2 fails to load, tries re-interpreting as JPEG
+export async function getDisplayablePhotoUrl(photoData) {
+  if (!photoData || !photoData.data) return null;
+  const primary = photoToDataUrl(photoData);
+  if (!primary) return null;
+
+  const works = await testPhotoUrl(primary);
+  if (works) return primary;
+
+  // If JP2 failed, try as JPEG (some chips mislabel format)
+  if (photoData.format === 'jp2') {
+    const jpegUrl = photoToDataUrl({ ...photoData, format: 'jpeg' });
+    const jpegWorks = await testPhotoUrl(jpegUrl);
+    if (jpegWorks) return jpegUrl;
+  }
+
+  return null;
 }

@@ -5,14 +5,14 @@
 //
 // Protocol flow:
 // 1. Select ICAO MRTD applet (AID: A0000002471001)
-// 2. Establish BAC session (3DES encrypted channel)
+// 2. Establish BAC session (3DES encrypted channel) using MRZ-derived keys
 // 3. Read EF.COM to discover available data groups
 // 4. Read DG1 (MRZ data), DG2 (photo), DG11 (additional personal details)
 //
-// Note: Full BAC/PACE crypto requires 3DES and SHA-1 which are not natively
-// available in all JS environments. This module provides the APDU framing
-// and protocol structure; crypto operations use SubtleCrypto where possible
-// and fall back to software implementations.
+// All reads after BAC authentication use Secure Messaging (SM) with
+// 3DES encryption and ISO 9797-1 retail MAC.
+
+import { performBAC, secureReadFile } from './bacAuth.js';
 
 // ICAO MRTD Application Identifier
 const MRTD_AID = [0xA0, 0x00, 0x00, 0x02, 0x47, 0x10, 0x01];
@@ -213,7 +213,11 @@ function checkSW(response) {
 export class ICAOReader {
   constructor(transceiveFn) {
     this.transceive = transceiveFn;
-    this.maxReadSize = 224; // Conservative read size for compatibility
+    this.maxReadSize = 224;
+    // Secure messaging state (set after BAC)
+    this.ksEnc = null;
+    this.ksMac = null;
+    this.ssc = null;
   }
 
   async selectMRTD() {
@@ -222,27 +226,50 @@ export class ICAOReader {
     return checkSW(response);
   }
 
+  // Perform BAC authentication using MRZ-derived keys
+  async authenticateBAC(documentNumber, dateOfBirth, dateOfExpiry) {
+    const { ksEnc, ksMac, ssc } = await performBAC(
+      this.transceive,
+      documentNumber,
+      dateOfBirth,
+      dateOfExpiry,
+    );
+    this.ksEnc = ksEnc;
+    this.ksMac = ksMac;
+    this.ssc = ssc;
+    return true;
+  }
+
+  get isAuthenticated() {
+    return this.ksEnc !== null && this.ksMac !== null;
+  }
+
+  // Read a file — uses secure messaging if authenticated
   async readFile(fileId) {
-    // Select the file
+    if (this.isAuthenticated) {
+      return this.readFileSecure(fileId);
+    }
+    return this.readFilePlain(fileId);
+  }
+
+  // Read file without secure messaging (for unauthenticated access)
+  async readFilePlain(fileId) {
     const selCmd = selectFile(fileId);
     const selResp = await this.transceive(selCmd);
     const selResult = checkSW(selResp);
     if (!selResult.ok) return null;
 
-    // Read first 4 bytes to get the length
     const headerCmd = readBinary(0, 4);
     const headerResp = await this.transceive(headerCmd);
     const headerResult = checkSW(headerResp);
     if (!headerResult.ok || headerResult.data.length < 4) return null;
 
-    // Parse TLV header to get total length
     const header = parseTLV(headerResult.data);
     if (!header) return null;
 
     const totalLength = header.endOffset + header.length;
-    if (totalLength > 50000) return null; // Safety limit (50KB)
+    if (totalLength > 50000) return null;
 
-    // Read the full file in chunks
     const data = [];
     let offset = 0;
     while (offset < totalLength) {
@@ -253,10 +280,23 @@ export class ICAOReader {
       if (!result.ok) break;
       data.push(...result.data);
       offset += result.data.length;
-      if (result.data.length < chunkSize) break; // Short read — done
+      if (result.data.length < chunkSize) break;
     }
 
     return data;
+  }
+
+  // Read file with secure messaging (after BAC authentication)
+  async readFileSecure(fileId) {
+    const { data, ssc } = await secureReadFile(
+      this.transceive,
+      this.ksEnc,
+      this.ksMac,
+      this.ssc,
+      fileId,
+    );
+    this.ssc = ssc;
+    return data ? Array.from(data) : null;
   }
 
   async readEfCOM() {
@@ -285,8 +325,9 @@ export class ICAOReader {
 }
 
 // Attempt ICAO reading via Capacitor NFC transceive
+// mrzData: optional { documentNumber, dateOfBirth, dateOfExpiry } for BAC auth
 // Returns null if transceive is not available or ICAO applet is not found
-export async function attemptICAORead(nfcPlugin) {
+export async function attemptICAORead(nfcPlugin, mrzData) {
   if (!nfcPlugin || typeof nfcPlugin.transceive !== 'function') {
     return null;
   }
@@ -309,32 +350,51 @@ export async function attemptICAORead(nfcPlugin) {
       return null; // Not an ICAO-compliant document
     }
 
-    // Step 2: Try to read EF.COM (may fail without BAC)
-    // Without BAC authentication, most cards will reject reads
-    // But we try anyway — some cards allow EF.CardAccess without BAC
-    const groups = await reader.readEfCOM();
-
-    // Step 3: Read available data groups
     const result = {
       icaoDetected: true,
-      needsBAC: groups.length === 0, // If EF.COM failed, BAC is required
-      availableGroups: groups,
+      needsBAC: false,
+      bacAuthenticated: false,
+      availableGroups: [],
       mrz: null,
       photo: null,
       additionalDetails: null,
     };
 
-    if (groups.length > 0) {
-      if (groups.includes('DG1')) {
-        result.mrz = await reader.readDG1();
+    // Step 2: Try unauthenticated read of EF.COM
+    let groups = await reader.readEfCOM();
+
+    // Step 3: If unauthenticated read failed and we have MRZ data, try BAC
+    if (groups.length === 0 && mrzData) {
+      try {
+        await reader.authenticateBAC(
+          mrzData.documentNumber,
+          mrzData.dateOfBirth,
+          mrzData.dateOfExpiry,
+        );
+        result.bacAuthenticated = true;
+        groups = await reader.readEfCOM();
+      } catch (bacErr) {
+        result.bacError = bacErr.message;
       }
-      if (groups.includes('DG11')) {
-        result.additionalDetails = await reader.readDG11();
-      }
-      // DG2 (photo) is large — only read if other DGs succeeded
-      if (groups.includes('DG2') && result.mrz) {
-        result.photo = await reader.readDG2();
-      }
+    }
+
+    if (groups.length === 0 && !mrzData) {
+      result.needsBAC = true;
+      return result;
+    }
+
+    result.availableGroups = groups;
+
+    // Step 4: Read available data groups
+    if (groups.includes('DG1')) {
+      result.mrz = await reader.readDG1();
+    }
+    if (groups.includes('DG11')) {
+      result.additionalDetails = await reader.readDG11();
+    }
+    // DG2 (photo) is large — only read if other DGs succeeded
+    if (groups.includes('DG2') && result.mrz) {
+      result.photo = await reader.readDG2();
     }
 
     return result;
