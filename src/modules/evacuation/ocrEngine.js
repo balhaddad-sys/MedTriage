@@ -1423,8 +1423,8 @@ const EntityRecognizer = {
 
   scoreWard(t) {
     const upper = t.toUpperCase().trim();
-    // ICU/CCU/NICU/PICU etc.
-    if (/^(?:ICU|MICU|SICU|CCU|NICU|PICU|HDU|MAU|AMU|ACU|EDW|ED|ER|OT|OR|PACU|RECOVERY)$/i.test(upper))
+    // ICU/CCU/NICU/PICU/specialty units
+    if (/^(?:ICU|MICU|SICU|CCU|NICU|PICU|HDU|MAU|AMU|ACU|EDW|ED|ER|OT|OR|PACU|RECOVERY|SCU|CSICU|CTICU|BMT|ONC|DIALYSIS|RENAL|NEURO|CARDIO|RESP|ORTHO|GI|UROL|SURG|MED)$/i.test(upper))
       return { entity: 'WARD', confidence: 0.92, corrected: upper, meta: { ward: upper } };
     if (/^(?:ER|ED)\s*\/\s*UNASSIGNED$/i.test(upper) || /^UNASSIGNED$/i.test(upper))
       return { entity: 'WARD', confidence: 0.9, corrected: upper, meta: { ward: upper } };
