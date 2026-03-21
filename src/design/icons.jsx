@@ -124,3 +124,16 @@ export const CameraIcon = (props) => <I {...props} d={<>
   <path d="M23 19a2 2 0 01-2 2H3a2 2 0 01-2-2V8a2 2 0 012-2h4l2-3h6l2 3h4a2 2 0 012 2z" />
   <circle cx="12" cy="13" r="4" />
 </>} />;
+
+export const NfcIcon = (props) => <I {...props} d={<>
+  <path d="M6 8.32a7.43 7.43 0 010 7.36" />
+  <path d="M9.46 6.21a11.76 11.76 0 010 11.58" />
+  <path d="M12.91 4.1a16.1 16.1 0 010 15.8" />
+  <path d="M16.37 2a20.43 20.43 0 010 20" />
+</>} />;
+
+export const ScanIcon = (props) => <I {...props} d={<>
+  <path d="M3 7V5a2 2 0 012-2h2" /><path d="M17 3h2a2 2 0 012 2v2" />
+  <path d="M21 17v2a2 2 0 01-2 2h-2" /><path d="M7 21H5a2 2 0 01-2-2v-2" />
+  <path d="M7 12h10" />
+</>} />;

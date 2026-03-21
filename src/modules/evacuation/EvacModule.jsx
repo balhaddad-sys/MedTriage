@@ -1,10 +1,12 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { useApp } from '../../app.jsx';
 import { colors, fonts, triageColors, evacColors } from '../../design/tokens.js';
-import { PlusIcon, SearchIcon, SettingsIcon } from '../../design/icons.jsx';
+import { PlusIcon, SearchIcon, SettingsIcon, CameraIcon, NfcIcon } from '../../design/icons.jsx';
 import PatientCard from './PatientCard.jsx';
 import QuickAdd from './QuickAdd.jsx';
 import CommandCenter from './CommandCenter.jsx';
+import OCRScanner from './OCRScanner.jsx';
+import NFCScanner from './NFCScanner.jsx';
 
 const TRIAGE_ORDER = { RED: 0, YELLOW: 1, GREEN: 2, GRAY: 3, BLACK: 4 };
 
@@ -56,6 +58,8 @@ export default function EvacModule() {
   const [triageFilter, setTriageFilter] = useState(null);
   const [showAdd, setShowAdd] = useState(false);
   const [showCommand, setShowCommand] = useState(false);
+  const [showOCR, setShowOCR] = useState(false);
+  const [showNFC, setShowNFC] = useState(false);
 
   const triageCounts = useMemo(() => {
     const counts = { RED: 0, YELLOW: 0, GREEN: 0, GRAY: 0, BLACK: 0 };
@@ -99,6 +103,18 @@ export default function EvacModule() {
             onChange={e => setSearch(e.target.value)}
           />
         </div>
+        <button onClick={() => setShowOCR(true)} style={{
+          background: colors.bg2, border: `1px solid ${colors.border}`,
+          borderRadius: '8px', padding: '10px', cursor: 'pointer',
+        }} title="Scan patient list">
+          <CameraIcon size={18} color={colors.text2} />
+        </button>
+        <button onClick={() => setShowNFC(true)} style={{
+          background: colors.bg2, border: `1px solid ${colors.border}`,
+          borderRadius: '8px', padding: '10px', cursor: 'pointer',
+        }} title="Scan Civil ID">
+          <NfcIcon size={18} color={colors.text2} />
+        </button>
         {auth?.isAdmin && (
           <button onClick={() => setShowCommand(true)} style={{
             background: colors.bg2, border: `1px solid ${colors.border}`,
@@ -156,6 +172,8 @@ export default function EvacModule() {
       {/* Modals */}
       {showAdd && <QuickAdd onClose={() => setShowAdd(false)} />}
       {showCommand && <CommandCenter onClose={() => setShowCommand(false)} />}
+      {showOCR && <OCRScanner onClose={() => setShowOCR(false)} />}
+      {showNFC && <NFCScanner onClose={() => setShowNFC(false)} />}
     </div>
   );
 }
