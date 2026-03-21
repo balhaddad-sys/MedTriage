@@ -343,12 +343,15 @@ async function scanCapacitorNfc(onResult, onError, onReading, mrzData, onProgres
 
       // If IsoDep is connected, try ICAO MRTD protocol read
       let icaoData = null;
-      if (useIsoDep && event.connected) {
+      console.log('[NFC] Tag event:', JSON.stringify({ id: event.id, hasIsoDep: event.hasIsoDep, connected: event.connected, useIsoDep }));
+      if (useIsoDep && (event.connected === true || event.connected === 'true')) {
         try {
           onProgress?.('Reading chip...');
+          console.log('[NFC] Starting ICAO read with IsoDep plugin...');
           icaoData = await attemptICAORead(isoDepPlugin, mrzData || null, onProgress, { readPhoto: true });
-        } catch {
-          // ICAO read failed — fall back to basic tag info
+          console.log('[NFC] ICAO result:', JSON.stringify(icaoData ? { detected: icaoData.icaoDetected, needsBAC: icaoData.needsBAC, groups: icaoData.availableGroups, hasMrz: !!icaoData.mrz } : null));
+        } catch (e) {
+          console.error('[NFC] ICAO read error:', e);
         }
       } else if (!useIsoDep) {
         // Capgo plugin — try ICAO (will fail since no transceive, but harmless)

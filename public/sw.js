@@ -1,4 +1,4 @@
-const CACHE_NAME = 'medevac-v3.7.0';
+const CACHE_NAME = 'medevac-v3.8.0';
 const BACKUP_CACHE = 'medevac-patient-backups';
 const OCR_MODEL_CACHE = 'medevac-ocr-models';
 
@@ -7,6 +7,16 @@ const PRECACHE_URLS = [
   '/index.html',
   '/app.js',
   '/manifest.json',
+  '/ort.mjs',
+  '/ort-wasm-simd-threaded.mjs',
+  '/ort-wasm-simd-threaded.wasm',
+  '/ort-wasm-simd-threaded.jsep.mjs',
+  '/ort-wasm-simd-threaded.jsep.wasm',
+  '/models/ocr/det.onnx',
+  '/models/ocr/latin-rec.onnx',
+  '/models/ocr/latin-dict.txt',
+  '/models/ocr/arabic-rec.onnx',
+  '/models/ocr/arabic-dict.txt',
   '/icons/icon.svg',
   '/icons/icon-192.png',
   '/icons/icon-512.png',

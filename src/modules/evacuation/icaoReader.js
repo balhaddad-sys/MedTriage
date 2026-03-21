@@ -383,7 +383,15 @@ export class ICAOReader {
 // options: { readPhoto: false } to skip DG2 for speed
 // Returns null if transceive is not available or ICAO applet is not found
 export async function attemptICAORead(nfcPlugin, mrzData, onProgress, options) {
-  if (!nfcPlugin || typeof nfcPlugin.transceive !== 'function') {
+  // Capacitor plugin methods are Proxy objects — typeof check may fail
+  // Instead, just check the plugin exists and try to call transceive
+  if (!nfcPlugin) {
+    return null;
+  }
+  // Quick check: try calling transceive to see if it exists
+  try {
+    if (!nfcPlugin.transceive) return null;
+  } catch {
     return null;
   }
 
@@ -401,11 +409,20 @@ export async function attemptICAORead(nfcPlugin, mrzData, onProgress, options) {
       // The response may be a JSArray (Capacitor bridge converts to regular array)
       const resp = result?.response;
       if (!resp) return [];
+      // Capacitor JSArray may come as: real array, object with numeric keys, or JSON string
       if (Array.isArray(resp)) return resp;
-      // JSArray-like object with numeric indices
+      if (typeof resp === 'string') {
+        try { return JSON.parse(resp); } catch { return []; }
+      }
+      // JSArray-like object with numeric indices or length property
       const arr = [];
-      for (let i = 0; resp[i] !== undefined; i++) arr.push(resp[i]);
-      return arr.length > 0 ? arr : [];
+      const len = resp.length || 0;
+      if (len > 0) {
+        for (let i = 0; i < len; i++) arr.push(Number(resp[i]) || 0);
+      } else {
+        for (let i = 0; resp[i] !== undefined && i < 1000; i++) arr.push(Number(resp[i]) || 0);
+      }
+      return arr;
     } catch {
       return [];
     }
@@ -416,7 +433,9 @@ export async function attemptICAORead(nfcPlugin, mrzData, onProgress, options) {
   try {
     // Step 1: Select MRTD applet — must be fast
     onProgress?.('Selecting MRTD applet...');
+    console.log('[ICAO] Selecting MRTD applet...');
     const selectResult = await reader.selectMRTD();
+    console.log('[ICAO] Select result:', JSON.stringify({ ok: selectResult.ok, sw: selectResult.sw?.toString(16) }));
     if (!selectResult.ok) {
       return null; // Not an ICAO-compliant document
     }
@@ -471,12 +490,19 @@ export async function attemptICAORead(nfcPlugin, mrzData, onProgress, options) {
     }
 
     // Step 6: DG2 photo is 5-15KB — only if requested and MRZ succeeded
+    // Skip photo in emergency mode for speed (readPhoto: false)
     if (readPhoto && groups.includes('DG2') && result.mrz) {
-      onProgress?.('Reading photo (hold steady)...');
+      onProgress?.('Reading photo (hold steady ~5s)...');
       try {
-        result.photo = await reader.readDG2();
+        const photoTimeout = 12000; // 12s max for photo read
+        const photoPromise = reader.readDG2();
+        const photo = await Promise.race([
+          photoPromise,
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Photo read timeout')), photoTimeout)),
+        ]);
+        result.photo = photo;
       } catch {
-        // Photo read failed — not critical, continue
+        // Photo read failed or timed out — not critical
         result.photoError = true;
       }
     }

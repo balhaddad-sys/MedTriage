@@ -1,10 +1,23 @@
 import assert from 'node:assert/strict';
+import { existsSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 // Bundle ocrEngine.js — mark paddleocr and onnxruntime-web as external
 // (we only test the analysis pipeline, not the OCR runtime)
 const { analyzeOcrWords } = await import(pathToFileURL(resolve('src/modules/evacuation/ocrEngine.js')).href);
+
+const requiredRuntimeAssets = [
+  'public/models/ocr/det.onnx',
+  'public/models/ocr/latin-rec.onnx',
+  'public/models/ocr/latin-dict.txt',
+  'public/models/ocr/arabic-rec.onnx',
+  'public/models/ocr/arabic-dict.txt',
+];
+
+for (const assetPath of requiredRuntimeAssets) {
+  assert.ok(existsSync(resolve(assetPath)), `missing packaged OCR runtime asset: ${assetPath}`);
+}
 
 function word(text, x, y, confidence = 92, width = text.length * 10) {
   return {

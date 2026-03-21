@@ -227,27 +227,33 @@ function substitutionCost(a, b) {
   return 1;
 }
 
-function ocrDistance(a, b) {
+// OCR-aware edit distance — single-row O(min(m,n)) memory with early termination
+function ocrDistance(a, b, maxDist) {
   const left = `${a || ''}`;
   const right = `${b || ''}`;
-  const m = left.length;
-  const n = right.length;
-  const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
-
-  for (let i = 0; i <= m; i++) dp[i][0] = i;
-  for (let j = 0; j <= n; j++) dp[0][j] = j;
-
-  for (let i = 1; i <= m; i++) {
-    for (let j = 1; j <= n; j++) {
-      dp[i][j] = Math.min(
-        dp[i - 1][j] + 1,
-        dp[i][j - 1] + 1,
-        dp[i - 1][j - 1] + substitutionCost(left[i - 1], right[j - 1])
+  if (left === right) return 0;
+  const m = left.length, n = right.length;
+  if (maxDist != null && Math.abs(m - n) > maxDist) return maxDist + 1;
+  // Use shorter string as inner loop
+  const [short, long, sLen, lLen] = m <= n ? [left, right, m, n] : [right, left, n, m];
+  let prev = new Float32Array(sLen + 1);
+  let curr = new Float32Array(sLen + 1);
+  for (let i = 0; i <= sLen; i++) prev[i] = i;
+  for (let j = 1; j <= lLen; j++) {
+    curr[0] = j;
+    let rowMin = j;
+    for (let i = 1; i <= sLen; i++) {
+      curr[i] = Math.min(
+        prev[i] + 1,
+        curr[i - 1] + 1,
+        prev[i - 1] + substitutionCost(short[i - 1], long[j - 1])
       );
+      if (curr[i] < rowMin) rowMin = curr[i];
     }
+    if (maxDist != null && rowMin > maxDist) return maxDist + 1;
+    [prev, curr] = [curr, prev];
   }
-
-  return dp[m][n];
+  return prev[sLen];
 }
 
 function isHeaderLike(text) {
@@ -878,11 +884,14 @@ const MedicalVocabulary = {
     'Boushehri', 'Marafi', 'Khajah', 'Al-Wazzan',
   ]),
 
-  // Single-row Levenshtein — O(min(m,n)) memory instead of O(m*n)
-  levenshtein(a, b) {
+  // Single-row Levenshtein with early termination — O(min(m,n)) memory
+  // maxDist: if provided, returns maxDist+1 early when distance exceeds threshold
+  levenshtein(a, b, maxDist) {
     if (a === b) return 0;
     if (a.length === 0) return b.length;
     if (b.length === 0) return a.length;
+    const lenDiff = Math.abs(a.length - b.length);
+    if (maxDist != null && lenDiff > maxDist) return maxDist + 1;
     // Ensure a is the shorter string for memory efficiency
     if (a.length > b.length) { const t = a; a = b; b = t; }
     const m = a.length, n = b.length;
@@ -891,13 +900,17 @@ const MedicalVocabulary = {
     for (let i = 0; i <= m; i++) prev[i] = i;
     for (let j = 1; j <= n; j++) {
       curr[0] = j;
+      let rowMin = j;
       for (let i = 1; i <= m; i++) {
         curr[i] = Math.min(
           prev[i] + 1,
           curr[i - 1] + 1,
           prev[i - 1] + (a[i - 1] !== b[j - 1] ? 1 : 0)
         );
+        if (curr[i] < rowMin) rowMin = curr[i];
       }
+      // Early termination: if every cell in this row exceeds maxDist, no solution
+      if (maxDist != null && rowMin > maxDist) return maxDist + 1;
       [prev, curr] = [curr, prev];
     }
     return prev[m];
@@ -916,12 +929,14 @@ const MedicalVocabulary = {
     }
 
     let bestMatch = null, bestDistance = Infinity;
+    const cutoff = Math.min(maxDistance, bestDistance - 1);
     for (const term of Object.keys(this.MEDICAL_TERMS)) {
       const termKey = stripForLexicon(term);
-      const dist = Math.min(...variants.map(variant => ocrDistance(variant, termKey)));
+      const dist = Math.min(...variants.map(variant => ocrDistance(variant, termKey, bestDistance < Infinity ? bestDistance : maxDistance)));
       if (dist < bestDistance && dist <= maxDistance) {
         bestDistance = dist;
         bestMatch = term;
+        if (bestDistance === 0) break;
       }
     }
     if (bestMatch) {
@@ -944,10 +959,11 @@ const MedicalVocabulary = {
     let bestMatch = null, bestDistance = Infinity;
     for (const med of this.MEDICATIONS) {
       const medKey = stripForLexicon(med);
-      const dist = Math.min(...variants.map(variant => ocrDistance(variant, medKey)));
+      const dist = Math.min(...variants.map(variant => ocrDistance(variant, medKey, bestDistance < Infinity ? bestDistance : maxDistance)));
       if (dist < bestDistance && dist <= maxDistance) {
         bestDistance = dist;
         bestMatch = med;
+        if (bestDistance === 0) break;
       }
     }
     if (bestMatch) {
@@ -2194,19 +2210,24 @@ import * as ort from 'onnxruntime-web';
 const MODEL_URLS = {
   detection: {
     key: 'det-v3',
-    url: 'https://huggingface.co/monkt/paddleocr-onnx/resolve/main/detection/v3/det.onnx',
+    url: '/models/ocr/det.onnx',
+    fallbackUrl: 'https://huggingface.co/monkt/paddleocr-onnx/resolve/main/detection/v3/det.onnx',
   },
   latin: {
     key: 'latin-rec',
-    url: 'https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/english/rec.onnx',
+    url: '/models/ocr/latin-rec.onnx',
+    fallbackUrl: 'https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/english/rec.onnx',
     dictKey: 'latin-dict',
-    dictUrl: 'https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/english/dict.txt',
+    dictUrl: '/models/ocr/latin-dict.txt',
+    dictFallbackUrl: 'https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/english/dict.txt',
   },
   arabic: {
     key: 'arabic-rec',
-    url: 'https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/arabic/rec.onnx',
+    url: '/models/ocr/arabic-rec.onnx',
+    fallbackUrl: 'https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/arabic/rec.onnx',
     dictKey: 'arabic-dict',
-    dictUrl: 'https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/arabic/dict.txt',
+    dictUrl: '/models/ocr/arabic-dict.txt',
+    dictFallbackUrl: 'https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/arabic/dict.txt',
   },
 };
 
@@ -2250,17 +2271,34 @@ async function setCachedModel(key, data) {
   } catch { /* cache write failure is non-fatal */ }
 }
 
-async function fetchModelWithCache(url, key, onProgress) {
+async function fetchModelWithCache(asset, onProgress) {
+  const { key, url, fallbackUrl } = asset;
   const cached = await getCachedModel(key);
   if (cached) return cached;
 
-  onProgress?.(`Downloading ${key} model...`);
-  const response = await fetch(url);
-  if (!response.ok) throw new Error(`Failed to fetch ${key}: ${response.status}`);
+  const sources = [
+    { label: 'packaged', url },
+    ...(fallbackUrl ? [{ label: 'remote', url: fallbackUrl }] : []),
+  ];
+  let lastError = null;
 
-  const data = key.endsWith('dict') ? await response.text() : await response.arrayBuffer();
-  await setCachedModel(key, data);
-  return data;
+  for (const source of sources) {
+    try {
+      onProgress?.(`Loading ${key} (${source.label})...`);
+      const response = await fetch(source.url);
+      if (!response.ok) throw new Error(`Failed to fetch ${key} from ${source.label}: ${response.status}`);
+
+      const data = key.endsWith('dict') ? await response.text() : await response.arrayBuffer();
+      await setCachedModel(key, data);
+      return data;
+    } catch (error) {
+      lastError = error;
+    }
+  }
+
+  throw new Error(
+    `Unable to load OCR asset "${key}". ${lastError?.message || 'No asset source succeeded.'}`
+  );
 }
 
 function parseDictionary(data) {
@@ -2310,11 +2348,27 @@ async function initContextOCR(onProgress) {
       arabicBuffer,
       arabicDictRaw,
     ] = await Promise.all([
-      fetchModelWithCache(MODEL_URLS.detection.url, MODEL_URLS.detection.key, onProgress),
-      fetchModelWithCache(MODEL_URLS.latin.url, MODEL_URLS.latin.key, onProgress),
-      fetchModelWithCache(MODEL_URLS.latin.dictUrl, MODEL_URLS.latin.dictKey, onProgress),
-      fetchModelWithCache(MODEL_URLS.arabic.url, MODEL_URLS.arabic.key, onProgress),
-      fetchModelWithCache(MODEL_URLS.arabic.dictUrl, MODEL_URLS.arabic.dictKey, onProgress),
+      fetchModelWithCache(MODEL_URLS.detection, onProgress),
+      fetchModelWithCache({
+        key: MODEL_URLS.latin.key,
+        url: MODEL_URLS.latin.url,
+        fallbackUrl: MODEL_URLS.latin.fallbackUrl,
+      }, onProgress),
+      fetchModelWithCache({
+        key: MODEL_URLS.latin.dictKey,
+        url: MODEL_URLS.latin.dictUrl,
+        fallbackUrl: MODEL_URLS.latin.dictFallbackUrl,
+      }, onProgress),
+      fetchModelWithCache({
+        key: MODEL_URLS.arabic.key,
+        url: MODEL_URLS.arabic.url,
+        fallbackUrl: MODEL_URLS.arabic.fallbackUrl,
+      }, onProgress),
+      fetchModelWithCache({
+        key: MODEL_URLS.arabic.dictKey,
+        url: MODEL_URLS.arabic.dictUrl,
+        fallbackUrl: MODEL_URLS.arabic.dictFallbackUrl,
+      }, onProgress),
     ]);
 
     onProgress?.('Initializing OCR engine...');
