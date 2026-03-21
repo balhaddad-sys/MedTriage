@@ -6,10 +6,7 @@
 const ImagePreprocessor = {
   async prepareVariants(imageSource) {
     const baseCanvas = await this.process(imageSource);
-    return OCR_PROFILES.map(profile => ({
-      ...profile,
-      canvas: this.applyProfile(baseCanvas, profile.id),
-    }));
+    return this.buildVariants(baseCanvas);
   },
 
   async process(imageSource) {
@@ -17,8 +14,8 @@ const ImagePreprocessor = {
     const ctx = canvas.getContext('2d');
     const img = await this.loadImage(imageSource);
 
-    // Downscale large images for performance (max 2200px on longest side)
-    const maxDim = 2200;
+    // Downscale large images for performance (max 1600px — faster inference, still accurate)
+    const maxDim = 1600;
     let w = img.width, h = img.height;
     if (w > maxDim || h > maxDim) {
       const scale = maxDim / Math.max(w, h);
@@ -37,6 +34,34 @@ const ImagePreprocessor = {
     canvas.width = source.width;
     canvas.height = source.height;
     canvas.getContext('2d').drawImage(source, 0, 0);
+    return canvas;
+  },
+
+  buildVariants(baseCanvas, profiles = OCR_PROFILES) {
+    return profiles.map(profile => ({
+      ...profile,
+      canvas: this.applyProfile(baseCanvas, profile.id),
+    }));
+  },
+
+  buildRescueVariants(baseCanvas) {
+    return [
+      { id: 'sharpened', label: 'Sharpened rescue', canvas: this.applyProfile(baseCanvas, 'sharpened') },
+      { id: 'balanced-rotate-left', label: 'Rotate left rescue', canvas: this.applyProfile(this.rotateCanvas(baseCanvas, -90), 'balanced') },
+      { id: 'balanced-rotate-right', label: 'Rotate right rescue', canvas: this.applyProfile(this.rotateCanvas(baseCanvas, 90), 'balanced') },
+    ];
+  },
+
+  rotateCanvas(source, degrees) {
+    const radians = degrees * Math.PI / 180;
+    const vertical = Math.abs(degrees) % 180 === 90;
+    const canvas = document.createElement('canvas');
+    canvas.width = vertical ? source.height : source.width;
+    canvas.height = vertical ? source.width : source.height;
+    const ctx = canvas.getContext('2d');
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    ctx.rotate(radians);
+    ctx.drawImage(source, -source.width / 2, -source.height / 2);
     return canvas;
   },
 
@@ -80,6 +105,8 @@ const ImagePreprocessor = {
 
     if (profileId === 'balanced') {
       this.paintGray(imageData, gray, value => ((value - mean) * 1.45) + 150);
+    } else if (profileId === 'sharpened') {
+      this.paintGray(imageData, gray, value => ((value - mean) * 1.9) + 150);
     } else {
       const threshold = Math.max(82, Math.min(190, mean - (stdev * 0.2)));
       this.paintGray(imageData, gray, value => {
@@ -125,6 +152,7 @@ const ImagePreprocessor = {
   },
 };
 
+// Single pass by default — only retry with cleanup if source quality is poor
 const OCR_PROFILES = [
   { id: 'source', label: 'Source image' },
   { id: 'balanced', label: 'Balanced cleanup' },
@@ -1787,7 +1815,7 @@ async function createScriptService(detBuffer, modelBuffer, dictionary, isSeconda
     detection: {
       // Second service needs its own copy of the buffer (ONNX takes ownership)
       modelBuffer: isSecondary ? detBuffer.slice(0) : detBuffer,
-      maxSideLength: 1920,
+      maxSideLength: 1280,
       textPixelThreshold: 0.5,
       minimumAreaThreshold: 16,
       paddingBoxVertical: 0.35,
@@ -1924,10 +1952,11 @@ function fuseRecognitionResults(latinResults, arabicResults) {
 
 function shouldRunArabicAugment(candidate) {
   if (!candidate) return true;
-  if ((candidate.qualityScore || 0) < 0.82) return true;
+  // Only run Arabic rescue if Latin quality is genuinely poor
+  if ((candidate.qualityScore || 0) >= 0.78 && candidate.patients.length > 0) return false;
   return candidate.patients.some(patient =>
     (!patient.fullName && (patient.bed || patient.dx || patient.civilId)) ||
-    ((patient.fieldConfidence?.fullName || 0) < 0.52 && !!patient.fullName)
+    ((patient.fieldConfidence?.fullName || 0) < 0.45 && !!patient.fullName)
   );
 }
 
@@ -2080,6 +2109,42 @@ function pickBestCandidate(candidates) {
   })[0];
 }
 
+function fuseCandidatePasses(candidates) {
+  const best = pickBestCandidate(candidates);
+  if (!best) return null;
+
+  let mergedPatients = [...best.patients];
+  let supportCount = 1;
+
+  for (const candidate of candidates) {
+    if (candidate === best) continue;
+    if ((candidate.qualityScore || 0) < Math.max(0.64, (best.qualityScore || 0) - 0.12)) continue;
+    supportCount++;
+
+    for (const patient of candidate.patients) {
+      const index = mergedPatients.findIndex(existing => shouldMerge(existing, patient));
+      if (index === -1) {
+        if ((patient.confidence || 0) >= 0.84) mergedPatients.push(patient);
+        continue;
+      }
+      mergedPatients[index] = mergePatients(mergedPatients[index], patient);
+    }
+  }
+
+  const finalizedPatients = finalizePatients(deduplicatePatients(mergedPatients));
+  const reviewCount = finalizedPatients.filter(patient => patient.reviewLevel !== 'READY').length;
+  const consensusScore = clamp((best.qualityScore || 0) + (Math.min(supportCount, 3) - 1) * 0.02);
+
+  return {
+    ...best,
+    patients: finalizedPatients,
+    reviewCount,
+    qualityScore: consensusScore,
+    qualityBand: confidenceBand(consensusScore),
+    consensusPasses: supportCount,
+  };
+}
+
 // ====== MAIN EXPORT ======
 export async function processPatientListImage(imageSource, onProgress) {
   const startTime = performance.now();
@@ -2125,9 +2190,9 @@ export async function processPatientListImage(imageSource, onProgress) {
     }
     candidates.push(candidate);
 
-    // Early exit if quality is good enough
-    const reviewThreshold = Math.ceil(Math.max(candidate.patients.length, 1) * 0.4);
-    if (candidate.patients.length > 0 && candidate.qualityScore >= 0.86 && candidate.reviewCount <= reviewThreshold) {
+    // Early exit after first pass if quality is acceptable — skip retries for speed
+    const reviewThreshold = Math.ceil(Math.max(candidate.patients.length, 1) * 0.5);
+    if (candidate.patients.length > 0 && candidate.qualityScore >= 0.72 && candidate.reviewCount <= reviewThreshold) {
       break;
     }
   }
