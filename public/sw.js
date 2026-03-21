@@ -1,4 +1,4 @@
-const CACHE_NAME = 'medevac-v3.4.0';
+const CACHE_NAME = 'medevac-v3.5.0';
 const BACKUP_CACHE = 'medevac-patient-backups';
 
 const PRECACHE_URLS = [
@@ -48,24 +48,44 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  event.respondWith(
-    caches.match(request).then((cached) => {
-      if (cached) return cached;
-      return fetch(request).then((response) => {
+  // Network-first for HTML and JS (always get latest code)
+  // Cache-first for static assets (icons, fonts)
+  const isAppCode = url.pathname.endsWith('.html') ||
+    url.pathname.endsWith('.js') ||
+    url.pathname === '/';
+
+  if (isAppCode) {
+    // Network-first: try fresh, fall back to cache
+    event.respondWith(
+      fetch(request).then((response) => {
         if (response.ok) {
           const clone = response.clone();
           caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
         }
         return response;
       }).catch(() => {
-        // Offline fallback for navigation
-        if (request.mode === 'navigate') {
-          return caches.match('/index.html');
-        }
-        return new Response('Offline', { status: 503 });
-      });
-    })
-  );
+        return caches.match(request).then((cached) => {
+          if (cached) return cached;
+          if (request.mode === 'navigate') return caches.match('/index.html');
+          return new Response('Offline', { status: 503 });
+        });
+      })
+    );
+  } else {
+    // Cache-first for static assets (icons, fonts, images)
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return fetch(request).then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        }).catch(() => new Response('Offline', { status: 503 }));
+      })
+    );
+  }
 });
 
 // Listen for patient data backup messages from the app
