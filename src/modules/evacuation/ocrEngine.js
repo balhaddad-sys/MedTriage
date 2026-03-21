@@ -1510,7 +1510,28 @@ const EntityRecognizer = {
       return { entity: 'DIAGNOSIS', confidence: 0 };
     }
     const match = MedicalVocabulary.correctTerm(upper, 1);
-    if (!match) return { entity: 'DIAGNOSIS', confidence: 0 };
+    if (!match) {
+      const tokens = `${rawText || ''}`
+        .split(/[\s,;/]+/)
+        .map(token => token.trim())
+        .filter(Boolean);
+      const tokenMatches = tokens
+        .map(token => MedicalVocabulary.correctTerm(token.toUpperCase(), 1))
+        .filter(Boolean);
+      if (tokenMatches.length === 0) return { entity: 'DIAGNOSIS', confidence: 0 };
+
+      const corrected = tokens.map(token => {
+        const tokenMatch = MedicalVocabulary.correctTerm(token.toUpperCase(), 1);
+        return tokenMatch?.term || token;
+      }).join(' ');
+      const confidence = clamp(0.52 + (average(tokenMatches.map(tokenMatch => tokenMatch.confidence), 0.55) * 0.28) + (Math.min(tokenMatches.length, 3) * 0.05));
+      return {
+        entity: 'DIAGNOSIS',
+        confidence,
+        corrected,
+        meta: tokenMatches[0]?.info || {},
+      };
+    }
     return {
       entity: 'DIAGNOSIS',
       confidence: 0.6 + match.confidence * 0.4,
@@ -1678,6 +1699,9 @@ const SpatialClusterer = {
       if (row.entities.some(entity => entity.entity === 'AGE_GENDER')) score += 1;
       if (row.entities.some(entity => entity.entity === 'AGE')) score += 0.3;
       if (row.entities.some(entity => entity.entity === 'GENDER')) score += 0.2;
+      if (hasPotentialNameAnchor(row.entities)) score += 0.9;
+      if (row.entities.some(entity => resolveAssemblyEntityType(entity) === 'DIAGNOSIS')) score += 0.2;
+      if (row.entities.some(entity => ['ASSIGNED_DOCTOR', 'SHEET_STATUS'].includes(resolveAssemblyEntityType(entity)))) score += 0.12;
       return score;
     };
 
@@ -1810,7 +1834,31 @@ const PatientAssembler = {
     }
 
     // Resolve unknowns by spatial proximity
+    const clusterMinX = Math.min(...cluster.map(entity => entity.box.x));
+    const clusterMaxX = Math.max(...cluster.map(entity => entity.box.x + entity.box.w));
+    const clusterSpan = Math.max(1, clusterMaxX - clusterMinX);
+    const clinicalBoundary = Math.min(
+      ...cluster
+        .filter(entity => ['DIAGNOSIS', 'MEDICATION', 'ASSIGNED_DOCTOR', 'SHEET_STATUS', 'STATUS', 'O2', 'ISOLATION'].includes(resolveAssemblyEntityType(entity)))
+        .map(entity => entity.box.x),
+      Infinity
+    );
+    const likelyNameBoundary = Number.isFinite(clinicalBoundary)
+      ? (clinicalBoundary - 10)
+      : (clusterMinX + (clusterSpan * 0.48));
+    const likelyDoctorBoundary = clusterMinX + (clusterSpan * 0.62);
+
     for (const unk of unknowns) {
+      const likelyNameScore = scoreLikelyNameText(unk.corrected || unk.text);
+      if (likelyNameScore >= 0.72 && unk.box.cx <= likelyNameBoundary) {
+        names.push({ ...unk, entity: 'NAME', confidence: Math.max(unk.confidence, likelyNameScore) });
+        continue;
+      }
+      if (likelyNameScore >= 0.76 && names.length > 0 && unk.box.cx >= likelyDoctorBoundary) {
+        assignedDoctors.push({ ...unk, entity: 'ASSIGNED_DOCTOR', confidence: Math.max(unk.confidence, likelyNameScore) });
+        continue;
+      }
+
       const nearName = this.findNearest(unk, cluster.filter(e => e.entity === 'NAME'));
       const nearDx = this.findNearest(unk, cluster.filter(e => e.entity === 'DIAGNOSIS'));
 
@@ -2117,6 +2165,61 @@ function filterMeaningfulEntities(entities) {
   return entities.filter(entity => entity.entity !== 'NOISE' && entity.entity !== 'HEADER');
 }
 
+function scoreLikelyNameText(text) {
+  const raw = `${text || ''}`.trim();
+  if (!raw || raw.length < 2 || /\d/.test(raw) || isHeaderLike(raw)) return 0;
+  if (EntityRecognizer.scoreWard(raw).confidence > 0.72) return 0;
+  if (EntityRecognizer.scoreSheetStatus(raw).confidence > 0.76) return 0;
+  if (EntityRecognizer.scoreStatus(raw.toUpperCase()).confidence > 0.82) return 0;
+  if (EntityRecognizer.scoreO2(raw).confidence > 0.82) return 0;
+  if (EntityRecognizer.scoreIsolation(raw.toUpperCase()).confidence > 0.82) return 0;
+
+  const words = raw.split(/\s+/).filter(Boolean);
+  if (words.length === 0 || words.length > 4) return 0;
+  const normalizedWords = words
+    .map(word => word.replace(/^[?.]+|[.,;:!?]+$/g, ''))
+    .filter(Boolean);
+  if (normalizedWords.length !== words.length) return 0;
+  if (!normalizedWords.every(word => /^[A-Za-z\u0600-\u06FF][A-Za-z\u0600-\u06FF'’`-]*$/.test(word))) return 0;
+
+  const fullMatch = MedicalVocabulary.lookupName(raw)?.confidence || 0;
+  const tokenMatch = Math.max(...normalizedWords.map(word => MedicalVocabulary.lookupName(word)?.confidence || 0), 0);
+  const lexiconConfidence = Math.max(fullMatch, tokenMatch);
+
+  const clinicalHits = normalizedWords.filter(word =>
+    MedicalVocabulary.correctTerm(word, 1) ||
+    MedicalVocabulary.correctMedication(word, 1) ||
+    EntityRecognizer.scoreWard(word).confidence > 0.72 ||
+    EntityRecognizer.scoreSheetStatus(word).confidence > 0.76
+  ).length;
+  if (clinicalHits >= Math.max(1, Math.ceil(normalizedWords.length / 2)) && lexiconConfidence < 0.7) return 0;
+
+  if (lexiconConfidence >= 0.9) return normalizedWords.length >= 2 ? 0.95 : 0.84;
+  if (lexiconConfidence >= 0.78) return normalizedWords.length >= 2 ? 0.88 : 0.78;
+  if (/[\u0600-\u06FF]/.test(raw)) return normalizedWords.length >= 2 ? 0.82 : 0.68;
+  if (normalizedWords.length >= 2 && normalizedWords.every(word => /^[A-Za-z][A-Za-z'’-]{1,}$/.test(word))) {
+    const capitalized = normalizedWords.filter(word => /^[A-Z]/.test(word)).length;
+    if (capitalized >= 1 || normalizedWords.every(word => /^[a-z]/.test(word))) return 0.66;
+  }
+  if (normalizedWords.length === 1 && (/^[A-Z][a-z]{2,20}$/.test(raw) || /^[a-z]{3,20}$/.test(raw))) return 0.52;
+  return 0;
+}
+
+function hasPotentialNameAnchor(entities) {
+  if (!entities.length) return false;
+  const minX = Math.min(...entities.map(entity => entity.box.x));
+  const maxX = Math.max(...entities.map(entity => entity.box.x + entity.box.w));
+  const span = Math.max(1, maxX - minX);
+
+  return entities.some(entity => {
+    const assemblyEntity = resolveAssemblyEntityType(entity);
+    if (assemblyEntity === 'NAME' || entity.meta?.columnRole === 'NAME') return true;
+    const likelyNameScore = scoreLikelyNameText(entity.corrected || entity.text);
+    if (likelyNameScore < 0.72) return false;
+    return ((entity.box.cx - minX) / span) <= 0.48;
+  });
+}
+
 function rowIdentityScore(entities) {
   let score = 0;
   if (entities.some(entity => entity.entity === 'BED')) score += 1.2;
@@ -2125,6 +2228,9 @@ function rowIdentityScore(entities) {
   if (entities.some(entity => entity.entity === 'AGE')) score += 0.3;
   if (entities.some(entity => entity.entity === 'GENDER')) score += 0.25;
   if (entities.some(entity => entity.entity === 'CIVIL_ID')) score += 0.6;
+  if (hasPotentialNameAnchor(entities)) score += 0.95;
+  if (entities.some(entity => resolveAssemblyEntityType(entity) === 'DIAGNOSIS')) score += 0.2;
+  if (entities.some(entity => ['ASSIGNED_DOCTOR', 'SHEET_STATUS'].includes(resolveAssemblyEntityType(entity)))) score += 0.12;
   return score;
 }
 
@@ -2420,13 +2526,35 @@ function inferColumnsFromRows(rows, imageWidth) {
     current.centerX = average(current.entities.map(item => item.box.cx), current.centerX);
   }
 
-  return bands
+  const inferred = bands
     .map(band => {
       const roleWeights = new Map();
       band.entities.forEach(entity => {
         const role = mapEntityToColumnRole(entity.entity);
-        if (!role) return;
-        roleWeights.set(role, (roleWeights.get(role) || 0) + Math.max(entity.confidence || 0, 0.2));
+        if (role) {
+          roleWeights.set(role, (roleWeights.get(role) || 0) + Math.max(entity.confidence || 0, 0.2));
+        }
+
+        const text = entity.corrected || entity.text || '';
+        const likelyNameScore = scoreLikelyNameText(text);
+        if (likelyNameScore >= 0.6) {
+          roleWeights.set('NAME', (roleWeights.get('NAME') || 0) + likelyNameScore);
+        }
+
+        const sheetStatusScore = EntityRecognizer.scoreSheetStatus(text).confidence || 0;
+        if (sheetStatusScore >= 0.72) {
+          roleWeights.set('SHEET_STATUS', (roleWeights.get('SHEET_STATUS') || 0) + sheetStatusScore);
+        }
+
+        const wardScore = EntityRecognizer.scoreWard(text).confidence || 0;
+        if (wardScore >= 0.72) {
+          roleWeights.set('WARD', (roleWeights.get('WARD') || 0) + wardScore);
+        }
+
+        const diagnosisScore = EntityRecognizer.scoreDiagnosis(text).confidence || 0;
+        if (diagnosisScore >= 0.5) {
+          roleWeights.set('DIAGNOSIS', (roleWeights.get('DIAGNOSIS') || 0) + diagnosisScore);
+        }
       });
 
       const rankedRoles = [...roleWeights.entries()].sort((a, b) => b[1] - a[1]);
@@ -2451,6 +2579,18 @@ function inferColumnsFromRows(rows, imageWidth) {
     })
     .filter(Boolean)
     .sort((a, b) => a.centerX - b.centerX);
+
+  const nameColumns = inferred.filter(column => column.role === 'NAME');
+  if (nameColumns.length > 1) {
+    const primaryName = nameColumns[0];
+    nameColumns.slice(1).forEach(column => {
+      if (column.centerX > (primaryName.centerX + Math.max(90, imageWidth * 0.14))) {
+        column.role = 'ASSIGNED_DOCTOR';
+      }
+    });
+  }
+
+  return inferred;
 }
 
 function normalizeStructuredColumns(columns) {
@@ -3285,6 +3425,10 @@ export function analyzeOcrWords(words, imageWidth, imageHeight) {
   // 3. Classify every detection as an entity type
   const entities = split.map(detection => EntityRecognizer.classify(detection));
   const entityCount = entities.filter(entity => entity.entity !== 'NOISE' && entity.entity !== 'HEADER').length;
+  console.log(`[OCR] Entities: ${entityCount} meaningful out of ${entities.length} total`);
+  entities.filter(e => e.entity !== 'NOISE').slice(0, 15).forEach(e =>
+    console.log(`[OCR]   "${e.text}" → ${e.entity} (conf=${e.confidence.toFixed(2)})`)
+  );
   const evaluatedHypotheses = LayoutHypothesisEngine
     .build(entities, imageWidth, imageHeight)
     .map(hypothesis => LayoutHypothesisEngine.evaluate(hypothesis));
@@ -3298,6 +3442,9 @@ export function analyzeOcrWords(words, imageWidth, imageHeight) {
     ((finalized.filter(patient => patient.reviewLevel === 'READY').length / Math.max(finalized.length, 1)) * 0.2) +
     (scoreTextDensity(finalized.map(patient => [patient.fullName, patient.bed, patient.dx].filter(Boolean).join(' ')).join(' ')) * 0.18)
   );
+  console.log(`[OCR] Final: ${finalized.length} patients, strategy=${bestHypothesis?.id || 'none'}, score=${analysisScore.toFixed(2)}`);
+  finalized.forEach((p, i) => console.log(`[OCR]   Patient ${i+1}: "${p.fullName || '?'}" bed=${p.bed || '?'} age=${p.age ?? '?'} dx=${p.dx || '?'} conf=${(p.confidence || 0).toFixed(2)} review=${p.reviewLevel}`));
+
   return {
     patients: finalized,
     entityCount,
@@ -3443,7 +3590,13 @@ export async function processPatientListImage(imageSource, onProgress) {
     onProgress?.(`Recognizing text (${variant.label}, pass ${i + 1}/${variants.length}, latin)...`);
 
     const input = canvasToImageInput(variant.canvas);
+    console.log(`[OCR] Input: ${input.width}x${input.height}, ${input.data.length} bytes (${input.data.length / (input.width * input.height)} channels)`);
     const latinResults = await runtime.latin.recognize(input);
+    console.log(`[OCR] Latin results: ${latinResults.length} detections`);
+    if (latinResults.length > 0) {
+      latinResults.slice(0, 10).forEach((r, i) => console.log(`[OCR]   ${i}: "${r.text}" conf=${r.confidence?.toFixed(2)} box=${JSON.stringify(r.box)}`));
+      if (latinResults.length > 10) console.log(`[OCR]   ... and ${latinResults.length - 10} more`);
+    }
 
     onProgress?.(`Analyzing patient structure (${variant.label})...`);
     let candidate = buildPassCandidate(latinResults, variant.canvas, variant.id, {
