@@ -968,33 +968,77 @@ const MedicalVocabulary = {
     '\u062F\u064A\u0645\u0629', '\u0643\u0648\u062B\u0631', '\u0633\u062C\u0649', '\u0631\u0646\u064A\u0645',
     '\u0645\u0647\u0627', '\u0644\u0645\u064A\u0627\u0621', '\u0634\u064A\u0645\u0627\u0621', '\u062D\u0646\u064A\u0646',
     '\u0639\u0646\u0648\u062F', '\u0634\u0631\u064A\u0641\u0629', '\u0645\u0636\u0627\u0648\u064A',
-    // Transliterated — common in English records
-    'Ahmed', 'Mohammad', 'Mohammed', 'Abdullah', 'Khaled', 'Khalid',
-    'Abdulrahman', 'Fahad', 'Fahd', 'Saud', 'Bader', 'Badr',
-    'Yousef', 'Yousuf', 'Ali', 'Hussein', 'Hussain', 'Hassan',
-    'Omar', 'Ibrahim', 'Salman', 'Nasser', 'Nassir',
-    'Jaber', 'Sabah', 'Mubarak', 'Talal', 'Faisal', 'Faysal',
-    'Salem', 'Mishari', 'Meshaal', 'Abdulaziz', 'Nawaf',
-    'Turki', 'Saad', 'Majed', 'Majid', 'Waleed', 'Walid',
-    'Hani', 'Rashed', 'Rashid', 'Mansour', 'Mansoor',
-    'Hamad', 'Hamoud', 'Jasem', 'Jassim', 'Jassem',
-    'Anwar', 'Adel', 'Abdulhadi', 'Abdullatif', 'Abdulkarim',
-    'Abdulwahab', 'Tareq', 'Tarek', 'Zaid', 'Zayed',
-    'Barak', 'Musaed', 'Essa', 'Isa', 'Khalifa',
-    'Anas', 'Ziad', 'Mazen', 'Basel', 'Basil',
-    'Hamed', 'Maher', 'Hesham', 'Hisham', 'Osama',
-    'Marwan', 'Ghanem', 'Mohsen', 'Aqeel', 'Rida',
-    'Abbas', 'Jaafar', 'Mahdi', 'Murtada', 'Kazem',
-    'Mustafa', 'Emad', 'Khalil', 'Sami', 'Rami',
-    'Fatima', 'Fatma', 'Noura', 'Nora', 'Mariam', 'Maryam',
-    'Sara', 'Sarah', 'Haya', 'Dalal', 'Muneera', 'Munira',
-    'Aisha', 'Aysha', 'Reem', 'Dana', 'Lulwa', 'Lulu',
-    'Latifa', 'Sheikha', 'Badria', 'Jawaher', 'Jawahir',
-    'Amal', 'Hind', 'Manal', 'Nawal', 'Samira',
-    'Nadia', 'Alia', 'Salwa', 'Haifa', 'Zainab',
-    'Ruqayya', 'Khadija', 'Mona', 'Hessa', 'Abeer',
-    'Ghada', 'Shahd', 'Sadeem', 'Malak', 'Tala',
-    'Layan', 'Yara', 'Jouri', 'Razan', 'Nouf',
+    // Transliterated male — all common spelling variants OCR produces
+    'Ahmed', 'Ahmad', 'Mohammad', 'Mohammed', 'Muhammad', 'Muhammed',
+    'Abdullah', 'Abdallah', 'Abdulla', 'Khaled', 'Khalid', 'Khaleid',
+    'Abdulrahman', 'Abdul Rahman', 'Abdulrhman', 'Abdelrahman',
+    'Fahad', 'Fahd', 'Saud', 'Saoud', 'Bader', 'Badr', 'Bedir',
+    'Yousef', 'Yousuf', 'Yousif', 'Yosef', 'Joseph',
+    'Ali', 'Aly', 'Hussein', 'Hussain', 'Husain', 'Hassan', 'Hasan',
+    'Omar', 'Omer', 'Ibrahim', 'Ibraheem', 'Ebrahim',
+    'Salman', 'Selman', 'Nasser', 'Nassir', 'Nasir', 'Nasr',
+    'Jaber', 'Jabir', 'Sabah', 'Mubarak', 'Mobarak',
+    'Talal', 'Faisal', 'Faysal', 'Fayez', 'Fawaz', 'Fawwaz',
+    'Salem', 'Salim', 'Mishari', 'Meshaal', 'Meshal', 'Mishaal',
+    'Abdulaziz', 'Abdul Aziz', 'Abdelaziz', 'Nawaf', 'Nowaf',
+    'Turki', 'Torki', 'Saad', 'Saeed', 'Said',
+    'Majed', 'Majid', 'Maajid', 'Waleed', 'Walid', 'Wael',
+    'Hani', 'Hany', 'Rashed', 'Rashid', 'Rasheed',
+    'Mansour', 'Mansoor', 'Mansor',
+    'Hamad', 'Hammad', 'Hamoud', 'Hammoud',
+    'Jasem', 'Jassim', 'Jassem', 'Qasem', 'Qassim',
+    'Anwar', 'Anwer', 'Adel', 'Adil',
+    'Abdulhadi', 'Abdullatif', 'Abdulkarim', 'Abdulwahab',
+    'Tareq', 'Tarek', 'Tariq', 'Zaid', 'Zayed', 'Zayd',
+    'Barak', 'Barrak', 'Musaed', 'Musaid',
+    'Essa', 'Isa', 'Eisa', 'Khalifa', 'Khaleefa',
+    'Anas', 'Ziad', 'Ziyad', 'Mazen', 'Mazin',
+    'Basel', 'Basil', 'Basim', 'Bassam',
+    'Hamed', 'Hameed', 'Maher', 'Mahir',
+    'Hesham', 'Hisham', 'Hisam', 'Osama', 'Usama',
+    'Marwan', 'Merwan', 'Ghanem', 'Ghannam',
+    'Mohsen', 'Muhsin', 'Aqeel', 'Akeel', 'Aqil',
+    'Rida', 'Ridha', 'Reza', 'Abbas', 'Abas',
+    'Jaafar', 'Jafar', 'Jafaar', 'Mahdi', 'Mehdi',
+    'Murtada', 'Murtadha', 'Kazem', 'Kazim', 'Kadhim',
+    'Mustafa', 'Mostafa', 'Emad', 'Imad', 'Khalil', 'Jalil',
+    'Sami', 'Sameer', 'Samir', 'Rami', 'Ramy',
+    'Jamal', 'Jamaal', 'Saleh', 'Salah', 'Zahra', 'Zahrah',
+    'Raju', 'Rojelo', 'Abdolmohsen',
+    'Sultan', 'Soltan', 'Nayef', 'Nayif', 'Naif',
+    'Yaser', 'Yasir', 'Yasin', 'Yaseen',
+    'Dawood', 'Dawoud', 'Daud', 'Yaqoub', 'Yacoub',
+    'Ismail', 'Ismael', 'Esmail',
+    // Transliterated female — all common spelling variants
+    'Fatima', 'Fatma', 'Fathima', 'Fatimah',
+    'Noura', 'Nora', 'Noorah', 'Norah',
+    'Mariam', 'Maryam', 'Miriam', 'Marian',
+    'Sara', 'Sarah', 'Saara', 'Haya', 'Hayat',
+    'Dalal', 'Dallal', 'Muneera', 'Munira', 'Monira',
+    'Aisha', 'Aysha', 'Aaisha', 'Aishah',
+    'Reem', 'Reema', 'Rima', 'Dana', 'Danah',
+    'Lulwa', 'Lulu', 'Lulwah', 'Latifa', 'Lateefa',
+    'Sheikha', 'Shaikha', 'Badria', 'Badriya',
+    'Jawaher', 'Jawahir', 'Jowaher',
+    'Amal', 'Amaal', 'Hind', 'Hend', 'Manal', 'Manel',
+    'Nawal', 'Nawaal', 'Samira', 'Sameera',
+    'Nadia', 'Nadya', 'Alia', 'Aaliya', 'Alya',
+    'Salwa', 'Selvwa', 'Haifa', 'Hayfa', 'Zainab', 'Zaynab', 'Zeinab',
+    'Ruqayya', 'Ruqayyah', 'Khadija', 'Khadeeja',
+    'Mona', 'Mouna', 'Hessa', 'Hissa', 'Abeer', 'Abir',
+    'Ghada', 'Ghadah', 'Shahd', 'Shahed',
+    'Sadeem', 'Malak', 'Malek', 'Tala', 'Talah',
+    'Layan', 'Layane', 'Yara', 'Yarah',
+    'Jouri', 'Jory', 'Razan', 'Razaan', 'Nouf', 'Noaf',
+    'Maha', 'Mahah', 'Hala', 'Halah',
+    'Yasmin', 'Yasmeen', 'Jasmine',
+    'Asma', 'Asmaa', 'Eman', 'Iman', 'Amani', 'Amna', 'Amina',
+    'Wafa', 'Wafaa', 'Afaf', 'Aziza', 'Azeeza',
+    'Basma', 'Buthaina', 'Buthayna',
+    'Fajr', 'Farah', 'Farha', 'Fawzia', 'Fowzia',
+    'Kawther', 'Kawthar', 'Lamia', 'Lamya',
+    'Layla', 'Leila', 'Lina', 'Lubna',
+    'Mashael', 'Meshaael', 'Shaima', 'Shaimaa',
   ]),
 
   FAMILY_NAMES: new Set([
@@ -1036,6 +1080,7 @@ const MedicalVocabulary = {
     'Al-Naqi', 'Al-Hashim', 'Dashti', 'Hayat', 'Marafie',
     'Marzouq', 'Ashkanani', 'Boodai', 'Khamis', 'Saif',
     'Boushehri', 'Marafi', 'Khajah', 'Al-Wazzan',
+    'Alessa', 'Bazzah', 'Bazza', 'Athoub', 'Athoob',
   ]),
 
   // Single-row Levenshtein with early termination — O(min(m,n)) memory
@@ -1132,24 +1177,63 @@ const MedicalVocabulary = {
     return null;
   },
 
+  // Lookup a single token or full name against name databases
+  // Works for Arabic script, English transliterated, and mixed
   lookupName(text) {
-    const normalized = normalizeArabicText(text);
-    for (const name of this.ARABIC_FIRST_NAMES) {
-      const normName = normalizeArabicText(name);
-      if (normName === normalized) return { confidence: 1.0 };
-      if (ocrDistance(normalized, normName) <= 1) return { confidence: 0.8 };
+    if (!text || text.length < 2) return null;
+    const words = text.trim().split(/\s+/);
+    let bestConf = 0;
+
+    for (const word of words) {
+      const conf = this._lookupSingleName(word);
+      if (conf > bestConf) bestConf = conf;
     }
-    for (const name of this.FAMILY_NAMES) {
-      if (typeof name === 'string') {
-        const normName = /[\u0600-\u06FF]/.test(name)
-          ? normalizeArabicText(name)
-          : name.toLowerCase();
-        const compare = /[\u0600-\u06FF]/.test(text) ? normalized : text.toLowerCase();
-        if (normName === compare) return { confidence: 1.0 };
-        if (ocrDistance(compare, normName) <= 1) return { confidence: 0.7 };
+
+    // Multi-word bonus — if any word matches a name, the whole thing is likely a name
+    if (bestConf > 0 && words.length >= 2) bestConf = Math.min(1.0, bestConf + 0.1);
+    return bestConf > 0 ? { confidence: bestConf } : null;
+  },
+
+  _lookupSingleName(word) {
+    if (!word || word.length < 2) return 0;
+    const isArabic = /[\u0600-\u06FF]/.test(word);
+    const lower = word.toLowerCase().trim();
+    // Strip common OCR artifacts: "Al-" prefix variations for matching
+    const stripped = lower.replace(/^al[- ]?/i, '');
+
+    // Check first names
+    for (const name of this.ARABIC_FIRST_NAMES) {
+      if (isArabic && /[\u0600-\u06FF]/.test(name)) {
+        const norm = normalizeArabicText(word);
+        const normName = normalizeArabicText(name);
+        if (norm === normName) return 1.0;
+        if (norm.length >= 3 && ocrDistance(norm, normName, 1) <= 1) return 0.8;
+      } else if (!isArabic && !/[\u0600-\u06FF]/.test(name)) {
+        const nameLower = name.toLowerCase();
+        if (lower === nameLower) return 1.0;
+        if (stripped === nameLower.replace(/^al[- ]?/i, '')) return 0.95;
+        if (lower.length >= 3 && ocrDistance(lower, nameLower, 1) <= 1) return 0.8;
       }
     }
-    return null;
+
+    // Check family names
+    for (const name of this.FAMILY_NAMES) {
+      if (typeof name !== 'string') continue;
+      if (isArabic && /[\u0600-\u06FF]/.test(name)) {
+        const norm = normalizeArabicText(word);
+        const normName = normalizeArabicText(name);
+        if (norm === normName) return 1.0;
+        if (norm.length >= 3 && ocrDistance(norm, normName, 1) <= 1) return 0.75;
+      } else if (!isArabic && !/[\u0600-\u06FF]/.test(name)) {
+        const nameLower = name.toLowerCase();
+        if (lower === nameLower) return 1.0;
+        // Match without "Al-" prefix — OCR often drops or merges it
+        if (stripped === nameLower.replace(/^al[- ]?/i, '')) return 0.9;
+        if (lower.length >= 4 && ocrDistance(lower, nameLower, 2) <= 2) return 0.7;
+      }
+    }
+
+    return 0;
   },
 };
 
@@ -1345,28 +1429,77 @@ const EntityRecognizer = {
 
   scoreName(t) {
     let conf = 0;
+    if (!t || t.length < 2) return { entity: 'NAME', confidence: 0 };
+
+    // Reject: has digits (except MRN-like which is handled by CIVIL_ID), or is a header
     if (/\d/.test(t) || isHeaderLike(t)) return { entity: 'NAME', confidence: 0 };
 
-    // Arabic text >= 2 chars
-    if (/[\u0600-\u06FF]/.test(t) && t.replace(/[^\u0600-\u06FF]/g, '').length >= 2) {
-      conf = 0.75;
+    // Reject: all uppercase short tokens that look like medical abbreviations
+    if (/^[A-Z]{2,6}$/.test(t)) return { entity: 'NAME', confidence: 0 };
+
+    const hasArabic = /[\u0600-\u06FF]/.test(t);
+    const arabicLen = (t.match(/[\u0600-\u06FF]/g) || []).length;
+    const words = t.trim().split(/\s+/);
+
+    // === Arabic text ===
+    if (hasArabic && arabicLen >= 2) {
+      conf = 0.72;
+      // Multi-word Arabic = almost certainly a name
+      if (words.length >= 2) conf = 0.88;
+      if (words.length >= 3) conf = 0.93;
       const match = MedicalVocabulary.lookupName(t);
-      if (match && match.confidence > 0.6) conf = 0.9;
+      if (match) conf = Math.max(conf, match.confidence);
     }
 
-    // Capitalized English word
-    if (/^[A-Z][a-z]{1,20}$/.test(t)) {
-      conf = Math.max(conf, 0.45);
-      if (/^Al[- ]?[A-Z]/.test(t)) conf = 0.8;
+    // === Latin text — single word ===
+    if (!hasArabic && words.length === 1) {
+      const w = words[0];
+      // Database lookup first — most reliable signal
+      const match = MedicalVocabulary.lookupName(w);
+      if (match && match.confidence >= 0.7) {
+        conf = Math.max(conf, match.confidence);
+      }
+      // Capitalized word not in medical dictionary
+      else if (/^[A-Z][a-z]{2,20}$/.test(w)) {
+        conf = Math.max(conf, 0.48);
+      }
+      // "Al-" prefix = almost certainly a family name
+      if (/^Al[- ]?[A-Z]/i.test(w)) conf = Math.max(conf, 0.82);
+      // All lowercase but in name database
+      if (/^[a-z]{3,}$/.test(w) && match && match.confidence >= 0.8) {
+        conf = Math.max(conf, 0.75);
+      }
     }
 
-    // Multi-word with capitals
-    if (/^[A-Z][a-z]+\s+(?:Al[- ])?[A-Z][a-z]+/.test(t)) conf = 0.85;
-    if (/^[A-Z][a-z]+(?:\s+[a-z]{2,})+$/.test(t)) conf = Math.max(conf, 0.72);
+    // === Latin text — multi-word ===
+    if (!hasArabic && words.length >= 2) {
+      // Any two+ capitalized words
+      const capWords = words.filter(w => /^[A-Z]/.test(w)).length;
+      if (capWords >= 2) conf = Math.max(conf, 0.82);
+      // "Firstname Al-Lastname" pattern
+      if (/Al[- ]?/i.test(t) && capWords >= 1) conf = Math.max(conf, 0.88);
+      // Three+ words with capitals
+      if (words.length >= 3 && capWords >= 2) conf = Math.max(conf, 0.90);
+      // Database-backed: any word matches a known name
+      const match = MedicalVocabulary.lookupName(t);
+      if (match && match.confidence >= 0.7) conf = Math.max(conf, match.confidence);
+      // All lowercase multi-word but database match
+      if (match && match.confidence >= 0.8 && words.every(w => /^[a-z]/.test(w))) {
+        conf = Math.max(conf, 0.78);
+      }
+      // Mixed case multi-word phrases (OCR sometimes lowercases)
+      if (words.length >= 2 && words.every(w => /^[a-zA-Z]{2,}$/.test(w)) && !MedicalVocabulary.correctTerm(t, 0)) {
+        conf = Math.max(conf, 0.65);
+      }
+    }
 
-    // Penalize if it matches a medical term
+    // === Penalize if it's a medical term ===
     const medMatch = MedicalVocabulary.correctTerm(t, 0);
-    if (medMatch) conf *= 0.3;
+    if (medMatch) conf *= 0.25;
+
+    // === Penalize if it looks like a medication ===
+    const medName = MedicalVocabulary.correctMedication(t, 0);
+    if (medName) conf *= 0.3;
 
     return { entity: 'NAME', confidence: conf };
   },
