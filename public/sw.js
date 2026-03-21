@@ -1,5 +1,6 @@
-const CACHE_NAME = 'medevac-v3.6.0';
+const CACHE_NAME = 'medevac-v3.7.0';
 const BACKUP_CACHE = 'medevac-patient-backups';
+const OCR_MODEL_CACHE = 'medevac-ocr-models';
 
 const PRECACHE_URLS = [
   '/',
@@ -25,7 +26,7 @@ self.addEventListener('activate', (event) => {
     caches.keys().then((keys) =>
       Promise.all(
         keys
-          .filter((key) => key !== CACHE_NAME && key !== BACKUP_CACHE)
+          .filter((key) => key !== CACHE_NAME && key !== BACKUP_CACHE && key !== OCR_MODEL_CACHE)
           .map((key) => caches.delete(key))
       )
     )
@@ -41,6 +42,22 @@ self.addEventListener('fetch', (event) => {
   // Skip non-GET requests
   if (request.method !== 'GET') return;
 
+  // Cache HuggingFace OCR model downloads (cache-first, they never change)
+  if (url.hostname.includes('huggingface.co') && url.pathname.includes('paddleocr-onnx')) {
+    event.respondWith(
+      caches.open(OCR_MODEL_CACHE).then((cache) =>
+        cache.match(request).then((cached) => {
+          if (cached) return cached;
+          return fetch(request).then((response) => {
+            if (response.ok) cache.put(request, response.clone());
+            return response;
+          });
+        })
+      )
+    );
+    return;
+  }
+
   // Skip external requests except Google Fonts
   if (url.origin !== self.location.origin &&
       !url.hostname.includes('fonts.googleapis.com') &&
@@ -49,10 +66,27 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Network-first for HTML and JS (always get latest code)
-  // Cache-first for static assets (icons, fonts)
+  // Cache-first for static assets (icons, fonts, WASM)
   const isAppCode = url.pathname.endsWith('.html') ||
-    url.pathname.endsWith('.js') ||
+    (url.pathname.endsWith('.js') && !url.pathname.endsWith('.wasm')) ||
     url.pathname === '/';
+
+  // WASM files are large and immutable — always cache-first
+  if (url.pathname.endsWith('.wasm') || url.pathname.endsWith('.onnx')) {
+    event.respondWith(
+      caches.match(request).then((cached) => {
+        if (cached) return cached;
+        return fetch(request).then((response) => {
+          if (response.ok) {
+            const clone = response.clone();
+            caches.open(CACHE_NAME).then((cache) => cache.put(request, clone));
+          }
+          return response;
+        }).catch(() => new Response('Offline', { status: 503 }));
+      })
+    );
+    return;
+  }
 
   if (isAppCode) {
     // Network-first: try fresh, fall back to cache

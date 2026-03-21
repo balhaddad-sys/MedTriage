@@ -1,13 +1,40 @@
 import assert from 'node:assert/strict';
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
-import { join, resolve } from 'node:path';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { pathToFileURL } from 'node:url';
+import * as esbuild from 'esbuild';
 
+// Bundle ocrEngine.js — mark paddleocr and onnxruntime-web as external
+// (we only test the analysis pipeline, not the OCR runtime)
 const tmpDir = mkdtempSync(join(tmpdir(), 'medevac-ocr-'));
-const outfile = join(tmpDir, 'ocr-engine.mjs');
+const outfile = join(tmpDir, 'ocr-engine-test.mjs');
 
-writeFileSync(outfile, readFileSync(resolve('src/modules/evacuation/ocrEngine.js'), 'utf8'));
+// Create stubs for the OCR runtime imports
+writeFileSync(join(tmpDir, 'node_modules', 'paddleocr', 'index.mjs').replace(/node_modules[/\\]paddleocr/, ''), '');
+const stubPaddle = join(tmpDir, 'paddle-stub.mjs');
+const stubOrt = join(tmpDir, 'ort-stub.mjs');
+writeFileSync(stubPaddle, 'export class PaddleOcrService { static async createInstance() { return {}; } }');
+writeFileSync(stubOrt, 'export const env = { wasm: {} }; export default { env: { wasm: {} } };');
+
+// Use esbuild plugin to redirect imports to stubs
+const stubPlugin = {
+  name: 'stub-ocr-deps',
+  setup(build) {
+    build.onResolve({ filter: /^paddleocr$/ }, () => ({ path: stubPaddle }));
+    build.onResolve({ filter: /^onnxruntime-web$/ }, () => ({ path: stubOrt }));
+  },
+};
+
+await esbuild.build({
+  entryPoints: ['src/modules/evacuation/ocrEngine.js'],
+  bundle: true,
+  format: 'esm',
+  platform: 'node',
+  outfile,
+  plugins: [stubPlugin],
+  define: { 'process.env.NODE_ENV': '"test"' },
+});
 
 const { analyzeOcrWords } = await import(pathToFileURL(outfile).href);
 
@@ -19,6 +46,7 @@ function word(text, x, y, confidence = 92, width = text.length * 10) {
   };
 }
 
+// Test 1: Single patient line
 const singlePatient = analyzeOcrWords([
   word('E-M-03', 10, 10),
   word('Ahmed', 100, 10),
@@ -35,6 +63,7 @@ assert.equal(singlePatient.patients[0].gender, 'M');
 assert.match(singlePatient.patients[0].fullName, /Ahmed Ali/i);
 assert.match(singlePatient.patients[0].dx, /NSTEMI/);
 
+// Test 2: Two patients on separate rows
 const twoPatients = analyzeOcrWords([
   word('E-M-03', 10, 10),
   word('Ahmed', 100, 10),
@@ -52,6 +81,7 @@ assert.equal(twoPatients.patients.length, 2, 'expected two patients from two row
 assert.match(twoPatients.patients[1].fullName, /Fatima Hassan/i);
 assert.equal(twoPatients.patients[1].gender, 'F');
 
+// Test 3: Multi-line patient (continuation lines)
 const multilinePatient = analyzeOcrWords([
   word('E-M-09', 10, 10),
   word('Mona', 100, 10),

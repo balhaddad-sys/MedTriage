@@ -47,4 +47,22 @@ if (existsSync(dataDir)) {
   }
 }
 
+// Copy ONNX Runtime WASM files for PaddleOCR (only the essential ones)
+const ortWasmDir = join('node_modules', 'onnxruntime-web', 'dist');
+const essentialWasm = [
+  'ort-wasm-simd-threaded.wasm',
+  'ort-wasm-simd-threaded.mjs',
+  'ort-wasm-simd-threaded.jsep.wasm',
+  'ort-wasm-simd-threaded.jsep.mjs',
+];
+if (existsSync(ortWasmDir)) {
+  for (const file of essentialWasm) {
+    const src = join(ortWasmDir, file);
+    if (existsSync(src)) {
+      copyFileSync(src, join(outdir, file));
+    }
+  }
+  console.log('ONNX Runtime WASM files copied to dist/');
+}
+
 console.log('Build complete → dist/');

@@ -1090,13 +1090,17 @@ const ClinicalValidator = {
 
 // ====== BOX NORMALIZATION ======
 function normalizeBox(box) {
+  // PaddleOCR RecognitionResult box: {x, y, width, height}
+  if (box.x !== undefined && box.width !== undefined) {
+    return { x: box.x, y: box.y, w: box.width, h: box.height, cx: box.x + box.width / 2, cy: box.y + box.height / 2 };
+  }
   // Tesseract.js word bbox: {x0, y0, x1, y1}
   if (box.x0 !== undefined) {
     const w = box.x1 - box.x0;
     const h = box.y1 - box.y0;
     return { x: box.x0, y: box.y0, w, h, cx: box.x0 + w / 2, cy: box.y0 + h / 2 };
   }
-  // Array of 4 corner points (PaddleOCR)
+  // Array of 4 corner points
   if (Array.isArray(box) && box.length === 4 && Array.isArray(box[0])) {
     const xs = box.map(p => p[0]), ys = box.map(p => p[1]);
     const x = Math.min(...xs), y = Math.min(...ys);
@@ -1211,29 +1215,145 @@ function mergePatients(a, b) {
   };
 }
 
-// ====== TESSERACT LOADER ======
-let tesseractWorker = null;
+// ====== PADDLEOCR ENGINE (ONNX Runtime Web) ======
+import { PaddleOcrService } from 'paddleocr';
+import * as ort from 'onnxruntime-web';
 
-async function loadTesseract() {
-  if (tesseractWorker) return tesseractWorker;
+// Model URLs — PP-OCRv3 detection (2.3MB) + PP-OCRv5 English recognition (7.5MB)
+const MODEL_URLS = {
+  detection: 'https://huggingface.co/monkt/paddleocr-onnx/resolve/main/detection/v3/det.onnx',
+  recognition: 'https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/english/rec.onnx',
+  dictionary: 'https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/english/dict.txt',
+};
 
-  if (!window.Tesseract) {
-    await new Promise((resolve, reject) => {
-      const script = document.createElement('script');
-      script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-      script.onload = resolve;
-      script.onerror = reject;
-      document.head.appendChild(script);
-    }).catch(() => {
-      throw new Error('OCR runtime failed to load. Connect once to load the engine or bundle Tesseract locally before deployment.');
-    });
-  }
+const MODEL_CACHE_DB = 'medevac-ocr-models';
+const MODEL_CACHE_VERSION = 2;
 
-  tesseractWorker = await window.Tesseract.createWorker('eng+ara', 1, {
-    logger: () => {},
+// IndexedDB model caching for true offline support
+async function openModelCache() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(MODEL_CACHE_DB, MODEL_CACHE_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if (!db.objectStoreNames.contains('models')) db.createObjectStore('models');
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
   });
+}
 
-  return tesseractWorker;
+async function getCachedModel(key) {
+  try {
+    const db = await openModelCache();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('models', 'readonly');
+      const req = tx.objectStore('models').get(key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  } catch { return null; }
+}
+
+async function setCachedModel(key, data) {
+  try {
+    const db = await openModelCache();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction('models', 'readwrite');
+      tx.objectStore('models').put(data, key);
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+  } catch { /* cache write failure is non-fatal */ }
+}
+
+async function fetchModelWithCache(url, key, onProgress) {
+  // Try cache first
+  const cached = await getCachedModel(key);
+  if (cached) return cached;
+
+  // Fetch from network
+  onProgress?.(`Downloading ${key} model...`);
+  const response = await fetch(url);
+  if (!response.ok) throw new Error(`Failed to fetch ${key}: ${response.status}`);
+
+  const data = key === 'dictionary'
+    ? await response.text()
+    : await response.arrayBuffer();
+
+  // Cache for offline use
+  await setCachedModel(key, data);
+  return data;
+}
+
+let paddleOcrService = null;
+let paddleInitPromise = null;
+
+async function initPaddleOCR(onProgress) {
+  if (paddleOcrService) return paddleOcrService;
+  if (paddleInitPromise) return paddleInitPromise;
+
+  paddleInitPromise = (async () => {
+    onProgress?.('Loading OCR models...');
+
+    // Configure ONNX Runtime for browser
+    ort.env.wasm.numThreads = 1;
+    ort.env.wasm.simd = true;
+    // WASM files are copied to dist/ root by build script
+    ort.env.wasm.wasmPaths = '/';
+
+    const [detBuffer, recBuffer, dictText] = await Promise.all([
+      fetchModelWithCache(MODEL_URLS.detection, 'detection', onProgress),
+      fetchModelWithCache(MODEL_URLS.recognition, 'recognition', onProgress),
+      fetchModelWithCache(MODEL_URLS.dictionary, 'dictionary', onProgress),
+    ]);
+
+    onProgress?.('Initializing OCR engine...');
+    const dictionary = typeof dictText === 'string'
+      ? dictText.split('\n').filter(l => l.trim().length > 0)
+      : new TextDecoder().decode(dictText).split('\n').filter(l => l.trim().length > 0);
+
+    paddleOcrService = await PaddleOcrService.createInstance({
+      ort,
+      detection: {
+        modelBuffer: detBuffer,
+        maxSideLength: 1920,
+        textPixelThreshold: 0.5,
+        minimumAreaThreshold: 16,
+        paddingBoxVertical: 0.35,
+        paddingBoxHorizontal: 0.55,
+      },
+      recognition: {
+        modelBuffer: recBuffer,
+        charactersDictionary: dictionary,
+        imageHeight: 48,
+      },
+    });
+
+    return paddleOcrService;
+  })();
+
+  return paddleInitPromise;
+}
+
+// Extract RGBA pixel data from a canvas for PaddleOCR input
+function canvasToImageInput(canvas) {
+  const ctx = canvas.getContext('2d');
+  const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+  return {
+    data: imageData.data,
+    width: canvas.width,
+    height: canvas.height,
+  };
+}
+
+// Check if models are cached (for UI status)
+export async function areModelsCached() {
+  try {
+    const det = await getCachedModel('detection');
+    const rec = await getCachedModel('recognition');
+    const dict = await getCachedModel('dictionary');
+    return !!(det && rec && dict);
+  } catch { return false; }
 }
 
 // ====== v3 PIPELINE: ENTITY-FIRST SPATIAL CLUSTERING ======
@@ -1310,21 +1430,29 @@ export function parseFromPlainText(rawText) {
   return analyzeOcrWords(detections, 1000, Math.max(lines.length * lineHeight, 300));
 }
 
-function buildPassCandidate(data, canvas, profileId) {
-  const words = data.words && data.words.length > 0
-    ? data.words.filter(w => w.text && w.text.trim().length > 0 && w.confidence > 12)
-    : [];
+function buildPassCandidate(results, canvas, profileId) {
+  // PaddleOCR results: [{text, box: {x,y,width,height}, confidence}, ...]
+  const words = results
+    .filter(r => r.text && r.text.trim().length > 0 && r.confidence > 0.1)
+    .map(r => ({
+      text: r.text.trim(),
+      bbox: r.box,
+      confidence: r.confidence,
+    }));
+
+  const rawText = words.map(w => w.text).join(' ');
   const analysis = words.length > 0
     ? analyzeOcrWords(words, canvas.width || 1000, canvas.height || 1000)
-    : parseFromPlainText(data.text || '');
-  const wordConfidence = average(
-    words.map(w => Number.isFinite(w.confidence) ? w.confidence / 100 : 0),
-    Number.isFinite(data.confidence) ? data.confidence / 100 : 0.4
+    : { patients: [], entityCount: 0, clusterCount: 0, analysisScore: 0 };
+
+  const wordConfidence = average(words.map(w => w.confidence), 0.4);
+  const qualityScore = clamp(
+    (analysis.analysisScore * 0.62) + (wordConfidence * 0.24) + (scoreTextDensity(rawText) * 0.14)
   );
-  const qualityScore = clamp((analysis.analysisScore * 0.62) + (wordConfidence * 0.24) + (scoreTextDensity(data.text || '') * 0.14));
+
   return {
     profileId,
-    rawText: data.text || '',
+    rawText,
     wordConfidence,
     qualityScore,
     qualityBand: confidenceBand(qualityScore),
@@ -1344,8 +1472,12 @@ function pickBestCandidate(candidates) {
 // ====== MAIN EXPORT ======
 export async function processPatientListImage(imageSource, onProgress) {
   const startTime = performance.now();
-  onProgress?.('Preparing image variants...');
 
+  // Step 1: Initialize PaddleOCR (downloads + caches models on first use)
+  const service = await initPaddleOCR(onProgress);
+
+  // Step 2: Prepare image variants
+  onProgress?.('Preparing image variants...');
   let variants;
   try {
     variants = await ImagePreprocessor.prepareVariants(imageSource);
@@ -1353,18 +1485,21 @@ export async function processPatientListImage(imageSource, onProgress) {
     variants = [{ id: 'source', label: 'Source image', canvas: imageSource }];
   }
 
-  onProgress?.('Loading OCR engine...');
-  const worker = await loadTesseract();
   const candidates = [];
 
+  // Step 3: Multi-pass OCR with PaddleOCR
   for (let i = 0; i < variants.length; i++) {
     const variant = variants[i];
     onProgress?.(`Recognizing text (${variant.label}, pass ${i + 1}/${variants.length})...`);
-    const { data } = await worker.recognize(variant.canvas);
+
+    const input = canvasToImageInput(variant.canvas);
+    const results = await service.recognize(input);
+
     onProgress?.(`Analyzing patient structure (${variant.label})...`);
-    const candidate = buildPassCandidate(data, variant.canvas, variant.id);
+    const candidate = buildPassCandidate(results, variant.canvas, variant.id);
     candidates.push(candidate);
 
+    // Early exit if quality is good enough
     const reviewThreshold = Math.ceil(Math.max(candidate.patients.length, 1) * 0.4);
     if (candidate.patients.length > 0 && candidate.qualityScore >= 0.86 && candidate.reviewCount <= reviewThreshold) {
       break;
@@ -1377,18 +1512,16 @@ export async function processPatientListImage(imageSource, onProgress) {
       patients: [],
       rawText: '',
       processingTime: performance.now() - startTime,
-      engine: 'tesseract-v3-pro',
+      engine: 'paddleocr-v5',
       entityCount: 0,
       clusterCount: 0,
       qualityScore: 0,
       qualityBand: 'LOW',
       profile: 'source',
       reviewCount: 0,
-      passes: candidates.map(candidate => ({
-        profile: candidate.profileId,
-        qualityScore: candidate.qualityScore,
-        qualityBand: candidate.qualityBand,
-        patients: candidate.patients.length,
+      passes: candidates.map(c => ({
+        profile: c.profileId, qualityScore: c.qualityScore,
+        qualityBand: c.qualityBand, patients: c.patients.length,
       })),
     };
   }
@@ -1405,7 +1538,7 @@ export async function processPatientListImage(imageSource, onProgress) {
     evac: 'IN_WARD',
     ocrImported: true,
     ocrMeta: {
-      engine: 'tesseract-v3-pro',
+      engine: 'paddleocr-v5',
       profile: best.profileId,
       qualityScore: best.qualityScore,
       qualityBand: best.qualityBand,
@@ -1419,7 +1552,7 @@ export async function processPatientListImage(imageSource, onProgress) {
     patients,
     rawText: best.rawText,
     processingTime: performance.now() - startTime,
-    engine: 'tesseract-v3-pro',
+    engine: 'paddleocr-v5',
     entityCount: best.entityCount,
     clusterCount: best.clusterCount,
     qualityScore: best.qualityScore,
@@ -1427,12 +1560,10 @@ export async function processPatientListImage(imageSource, onProgress) {
     wordConfidence: best.wordConfidence,
     profile: best.profileId,
     reviewCount: best.reviewCount,
-    passes: candidates.map(candidate => ({
-      profile: candidate.profileId,
-      qualityScore: candidate.qualityScore,
-      qualityBand: candidate.qualityBand,
-      patients: candidate.patients.length,
-      reviewCount: candidate.reviewCount,
+    passes: candidates.map(c => ({
+      profile: c.profileId, qualityScore: c.qualityScore,
+      qualityBand: c.qualityBand, patients: c.patients.length,
+      reviewCount: c.reviewCount,
     })),
   };
 }
