@@ -16,14 +16,9 @@ const styles = {
     width: '120px', height: '120px', borderRadius: '50%',
     border: `3px solid ${colors.blue}`, display: 'flex',
     alignItems: 'center', justifyContent: 'center',
-    position: 'relative',
   },
-  nfcRingScanning: {
-    animation: 'nfcPulse 2s ease-in-out infinite',
-  },
-  nfcRingSuccess: {
-    borderColor: colors.green,
-  },
+  nfcRingScanning: { animation: 'nfcPulse 2s ease-in-out infinite' },
+  nfcRingDetected: { borderColor: colors.green, animation: 'none' },
   statusText: { fontSize: '14px', fontWeight: 600, color: colors.text0, textAlign: 'center' },
   subText: { fontSize: '12px', color: colors.text3, textAlign: 'center' },
   resultCard: {
@@ -31,9 +26,7 @@ const styles = {
     border: `1px solid ${colors.green}44`, background: colors.green + '11',
     display: 'flex', flexDirection: 'column', gap: '8px',
   },
-  resultRow: {
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-  },
+  resultRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
   resultLabel: { fontSize: '11px', fontWeight: 700, color: colors.text3, textTransform: 'uppercase' },
   resultValue: { fontSize: '14px', fontWeight: 600, color: colors.text0, fontFamily: fonts.mono },
   manualInput: {
@@ -57,10 +50,10 @@ const styles = {
     background: colors.red + '15', border: `1px solid ${colors.red}33`,
     fontSize: '12px', color: colors.red, fontWeight: 600,
   },
-  warningBox: {
+  successBox: {
     width: '100%', padding: '12px', borderRadius: '8px',
-    background: colors.amber + '15', border: `1px solid ${colors.amber}33`,
-    fontSize: '12px', color: colors.amber, fontWeight: 600,
+    background: colors.green + '15', border: `1px solid ${colors.green}33`,
+    fontSize: '13px', color: colors.green, fontWeight: 600,
     display: 'flex', alignItems: 'center', gap: '8px',
   },
   platformBadge: {
@@ -80,17 +73,35 @@ export default function NFCScanner({ onClose, onResult }) {
   const [error, setError] = useState(null);
   const [manualId, setManualId] = useState('');
   const [manualError, setManualError] = useState('');
+  // Card detected via NFC but needs manual Civil ID entry (ISO 7816 cards)
+  const [cardDetected, setCardDetected] = useState(false);
   const abortRef = useRef(null);
+  const inputRef = useRef(null);
 
   const startScan = useCallback(async () => {
     setScanning(true);
     setError(null);
     setNfcData(null);
+    setCardDetected(false);
 
     const abort = await scanNFC(
       (data) => {
-        setNfcData(data);
-        setScanning(false);
+        if (data.needsManualId) {
+          // Card tapped but can't read data (ISO 7816 — normal for Civil IDs)
+          setCardDetected(true);
+          setScanning(false);
+          // Auto-focus the Civil ID input after render
+          setTimeout(() => inputRef.current?.focus(), 100);
+        } else if (data.civilId) {
+          // Got full data (Capacitor native or rare NDEF card)
+          setNfcData(data);
+          setScanning(false);
+        } else if (data.tagDetected) {
+          // Tag detected but no civil ID in data
+          setCardDetected(true);
+          setScanning(false);
+          setTimeout(() => inputRef.current?.focus(), 100);
+        }
       },
       (err) => {
         setError(err.message);
@@ -103,7 +114,7 @@ export default function NFCScanner({ onClose, onResult }) {
   }, []);
 
   useEffect(() => {
-    if (mode === 'nfc' && !scanning && !nfcData && !error) {
+    if (mode === 'nfc' && !scanning && !nfcData && !error && !cardDetected) {
       startScan();
     }
     return () => { abortRef.current?.(); };
@@ -121,9 +132,10 @@ export default function NFCScanner({ onClose, onResult }) {
       age: result.age,
       fullName: '',
       gender: '',
-      nfcBackend: 'manual',
+      nfcBackend: cardDetected ? 'webnfc' : 'manual',
+      tagDetected: cardDetected,
     });
-  }, [manualId]);
+  }, [manualId, cardDetected]);
 
   const handleAddPatient = useCallback(async () => {
     if (!nfcData) return;
@@ -143,8 +155,9 @@ export default function NFCScanner({ onClose, onResult }) {
       notes: nfcData.nationality ? `Nationality: ${nfcData.nationality}` : '',
       ward: auth?.ward?.name || '',
       evac: 'IN_WARD',
-      nfcScanned: nfcData.nfcBackend !== 'manual',
+      nfcScanned: !!nfcData.tagDetected,
       nfcBackend: nfcData.nfcBackend || 'unknown',
+      nfcSerial: nfcData.serialNumber || '',
     };
     const saved = await addPatient(patient);
     await logAction('NFC_IMPORT', 'patient', saved.id);
@@ -162,20 +175,20 @@ export default function NFCScanner({ onClose, onResult }) {
 
       <div style={styles.container}>
         {/* Platform badge */}
-        <div style={{ display: 'flex', justifyContent: 'center', gap: '8px' }}>
+        <div style={{ display: 'flex', justifyContent: 'center' }}>
           <span style={styles.platformBadge}>
-            {nfcInfo.supported ? nfcInfo.label : 'No NFC — Manual Mode'}
+            {nfcInfo.supported ? nfcInfo.label : 'Manual Mode'}
           </span>
         </div>
 
-        {/* Mode tabs — always show both when NFC is available */}
+        {/* Mode tabs */}
         <div style={styles.tabRow}>
           {nfcInfo.supported && (
             <button style={{
               ...styles.tab,
               background: mode === 'nfc' ? colors.blue + '22' : colors.bg2,
               color: mode === 'nfc' ? colors.blue : colors.text3,
-            }} onClick={() => { setMode('nfc'); setNfcData(null); setError(null); }}>
+            }} onClick={() => { setMode('nfc'); setNfcData(null); setError(null); setCardDetected(false); setManualId(''); }}>
               NFC Tap
             </button>
           )}
@@ -183,13 +196,13 @@ export default function NFCScanner({ onClose, onResult }) {
             ...styles.tab,
             background: mode === 'manual' ? colors.blue + '22' : colors.bg2,
             color: mode === 'manual' ? colors.blue : colors.text3,
-          }} onClick={() => { setMode('manual'); setNfcData(null); setError(null); abortRef.current?.(); setScanning(false); }}>
+          }} onClick={() => { setMode('manual'); setNfcData(null); setError(null); setCardDetected(false); setManualId(''); abortRef.current?.(); setScanning(false); }}>
             Manual Entry
           </button>
         </div>
 
-        {/* NFC Mode */}
-        {mode === 'nfc' && !nfcData && (
+        {/* ═══ NFC MODE: Scanning ═══ */}
+        {mode === 'nfc' && !nfcData && !cardDetected && (
           <div style={styles.nfcArea}>
             <div style={{ ...styles.nfcRing, ...(scanning ? styles.nfcRingScanning : {}) }}>
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={colors.blue} strokeWidth="1.5">
@@ -200,33 +213,70 @@ export default function NFCScanner({ onClose, onResult }) {
               </svg>
             </div>
             <span style={styles.statusText}>
-              {scanning ? nfcInfo.hint : 'Ready to scan'}
+              {scanning ? 'Tap Civil ID card on back of phone...' : 'Ready to scan'}
             </span>
             <span style={styles.subText}>
-              {nfcInfo.backend === 'capacitor'
-                ? 'Native NFC — works on iOS and Android'
-                : 'Web NFC — Chrome on Android only'}
+              Card will be detected, then enter Civil ID number
             </span>
             {error && (
               <>
                 <div style={styles.errorBox}>{error}</div>
                 <button style={{ ...styles.btn, background: colors.blue, color: '#fff' }}
-                  onClick={startScan}>
+                  onClick={() => { setError(null); startScan(); }}>
                   Try Again
                 </button>
                 <button style={{ ...styles.btn, background: colors.bg2, color: colors.text0 }}
                   onClick={() => { setMode('manual'); abortRef.current?.(); setScanning(false); setError(null); }}>
-                  Switch to Manual Entry
+                  Enter Manually Instead
                 </button>
               </>
             )}
           </div>
         )}
 
-        {/* Manual Mode */}
+        {/* ═══ NFC MODE: Card Detected — Enter Civil ID ═══ */}
+        {mode === 'nfc' && !nfcData && cardDetected && (
+          <div style={{ ...styles.nfcArea, gap: '12px' }}>
+            <div style={{ ...styles.nfcRing, ...styles.nfcRingDetected }}>
+              <CheckIcon size={40} color={colors.green} />
+            </div>
+            <div style={styles.successBox}>
+              <CheckIcon size={16} color={colors.green} />
+              Card detected! Now enter the Civil ID number.
+            </div>
+            <input
+              ref={inputRef}
+              style={{
+                ...styles.manualInput,
+                borderColor: colors.green + '66',
+              }}
+              placeholder="281234567890"
+              value={manualId}
+              onChange={e => { setManualId(e.target.value.replace(/\D/g, '').slice(0, 12)); setManualError(''); }}
+              maxLength={12}
+              inputMode="numeric"
+              autoFocus
+            />
+            <span style={{ fontSize: '11px', color: colors.text3, fontFamily: fonts.mono }}>
+              {manualId.length}/12 digits
+            </span>
+            {manualError && <div style={styles.errorBox}>{manualError}</div>}
+            <button
+              style={{ ...styles.btn, background: manualId.length === 12 ? colors.green : colors.bg2, color: manualId.length === 12 ? '#fff' : colors.text3 }}
+              onClick={handleManualSubmit}
+              disabled={manualId.length !== 12}>
+              Validate & Add
+            </button>
+          </div>
+        )}
+
+        {/* ═══ MANUAL MODE ═══ */}
         {mode === 'manual' && !nfcData && (
           <div style={{ ...styles.nfcArea, gap: '12px' }}>
             <span style={styles.statusText}>Enter Civil ID Number</span>
+            <span style={styles.subText}>
+              Type the 12-digit number from the front of the card
+            </span>
             <input
               style={styles.manualInput}
               placeholder="281234567890"
@@ -249,14 +299,14 @@ export default function NFCScanner({ onClose, onResult }) {
           </div>
         )}
 
-        {/* Result display */}
+        {/* ═══ RESULT DISPLAY ═══ */}
         {nfcData && (
           <>
             <div style={styles.resultCard}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
                 <CheckIcon size={18} color={colors.green} />
                 <span style={{ fontSize: '14px', fontWeight: 700, color: colors.green }}>
-                  Civil ID {mode === 'nfc' ? 'Scanned' : 'Validated'}
+                  Civil ID {nfcData.tagDetected ? 'Scanned' : 'Validated'}
                 </span>
               </div>
 
@@ -300,8 +350,8 @@ export default function NFCScanner({ onClose, onResult }) {
 
             <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
               <button style={{ ...styles.btn, flex: 1, background: colors.bg2, color: colors.text0 }}
-                onClick={() => { setNfcData(null); setManualId(''); }}>
-                {mode === 'nfc' ? 'Rescan' : 'Re-enter'}
+                onClick={() => { setNfcData(null); setManualId(''); setCardDetected(false); }}>
+                {cardDetected ? 'Rescan' : 'Re-enter'}
               </button>
               <button style={{ ...styles.btn, flex: 1, background: colors.green, color: '#fff' }}
                 onClick={handleAddPatient}>
