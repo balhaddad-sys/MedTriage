@@ -1,17 +1,53 @@
-// Kuwait Civil ID NFC Reader
-// Uses Web NFC API to read Kuwait Civil ID cards
-// Kuwait Civil IDs contain NDEF records with personal data
+// Kuwait Civil ID NFC Reader — Universal
+// Priority: Capacitor NFC (native iOS/Android) → Web NFC (Chrome Android) → Manual entry
+//
+// iOS: CoreNFC via Capacitor plugin (reads NDEF from Civil ID)
+// Android: Capacitor NFC or Web NFC API
+// Desktop/Web: Manual Civil ID entry fallback
 
-// Check if Web NFC is supported
-export function isNFCSupported() {
-  return 'NDEFReader' in window;
+// ═══ PLATFORM DETECTION ═══
+
+function isCapacitorNative() {
+  return typeof window !== 'undefined' &&
+    window.Capacitor &&
+    window.Capacitor.isNativePlatform &&
+    window.Capacitor.isNativePlatform();
 }
 
-// Kuwait Civil ID number format: 12 digits (e.g., 281234567890)
-// First digit: century (2 = 1900s, 3 = 2000s)
-// Digits 2-3: birth year
-// Digits 4-5: birth month
-// Digits 6-7: birth day
+function hasCapacitorNfc() {
+  return isCapacitorNative() && window.Capacitor.Plugins && window.Capacitor.Plugins.CapacitorNfc;
+}
+
+function hasWebNfc() {
+  return typeof window !== 'undefined' && 'NDEFReader' in window;
+}
+
+export function getNfcBackend() {
+  if (hasCapacitorNfc()) return 'capacitor';
+  if (hasWebNfc()) return 'webnfc';
+  return 'manual';
+}
+
+export function isNFCSupported() {
+  return getNfcBackend() !== 'manual';
+}
+
+export function getNfcPlatformInfo() {
+  const backend = getNfcBackend();
+  switch (backend) {
+    case 'capacitor':
+      return { supported: true, backend, label: 'Native NFC', hint: 'Hold Civil ID card near device' };
+    case 'webnfc':
+      return { supported: true, backend, label: 'Web NFC', hint: 'Hold Civil ID card against back of phone' };
+    default:
+      return { supported: false, backend, label: 'Manual Entry', hint: 'Enter 12-digit Civil ID number' };
+  }
+}
+
+// ═══ CIVIL ID PARSER ═══
+// Kuwait Civil ID: 12 digits
+// Digit 1: century (2=1900s, 3=2000s)
+// Digits 2-3: birth year, 4-5: month, 6-7: day
 // Remaining: serial + check digit
 
 export function parseCivilIdNumber(civilId) {
@@ -35,8 +71,27 @@ export function parseCivilIdNumber(civilId) {
   };
 }
 
-// Parse NDEF records from Kuwait Civil ID
-function parseNDEFRecords(records) {
+// ═══ NDEF RECORD PARSER ═══
+// Extracts structured data from Civil ID NFC records
+
+function parseTextFromRecord(record) {
+  let text = '';
+  try {
+    if (record.recordType === 'text') {
+      const decoder = new TextDecoder(record.encoding || 'utf-8');
+      const payload = record.data;
+      const langLen = payload.getUint8(0) & 0x3F;
+      text = decoder.decode(new DataView(payload.buffer, payload.byteOffset + 1 + langLen));
+    } else if (record.recordType === 'url' || record.recordType === 'mime') {
+      text = new TextDecoder().decode(record.data);
+    } else {
+      text = new TextDecoder().decode(record.data);
+    }
+  } catch { /* skip unreadable records */ }
+  return text;
+}
+
+function extractCivilIdData(texts) {
   const result = {
     civilId: '',
     fullName: '',
@@ -44,34 +99,11 @@ function parseNDEFRecords(records) {
     age: null,
     gender: '',
     nationality: '',
-    raw: [],
+    raw: texts,
   };
 
-  for (const record of records) {
-    let text = '';
-
-    if (record.recordType === 'text') {
-      const decoder = new TextDecoder(record.encoding || 'utf-8');
-      // NDEF text records have a language code prefix byte
-      const payload = record.data;
-      const langLen = payload.getUint8(0) & 0x3F;
-      text = decoder.decode(new DataView(payload.buffer, payload.byteOffset + 1 + langLen));
-    } else if (record.recordType === 'url' || record.recordType === 'mime') {
-      const decoder = new TextDecoder();
-      text = decoder.decode(record.data);
-    } else {
-      // Try raw decode
-      try {
-        const decoder = new TextDecoder();
-        text = decoder.decode(record.data);
-      } catch {
-        continue;
-      }
-    }
-
-    result.raw.push(text);
-
-    // Try to extract civil ID (12 digits)
+  for (const text of texts) {
+    // Civil ID number (12 digits starting with 2 or 3)
     const civilIdMatch = text.match(/\b[23]\d{11}\b/);
     if (civilIdMatch && !result.civilId) {
       result.civilId = civilIdMatch[0];
@@ -79,8 +111,7 @@ function parseNDEFRecords(records) {
       if (parsed) result.age = parsed.age;
     }
 
-    // Try to detect name patterns
-    // Arabic name (right-to-left characters)
+    // Arabic name
     if (/[\u0600-\u06FF]{2,}/.test(text) && !result.fullNameArabic) {
       const arabicParts = text.match(/[\u0600-\u06FF\s]+/g);
       if (arabicParts) {
@@ -94,10 +125,9 @@ function parseNDEFRecords(records) {
       result.fullName = text.trim();
     }
 
-    // Gender detection
+    // Gender
     if (/\b(MALE|FEMALE|M|F|ذكر|أنثى)\b/i.test(text) && !result.gender) {
-      if (/FEMALE|أنثى/i.test(text)) result.gender = 'F';
-      else if (/MALE|ذكر/i.test(text)) result.gender = 'M';
+      result.gender = /FEMALE|أنثى/i.test(text) ? 'F' : 'M';
     }
 
     // Nationality
@@ -106,7 +136,6 @@ function parseNDEFRecords(records) {
     }
   }
 
-  // Use Arabic name if no English name found
   if (!result.fullName && result.fullNameArabic) {
     result.fullName = result.fullNameArabic;
   }
@@ -114,13 +143,101 @@ function parseNDEFRecords(records) {
   return result;
 }
 
-// Start NFC scanning session
-export async function scanNFC(onResult, onError, onReading) {
-  if (!isNFCSupported()) {
-    onError?.(new Error('NFC is not supported on this device. Web NFC requires Chrome on Android.'));
+// ═══ CAPACITOR NFC SCANNER ═══
+
+async function scanCapacitorNfc(onResult, onError, onReading) {
+  const NfcPlugin = window.Capacitor.Plugins.CapacitorNfc;
+  const abortController = { aborted: false };
+
+  try {
+    // Check NFC availability
+    const { isEnabled } = await NfcPlugin.isEnabled();
+    if (!isEnabled) {
+      onError?.(new Error('NFC is disabled. Please enable NFC in your device settings.'));
+      return null;
+    }
+
+    // Start scanning
+    await NfcPlugin.startScanSession({
+      alertMessage: 'Hold your Kuwait Civil ID near the device',
+    });
+
+    // Listen for NFC tag detection
+    const listener = await NfcPlugin.addListener('nfcTagDetected', (event) => {
+      if (abortController.aborted) return;
+      onReading?.();
+
+      const texts = [];
+
+      // Extract text from NDEF messages
+      if (event.messages) {
+        for (const message of event.messages) {
+          if (message.records) {
+            for (const record of message.records) {
+              if (record.payload) {
+                // Capacitor plugin returns payload as string or base64
+                let text = '';
+                if (typeof record.payload === 'string') {
+                  // Try to decode — may have language prefix for text records
+                  text = record.payload;
+                  // Strip NDEF text record language prefix (first few bytes)
+                  if (record.tnf === 1 && record.type === 'T') {
+                    const langLen = text.charCodeAt(0);
+                    text = text.substring(1 + langLen);
+                  }
+                }
+                if (text) texts.push(text);
+              }
+            }
+          }
+        }
+      }
+
+      // Also try raw tag ID as potential data source
+      if (event.id) texts.push(event.id);
+
+      const parsed = extractCivilIdData(texts);
+      parsed.serialNumber = event.id || '';
+      parsed.nfcBackend = 'capacitor';
+
+      // If we got raw data but no civil ID, check concatenated text
+      if (!parsed.civilId && texts.length > 0) {
+        const allText = texts.join(' ');
+        const idMatch = allText.match(/\b[23]\d{11}\b/);
+        if (idMatch) {
+          parsed.civilId = idMatch[0];
+          const info = parseCivilIdNumber(idMatch[0]);
+          if (info) parsed.age = info.age;
+        }
+      }
+
+      onResult(parsed);
+    });
+
+    // Listen for errors
+    const errorListener = await NfcPlugin.addListener('nfcError', (event) => {
+      if (!abortController.aborted) {
+        onError?.(new Error(event.message || 'NFC read error. Try repositioning the card.'));
+      }
+    });
+
+    // Return abort function
+    return () => {
+      abortController.aborted = true;
+      listener?.remove();
+      errorListener?.remove();
+      NfcPlugin.stopScanSession().catch(() => {});
+    };
+
+  } catch (err) {
+    onError?.(new Error(err.message || 'Failed to start NFC scanner.'));
     return null;
   }
+}
 
+// ═══ WEB NFC SCANNER ═══
+
+async function scanWebNfc(onResult, onError, onReading) {
   try {
     const ndef = new NDEFReader();
     const abortController = new AbortController();
@@ -132,18 +249,19 @@ export async function scanNFC(onResult, onError, onReading) {
     ndef.addEventListener('reading', ({ serialNumber, message }) => {
       onReading?.();
 
-      const records = [];
+      const texts = [];
       for (const record of message.records) {
-        records.push(record);
+        const text = parseTextFromRecord(record);
+        if (text) texts.push(text);
       }
 
-      const parsed = parseNDEFRecords(records);
+      const parsed = extractCivilIdData(texts);
       parsed.serialNumber = serialNumber;
+      parsed.nfcBackend = 'webnfc';
 
-      // If we got raw data but couldn't parse structured fields,
-      // try to extract civil ID from concatenated raw text
-      if (!parsed.civilId && parsed.raw.length > 0) {
-        const allText = parsed.raw.join(' ');
+      // Fallback: try concatenated raw text for civil ID
+      if (!parsed.civilId && texts.length > 0) {
+        const allText = texts.join(' ');
         const idMatch = allText.match(/\b[23]\d{11}\b/);
         if (idMatch) {
           parsed.civilId = idMatch[0];
@@ -156,9 +274,8 @@ export async function scanNFC(onResult, onError, onReading) {
     });
 
     await ndef.scan({ signal: abortController.signal });
-
-    // Return abort function
     return () => abortController.abort();
+
   } catch (err) {
     if (err.name === 'NotAllowedError') {
       onError?.(new Error('NFC permission denied. Please allow NFC access in browser settings.'));
@@ -171,7 +288,26 @@ export async function scanNFC(onResult, onError, onReading) {
   }
 }
 
-// Manual civil ID entry fallback — validate and extract age
+// ═══ UNIFIED SCANNER ═══
+// Automatically picks the best available NFC backend
+
+export async function scanNFC(onResult, onError, onReading) {
+  const backend = getNfcBackend();
+
+  if (backend === 'capacitor') {
+    return scanCapacitorNfc(onResult, onError, onReading);
+  }
+
+  if (backend === 'webnfc') {
+    return scanWebNfc(onResult, onError, onReading);
+  }
+
+  onError?.(new Error('NFC is not supported on this device. Use manual Civil ID entry.'));
+  return null;
+}
+
+// ═══ MANUAL CIVIL ID VALIDATION ═══
+
 export function validateCivilId(input) {
   const clean = input.replace(/\D/g, '');
   if (clean.length !== 12) return { valid: false, error: 'Civil ID must be 12 digits' };
