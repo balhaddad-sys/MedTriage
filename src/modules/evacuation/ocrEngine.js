@@ -856,6 +856,64 @@ const MedicalVocabulary = {
     'PRE-ECLAMPSIA': { category: 'obs', severity: 'YELLOW' },
     'PPH': { category: 'obs', severity: 'RED' },
     'ECTOPIC': { category: 'obs', severity: 'RED' },
+    // Common multi-word diagnoses (appear as phrases on ward sheets)
+    'CHEST INFECTION': { category: 'resp', severity: 'YELLOW' },
+    'LOWER RESPIRATORY TRACT INFECTION': { category: 'resp', severity: 'YELLOW' },
+    'UPPER RESPIRATORY TRACT INFECTION': { category: 'resp', severity: 'GREEN' },
+    'URINARY TRACT INFECTION': { category: 'infect', severity: 'GREEN' },
+    'ACUTE CORONARY SYNDROME': { category: 'cardio', severity: 'RED' },
+    'HEART FAILURE': { category: 'cardio', severity: 'YELLOW' },
+    'ATRIAL FIBRILLATION': { category: 'cardio', severity: 'YELLOW' },
+    'PULMONARY EMBOLISM': { category: 'resp', severity: 'RED' },
+    'DEEP VEIN THROMBOSIS': { category: 'cardio', severity: 'YELLOW' },
+    'CEREBROVASCULAR ACCIDENT': { category: 'neuro', severity: 'RED' },
+    'ACUTE KIDNEY INJURY': { category: 'renal', severity: 'RED' },
+    'CHRONIC KIDNEY DISEASE': { category: 'renal', severity: 'GREEN' },
+    'DIABETIC KETOACIDOSIS': { category: 'endo', severity: 'RED' },
+    'SEPTIC SHOCK': { category: 'infect', severity: 'RED' },
+    'RESPIRATORY FAILURE': { category: 'resp', severity: 'RED' },
+    'GI BLEED': { category: 'gi', severity: 'RED' },
+    'GI BLEEDING': { category: 'gi', severity: 'RED' },
+    'UPPER GI BLEED': { category: 'gi', severity: 'RED' },
+    'LOWER GI BLEED': { category: 'gi', severity: 'YELLOW' },
+    'LIVER CIRRHOSIS': { category: 'gi', severity: 'YELLOW' },
+    'HEPATIC ENCEPHALOPATHY': { category: 'gi', severity: 'YELLOW' },
+    'ACUTE PANCREATITIS': { category: 'gi', severity: 'YELLOW' },
+    'BOWEL OBSTRUCTION': { category: 'gi', severity: 'YELLOW' },
+    'SMALL BOWEL OBSTRUCTION': { category: 'gi', severity: 'YELLOW' },
+    'LARGE BOWEL OBSTRUCTION': { category: 'gi', severity: 'YELLOW' },
+    'COMMUNITY ACQUIRED PNEUMONIA': { category: 'resp', severity: 'YELLOW' },
+    'HOSPITAL ACQUIRED PNEUMONIA': { category: 'resp', severity: 'YELLOW' },
+    'ASPIRATION PNEUMONIA': { category: 'resp', severity: 'YELLOW' },
+    'LVF EXACERBATION': { category: 'cardio', severity: 'RED' },
+    'LVF': { category: 'cardio', severity: 'YELLOW' },
+    'RVF': { category: 'cardio', severity: 'YELLOW' },
+    'UROSEPSIS': { category: 'infect', severity: 'RED' },
+    'BILIARY SEPSIS': { category: 'infect', severity: 'RED' },
+    'WOUND INFECTION': { category: 'infect', severity: 'YELLOW' },
+    'DIABETIC FOOT': { category: 'infect', severity: 'YELLOW' },
+    'PRESSURE ULCER': { category: 'surg', severity: 'GREEN' },
+    'FALL': { category: 'ortho', severity: 'YELLOW' },
+    'HIP FRACTURE': { category: 'ortho', severity: 'YELLOW' },
+    'NECK OF FEMUR': { category: 'ortho', severity: 'YELLOW' },
+    'HYPERNATREMIA': { category: 'renal', severity: 'YELLOW' },
+    'HYPONATREMIA': { category: 'renal', severity: 'YELLOW' },
+    'HYPERKALEMIA': { category: 'renal', severity: 'RED' },
+    'HYPOKALEMIA': { category: 'renal', severity: 'YELLOW' },
+    'HYPERCALCEMIA': { category: 'renal', severity: 'YELLOW' },
+    'HYPOCALCEMIA': { category: 'renal', severity: 'YELLOW' },
+    'METABOLIC ACIDOSIS': { category: 'renal', severity: 'YELLOW' },
+    'LACTIC ACIDOSIS': { category: 'renal', severity: 'RED' },
+    'HYPERTENSIVE CRISIS': { category: 'cardio', severity: 'RED' },
+    'MALIGNANT HTN': { category: 'cardio', severity: 'RED' },
+    'CLD': { category: 'gi', severity: 'YELLOW' },
+    'NAFLD': { category: 'gi', severity: 'GREEN' },
+    'NASH': { category: 'gi', severity: 'YELLOW' },
+    'PORTAL HTN': { category: 'gi', severity: 'YELLOW' },
+    'HEPATORENAL': { category: 'gi', severity: 'RED' },
+    'FAILURE TO THRIVE': { category: 'status', severity: 'GREEN' },
+    'FTT': { category: 'status', severity: 'GREEN' },
+    'SOCIAL ADMISSION': { category: 'status', severity: 'GREEN' },
     // Status
     'NKDA': { category: 'status' }, 'DNR': { category: 'status' }, 'DNAR': { category: 'status' },
     'FULL': { category: 'status' }, 'NFR': { category: 'status' }, 'COMFORT': { category: 'status' },
@@ -1258,6 +1316,13 @@ const EntityRecognizer = {
       return result;
     }
 
+    // "Dr." or "Dr" prefix — mark as doctor title, not diagnosis
+    if (/^Dr\.?$/i.test(t)) {
+      result.entity = 'DOCTOR_TITLE';
+      result.confidence = 0.85;
+      return result;
+    }
+
     const candidates = [
       this.scoreBed(t),
       this.scoreAgeGender(t),
@@ -1572,11 +1637,23 @@ const EntityRecognizer = {
   scoreSheetStatus(t) {
     const normalized = `${t || ''}`.trim().replace(/\s+/g, ' ');
     const upper = normalized.toUpperCase();
-    if (/^(?:NEW|ACTIVE|CHRONIC|PENDING|TRANSFER|FOLLOW[- ]?UP)$/i.test(upper)) {
+    // Common ward sheet status terms
+    if (/^(?:NEW|ACTIVE|CHRONIC|PENDING|TRANSFER|FOLLOW[- ]?UP|STABLE|UNSTABLE|CRITICAL|IMPROVING|DETERIORATING|WORSENING)$/i.test(upper)) {
       return { entity: 'SHEET_STATUS', confidence: 0.76, corrected: normalized };
     }
-    if (/^(?:ICU|ER|WARD)\s+DISCHARGE$/i.test(upper) || /DISCHARGE/i.test(upper)) {
+    // Discharge / admission status
+    if (/^(?:ICU|ER|WARD|HDU|CCU)\s+(?:DISCHARGE|TRANSFER|ADMISSION)$/i.test(upper) ||
+        /^(?:DISCHARGE|DISCHARGED|D\/C|DC|DISCH)$/i.test(upper) ||
+        /^(?:ADMITTED|ADM|ADMISSION|RE-?ADM)$/i.test(upper)) {
       return { entity: 'SHEET_STATUS', confidence: 0.82, corrected: normalized };
+    }
+    // Ward operational abbreviations
+    if (/^(?:NBM|NPO|FOR OT|FOR OR|FOR CATH|FOR ERCP|FOR SCOPE|FOR CT|FOR MRI|FOR ECHO|FOR DIALYSIS|FOR HD|TCI|OBS|BOOKED|PLANNED|ELECTIVE|URGENT|ROUTINE|AWAITING|WAIT|READY|CLEARED)$/i.test(upper)) {
+      return { entity: 'SHEET_STATUS', confidence: 0.78, corrected: normalized };
+    }
+    // Transfer terms
+    if (/^(?:T\/F|TRANSFER|TRANSFERRED|TO ICU|TO HDU|TO WARD|FROM ICU|FROM ER|EX ICU|FROM HDU)$/i.test(upper)) {
+      return { entity: 'SHEET_STATUS', confidence: 0.80, corrected: normalized };
     }
     return { entity: 'SHEET_STATUS', confidence: 0 };
   },
@@ -1840,6 +1917,18 @@ const PatientAssembler = {
           if (!patient.bloodType || entity.confidence > (patient.fieldConfidence.bloodType || 0)) {
             patient.bloodType = entity.meta.bloodType || entity.corrected;
             patient.fieldConfidence.bloodType = entity.confidence;
+          }
+          break;
+        case 'DOCTOR_TITLE':
+          // "Dr." prefix — next NAME entity spatially to the right is the doctor
+          const nextName = cluster
+            .filter(e => e.entity === 'NAME' && e.box.cx > entity.box.cx && Math.abs(e.box.cy - entity.box.cy) < entity.box.h * 1.5)
+            .sort((a, b) => a.box.cx - b.box.cx)[0];
+          if (nextName) {
+            assignedDoctors.push(nextName);
+            // Remove from names to avoid double-counting
+            const nameIdx = names.indexOf(nextName);
+            if (nameIdx >= 0) names.splice(nameIdx, 1);
           }
           break;
         case 'UNKNOWN': unknowns.push(entity); break;
