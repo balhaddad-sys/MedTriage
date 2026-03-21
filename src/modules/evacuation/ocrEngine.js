@@ -132,6 +132,18 @@ const OCR_PROFILES = [
 ];
 
 const REVIEW_PRIORITY = { READY: 0, REVIEW: 1, VERIFY: 2 };
+const OCR_CONFUSION_GROUPS = [
+  ['0', 'O', 'Q', 'D'],
+  ['1', 'I', 'L', '|', '!'],
+  ['2', 'Z'],
+  ['5', 'S', '$'],
+  ['6', 'G'],
+  ['7', 'T'],
+  ['8', 'B'],
+];
+const OCR_CONFUSION_CANONICAL = Object.fromEntries(
+  OCR_CONFUSION_GROUPS.flatMap(group => group.map(char => [char, group[0]]))
+);
 const HEADER_PATTERNS = [
   /^(name|patient|pt|bed|room|rm|age|sex|gender|diagnosis|diag|dx|meds?|medications?|allerg(?:y|ies)|code|status|ward|location|notes?|id|mrn)$/i,
   /^(اسم|المريض|سرير|غرفة|العمر|الجنس|التشخيص|أدوية|ادوية|حساسية|الحالة|الرقم|ملاحظات)$/i,
@@ -159,6 +171,55 @@ function confidenceBand(score) {
   if (score >= 0.85) return 'HIGH';
   if (score >= 0.7) return 'MEDIUM';
   return 'LOW';
+}
+
+function normalizeArabicText(text) {
+  return `${text || ''}`
+    .replace(/[\u064B-\u065F\u0670]/g, '')
+    .replace(/[\u0623\u0625\u0622]/g, '\u0627')
+    .replace(/\u0629/g, '\u0647')
+    .replace(/\u0649/g, '\u064A');
+}
+
+function stripForLexicon(text) {
+  return `${text || ''}`
+    .normalize('NFKD')
+    .replace(/[^A-Za-z0-9\u0600-\u06FF ]/g, '')
+    .replace(/\s+/g, '')
+    .toUpperCase();
+}
+
+function normalizeLatinOcrToken(text) {
+  return stripForLexicon(text).replace(/[A-Z0-9$|!]/g, char => OCR_CONFUSION_CANONICAL[char] || char);
+}
+
+function substitutionCost(a, b) {
+  if (a === b) return 0;
+  if ((OCR_CONFUSION_CANONICAL[a] || a) === (OCR_CONFUSION_CANONICAL[b] || b)) return 0.18;
+  return 1;
+}
+
+function ocrDistance(a, b) {
+  const left = `${a || ''}`;
+  const right = `${b || ''}`;
+  const m = left.length;
+  const n = right.length;
+  const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
+
+  for (let i = 0; i <= m; i++) dp[i][0] = i;
+  for (let j = 0; j <= n; j++) dp[0][j] = j;
+
+  for (let i = 1; i <= m; i++) {
+    for (let j = 1; j <= n; j++) {
+      dp[i][j] = Math.min(
+        dp[i - 1][j] + 1,
+        dp[i][j - 1] + 1,
+        dp[i - 1][j - 1] + substitutionCost(left[i - 1], right[j - 1])
+      );
+    }
+  }
+
+  return dp[m][n];
 }
 
 function isHeaderLike(text) {
@@ -446,55 +507,79 @@ const MedicalVocabulary = {
   },
 
   correctTerm(rawText, maxDistance = 2) {
-    const upper = rawText.toUpperCase().trim();
-    if (this.MEDICAL_TERMS[upper]) return { term: upper, distance: 0, confidence: 1.0, info: this.MEDICAL_TERMS[upper] };
+    const normalized = stripForLexicon(rawText);
+    const variants = [...new Set([normalized, normalizeLatinOcrToken(rawText)])].filter(Boolean);
+    if (variants.length === 0) return null;
+
+    for (const term of Object.keys(this.MEDICAL_TERMS)) {
+      const termKey = stripForLexicon(term);
+      if (variants.includes(termKey)) {
+        return { term, distance: 0, confidence: 1.0, info: this.MEDICAL_TERMS[term] };
+      }
+    }
+
     let bestMatch = null, bestDistance = Infinity;
     for (const term of Object.keys(this.MEDICAL_TERMS)) {
-      const dist = this.levenshtein(upper, term);
+      const termKey = stripForLexicon(term);
+      const dist = Math.min(...variants.map(variant => ocrDistance(variant, termKey)));
       if (dist < bestDistance && dist <= maxDistance) {
         bestDistance = dist;
         bestMatch = term;
       }
     }
     if (bestMatch) {
-      return { term: bestMatch, distance: bestDistance, confidence: 1 - (bestDistance / Math.max(rawText.length, bestMatch.length)), info: this.MEDICAL_TERMS[bestMatch] };
+      const bestKey = stripForLexicon(bestMatch);
+      const confidenceBase = Math.max(variants[0]?.length || 0, bestKey.length, 1);
+      return {
+        term: bestMatch,
+        distance: bestDistance,
+        confidence: clamp(1 - (bestDistance / confidenceBase)),
+        info: this.MEDICAL_TERMS[bestMatch],
+      };
     }
     return null;
   },
 
   correctMedication(rawText, maxDistance = 3) {
-    const lower = rawText.toLowerCase().trim();
+    const normalized = stripForLexicon(rawText);
+    const variants = [...new Set([normalized, normalizeLatinOcrToken(rawText)])].filter(Boolean);
+    if (variants.length === 0) return null;
     let bestMatch = null, bestDistance = Infinity;
     for (const med of this.MEDICATIONS) {
-      const dist = this.levenshtein(lower, med.toLowerCase());
+      const medKey = stripForLexicon(med);
+      const dist = Math.min(...variants.map(variant => ocrDistance(variant, medKey)));
       if (dist < bestDistance && dist <= maxDistance) {
         bestDistance = dist;
         bestMatch = med;
       }
     }
     if (bestMatch) {
-      return { term: bestMatch, distance: bestDistance, confidence: 1 - (bestDistance / Math.max(rawText.length, bestMatch.length)) };
+      const bestKey = stripForLexicon(bestMatch);
+      const confidenceBase = Math.max(variants[0]?.length || 0, bestKey.length, 1);
+      return {
+        term: bestMatch,
+        distance: bestDistance,
+        confidence: clamp(1 - (bestDistance / confidenceBase)),
+      };
     }
     return null;
   },
 
   lookupName(text) {
-    // Check against Arabic name databases
-    const stripped = text.replace(/[\u064B-\u065F\u0670]/g, '');
-    const normalized = stripped.replace(/[\u0623\u0625\u0622]/g, '\u0627').replace(/\u0629/g, '\u0647').replace(/\u0649/g, '\u064A');
+    const normalized = normalizeArabicText(text);
     for (const name of this.ARABIC_FIRST_NAMES) {
-      const normName = name.replace(/[\u0623\u0625\u0622]/g, '\u0627').replace(/\u0629/g, '\u0647').replace(/\u0649/g, '\u064A');
+      const normName = normalizeArabicText(name);
       if (normName === normalized) return { confidence: 1.0 };
-      if (this.levenshtein(normalized, normName) <= 1) return { confidence: 0.8 };
+      if (ocrDistance(normalized, normName) <= 1) return { confidence: 0.8 };
     }
     for (const name of this.FAMILY_NAMES) {
       if (typeof name === 'string') {
         const normName = /[\u0600-\u06FF]/.test(name)
-          ? name.replace(/[\u0623\u0625\u0622]/g, '\u0627').replace(/\u0629/g, '\u0647').replace(/\u0649/g, '\u064A')
+          ? normalizeArabicText(name)
           : name.toLowerCase();
         const compare = /[\u0600-\u06FF]/.test(text) ? normalized : text.toLowerCase();
         if (normName === compare) return { confidence: 1.0 };
-        if (this.levenshtein(compare, normName) <= 1) return { confidence: 0.7 };
+        if (ocrDistance(compare, normName) <= 1) return { confidence: 0.7 };
       }
     }
     return null;
@@ -1214,6 +1299,304 @@ function mergePatients(a, b) {
     reviewReasons: [...new Set([...(a.reviewReasons || []), ...(b.reviewReasons || [])])],
   };
 }
+
+function entityFingerprint(entity) {
+  return [
+    Math.round(entity.box.x),
+    Math.round(entity.box.y),
+    Math.round(entity.box.w),
+    Math.round(entity.box.h),
+    entity.text,
+  ].join('|');
+}
+
+function filterMeaningfulEntities(entities) {
+  return entities.filter(entity => entity.entity !== 'NOISE' && entity.entity !== 'HEADER');
+}
+
+function rowIdentityScore(entities) {
+  let score = 0;
+  if (entities.some(entity => entity.entity === 'BED')) score += 1.2;
+  if (entities.some(entity => entity.entity === 'NAME')) score += 1.05;
+  if (entities.some(entity => entity.entity === 'AGE_GENDER')) score += 1;
+  if (entities.some(entity => entity.entity === 'AGE')) score += 0.3;
+  if (entities.some(entity => entity.entity === 'GENDER')) score += 0.25;
+  if (entities.some(entity => entity.entity === 'CIVIL_ID')) score += 0.6;
+  return score;
+}
+
+function groupEntitiesIntoRows(entities) {
+  if (entities.length === 0) return [];
+
+  const sorted = [...entities].sort((a, b) => a.box.cy - b.box.cy || a.box.cx - b.box.cx);
+  const avgHeight = average(sorted.map(entity => entity.box.h), 20);
+  const rowGap = Math.max(16, avgHeight * 0.82);
+  const rows = [];
+
+  for (const entity of sorted) {
+    const current = rows[rows.length - 1];
+    if (!current || Math.abs(entity.box.cy - current.centerY) > rowGap) {
+      rows.push({ entities: [entity], centerY: entity.box.cy });
+      continue;
+    }
+    current.entities.push(entity);
+    current.centerY = average(current.entities.map(item => item.box.cy), current.centerY);
+  }
+
+  return rows.map(row => row.entities.sort((a, b) => a.box.cx - b.box.cx));
+}
+
+function detectLaneRanges(entities, imageWidth) {
+  if (entities.length < 8) return [{ entities }];
+
+  const sorted = [...entities].sort((a, b) => a.box.cx - b.box.cx);
+  const avgWidth = average(sorted.map(entity => entity.box.w), 28);
+  let bestGap = null;
+
+  for (let i = 1; i < sorted.length; i++) {
+    const left = sorted[i - 1];
+    const right = sorted[i];
+    const gap = right.box.x - (left.box.x + left.box.w);
+    if (gap <= Math.max(avgWidth * 3.2, imageWidth * 0.12)) continue;
+    if (!bestGap || gap > bestGap.gap) {
+      bestGap = { gap, midpoint: left.box.x + left.box.w + gap / 2 };
+    }
+  }
+
+  if (!bestGap) return [{ entities }];
+
+  const leftLane = entities.filter(entity => entity.box.cx <= bestGap.midpoint);
+  const rightLane = entities.filter(entity => entity.box.cx > bestGap.midpoint);
+  if (leftLane.length < 4 || rightLane.length < 4) return [{ entities }];
+
+  return [
+    { entities: leftLane },
+    { entities: rightLane },
+  ].sort((a, b) => average(a.entities.map(entity => entity.box.x), 0) - average(b.entities.map(entity => entity.box.x), 0));
+}
+
+function mergeWeakRows(rows) {
+  const merged = [];
+
+  for (const row of rows) {
+    const previous = merged[merged.length - 1];
+    if (!previous) {
+      merged.push([...row]);
+      continue;
+    }
+
+    if (rowIdentityScore(row) < 0.6) {
+      previous.push(...row);
+      previous.sort((a, b) => a.box.cy - b.box.cy || a.box.cx - b.box.cx);
+      continue;
+    }
+
+    merged.push([...row]);
+  }
+
+  return merged;
+}
+
+function inferColumnRole(text) {
+  const cleaned = `${text || ''}`.trim().replace(/[:\-]+$/, '');
+  if (/^(?:bed|room|rm|#|سرير|غرفة)$/i.test(cleaned)) return 'BED';
+  if (/^(?:name|patient|pt|اسم|المريض)$/i.test(cleaned)) return 'NAME';
+  if (/^(?:age|dob|العمر)$/i.test(cleaned)) return 'AGE_GENDER';
+  if (/^(?:sex|gender|الجنس)$/i.test(cleaned)) return 'AGE_GENDER';
+  if (/^(?:diag|diagnosis|dx|التشخيص)$/i.test(cleaned)) return 'DIAGNOSIS';
+  if (/^(?:med|meds|medications|ادوية|أدوية)$/i.test(cleaned)) return 'MEDICATION';
+  if (/^(?:allergy|allergies|حساسية)$/i.test(cleaned)) return 'ALLERGY';
+  if (/^(?:code|status|الحالة)$/i.test(cleaned)) return 'STATUS';
+  if (/^(?:ward|location|الجناح|وحدة)$/i.test(cleaned)) return 'WARD';
+  if (/^(?:id|mrn|civil|الرقم)$/i.test(cleaned)) return 'CIVIL_ID';
+  return null;
+}
+
+function applyRoleProjection(entity, role) {
+  if (!role) return entity;
+
+  const scorerMap = {
+    BED: EntityRecognizer.scoreBed.bind(EntityRecognizer),
+    NAME: EntityRecognizer.scoreName.bind(EntityRecognizer),
+    AGE_GENDER: text => {
+      const combined = EntityRecognizer.scoreAgeGender(text);
+      if (combined.confidence > 0) return combined;
+      const age = EntityRecognizer.scoreAge(text);
+      if (age.confidence > 0) return { entity: 'AGE', confidence: age.confidence, meta: age.meta };
+      return EntityRecognizer.scoreGender(text);
+    },
+    DIAGNOSIS: EntityRecognizer.scoreDiagnosis.bind(EntityRecognizer),
+    MEDICATION: EntityRecognizer.scoreMedication.bind(EntityRecognizer),
+    ALLERGY: EntityRecognizer.scoreAllergy.bind(EntityRecognizer),
+    STATUS: EntityRecognizer.scoreStatus.bind(EntityRecognizer),
+    WARD: EntityRecognizer.scoreWard.bind(EntityRecognizer),
+    CIVIL_ID: EntityRecognizer.scoreCivilId.bind(EntityRecognizer),
+  };
+
+  const scorer = scorerMap[role];
+  if (!scorer) return entity;
+
+  const projected = role === 'STATUS' || role === 'ALLERGY'
+    ? scorer(entity.text.toUpperCase())
+    : scorer(entity.text);
+  if (!projected || projected.confidence <= 0) {
+    return { ...entity, meta: { ...(entity.meta || {}), columnRole: role } };
+  }
+
+  const nextEntity = projected.entity || entity.entity;
+  return {
+    ...entity,
+    entity: nextEntity,
+    confidence: clamp(Math.max(entity.confidence, projected.confidence * 0.95)),
+    corrected: projected.corrected || entity.corrected || entity.text,
+    meta: { ...(entity.meta || {}), ...(projected.meta || {}), columnRole: role },
+  };
+}
+
+const TableHypothesisBuilder = {
+  build(entities) {
+    const rows = groupEntitiesIntoRows(entities);
+    if (rows.length < 3) return null;
+
+    const headerIndex = rows.slice(0, 3).findIndex(row => row.filter(entity => isHeaderLike(entity.text)).length >= 2);
+    if (headerIndex === -1) return null;
+
+    const headerRow = rows[headerIndex];
+    const columns = headerRow
+      .map(entity => ({
+        role: inferColumnRole(entity.text),
+        centerX: entity.box.cx,
+      }))
+      .filter(column => column.role);
+    if (columns.length < 2) return null;
+
+    const clusters = [];
+    for (const row of rows.slice(headerIndex + 1)) {
+      const projected = row.map(entity => {
+        const nearestColumn = columns.reduce((best, column) => {
+          if (!best) return column;
+          return Math.abs(column.centerX - entity.box.cx) < Math.abs(best.centerX - entity.box.cx) ? column : best;
+        }, null);
+        return applyRoleProjection(entity, nearestColumn?.role || null);
+      });
+
+      if (rowIdentityScore(projected) < 0.6 && clusters.length > 0) {
+        clusters[clusters.length - 1].push(...projected);
+      } else {
+        clusters.push(projected);
+      }
+    }
+
+    if (clusters.length === 0) return null;
+
+    const coverage = new Set(clusters.flat().map(entityFingerprint)).size / Math.max(filterMeaningfulEntities(entities).length, 1);
+    return {
+      id: 'table-grid',
+      clusters,
+      structuralScore: 0.94,
+      coverage,
+    };
+  },
+};
+
+const LaneRowHypothesisBuilder = {
+  build(entities, imageWidth) {
+    const lanes = detectLaneRanges(entities, imageWidth);
+    const clusters = lanes.flatMap(lane => mergeWeakRows(groupEntitiesIntoRows(lane.entities)));
+    if (clusters.length === 0) return null;
+
+    const coverage = new Set(clusters.flat().map(entityFingerprint)).size / Math.max(filterMeaningfulEntities(entities).length, 1);
+    return {
+      id: lanes.length > 1 ? 'lane-rows' : 'row-bands',
+      clusters,
+      structuralScore: lanes.length > 1 ? 0.86 : 0.75,
+      coverage,
+      laneCount: lanes.length,
+    };
+  },
+};
+
+const LayoutHypothesisEngine = {
+  build(entities, imageWidth, imageHeight) {
+    const meaningful = filterMeaningfulEntities(entities);
+    const hypotheses = [];
+
+    const table = TableHypothesisBuilder.build(meaningful);
+    if (table) hypotheses.push(table);
+
+    const laneRows = LaneRowHypothesisBuilder.build(meaningful, imageWidth);
+    if (laneRows) hypotheses.push(laneRows);
+
+    const clusters = SpatialClusterer.cluster(entities, imageWidth, imageHeight);
+    if (clusters.length > 0) {
+      hypotheses.push({
+        id: 'spatial-cluster',
+        clusters,
+        structuralScore: 0.68,
+        coverage: new Set(clusters.flat().map(entityFingerprint)).size / Math.max(meaningful.length, 1),
+      });
+    }
+
+    return hypotheses;
+  },
+
+  evaluate(hypothesis) {
+    const patients = finalizePatients(
+      hypothesis.clusters
+        .map(cluster => PatientAssembler.assemble(cluster))
+        .filter(Boolean)
+    );
+    const readyRatio = patients.filter(patient => patient.reviewLevel === 'READY').length / Math.max(patients.length, 1);
+    const completeness = average(patients.map(patient => {
+      let score = 0;
+      if (patient.fullName) score += 0.35;
+      if (patient.bed) score += 0.2;
+      if (patient.age != null || patient.gender) score += 0.2;
+      if (patient.dx) score += 0.15;
+      if (patient.meds) score += 0.1;
+      return score;
+    }), 0);
+
+    return {
+      ...hypothesis,
+      patients,
+      score: clamp(
+        (average(patients.map(patient => patient.confidence), 0) * 0.46) +
+        (readyRatio * 0.18) +
+        ((hypothesis.coverage || 0) * 0.18) +
+        (completeness * 0.12) +
+        ((hypothesis.structuralScore || 0) * 0.06)
+      ),
+    };
+  },
+
+  pickBest(hypotheses) {
+    return [...hypotheses].sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      if (b.patients.length !== a.patients.length) return b.patients.length - a.patients.length;
+      return average(b.patients.map(patient => patient.confidence), 0) - average(a.patients.map(patient => patient.confidence), 0);
+    })[0] || null;
+  },
+
+  fuse(best, hypotheses) {
+    if (!best) return [];
+    let merged = [...best.patients];
+
+    for (const hypothesis of hypotheses) {
+      if (hypothesis.id === best.id) continue;
+      for (const patient of hypothesis.patients) {
+        const index = merged.findIndex(existing => shouldMerge(existing, patient));
+        if (index === -1) {
+          if ((patient.confidence || 0) >= 0.84) merged.push(patient);
+          continue;
+        }
+        merged[index] = mergePatients(merged[index], patient);
+      }
+    }
+
+    return finalizePatients(deduplicatePatients(merged));
+  },
+};
 
 // ====== PADDLEOCR ENGINE (ONNX Runtime Web) ======
 import { PaddleOcrService } from 'paddleocr';
