@@ -255,7 +255,9 @@ export default function OCRScanner({ onClose, onImport }) {
               <div style={styles.panelTitle}>OCR Quality Summary</div>
               <div style={styles.metaRow}>
                 <span style={styles.metaPill}>Engine {result.engine}</span>
+                {result.backend && <span style={styles.metaPill}>Backend {result.backend}</span>}
                 {result.profile && <span style={styles.metaPill}>Profile {result.profile}</span>}
+                {result.strategy && <span style={styles.metaPill}>Strategy {result.strategy}</span>}
                 {result.qualityBand && <span style={styles.metaPill}>Quality {result.qualityBand}</span>}
                 {Number.isFinite(result.qualityScore) && (
                   <span style={styles.metaPill}>Score {Math.round(result.qualityScore * 100)}%</span>
