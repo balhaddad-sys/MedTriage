@@ -128,6 +128,7 @@ export default function PatientCard({ patient }) {
             <EvacTag status={p.evac || 'IN_WARD'} />
             {p.o2 && p.o2 !== 'NONE' && <span style={tagStyle(colors.amber)}>O2: {p.o2}</span>}
             {p.iso && p.iso !== 'NONE' && <span style={tagStyle(colors.purple)}>ISO: {p.iso}</span>}
+            {p.bloodType && <span style={tagStyle(colors.red)}>{p.bloodType}</span>}
             {p.code && p.code !== 'FULL' && <span style={tagStyle(colors.red)}>{p.code}</span>}
             {p.mobility === 'CRITICAL_TRANSPORT' && <span style={tagStyle(colors.red)}>CRITICAL</span>}
           </div>
@@ -141,6 +142,14 @@ export default function PatientCard({ patient }) {
             <div style={styles.field}>
               <span style={styles.fieldLabel}>Civil ID</span>
               <span style={styles.fieldValue}>{p.civilId || '—'}</span>
+            </div>
+            <div style={styles.field}>
+              <span style={styles.fieldLabel}>Blood Type</span>
+              <span style={{ ...styles.fieldValue, color: p.bloodType ? colors.red : colors.text3 }}>{p.bloodType || '—'}</span>
+            </div>
+            <div style={styles.field}>
+              <span style={styles.fieldLabel}>Nationality</span>
+              <span style={styles.fieldValue}>{p.nationality || '—'}</span>
             </div>
             <div style={styles.field}>
               <span style={styles.fieldLabel}>Code Status</span>

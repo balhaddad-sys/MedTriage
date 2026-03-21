@@ -26,6 +26,9 @@ jobs:
       - name: Verify calculators
         run: npm run verify:calculators
 
+      - name: Verify NFC reader
+        run: npm run verify:nfc
+
       - name: Build
         run: npm run build
 
