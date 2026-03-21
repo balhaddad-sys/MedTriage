@@ -1,4 +1,4 @@
-const CACHE_NAME = 'medevac-v3.1.0';
+const CACHE_NAME = 'medevac-v3.2.0';
 const BACKUP_CACHE = 'medevac-patient-backups';
 
 const PRECACHE_URLS = [

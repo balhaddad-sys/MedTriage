@@ -92,7 +92,7 @@ export default function OCRScanner({ onClose, onImport }) {
         setProgress(msg);
         if (msg.includes('Loading')) setProgressPct(30);
         else if (msg.includes('Recognizing')) setProgressPct(50);
-        else if (msg.includes('medical')) setProgressPct(80);
+        else if (msg.includes('entities') || msg.includes('clustering')) setProgressPct(80);
       });
 
       setProgressPct(100);
@@ -182,8 +182,10 @@ export default function OCRScanner({ onClose, onImport }) {
           <>
             <div style={styles.statsRow}>
               <span>Engine: {result.engine}</span>
-              <span>Time: {Math.round(result.processingTime)}ms</span>
-              <span>Found: {result.patients.length} patients</span>
+              <span>{Math.round(result.processingTime)}ms</span>
+              {result.entityCount > 0 && <span>{result.entityCount} entities</span>}
+              {result.clusterCount > 0 && <span>{result.clusterCount} clusters</span>}
+              <span>{result.patients.length} patients</span>
             </div>
 
             {result.patients.length === 0 ? (

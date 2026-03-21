@@ -1,62 +1,36 @@
-// MedEvac Context OCR Engine
-// Domain-specific OCR for hospital patient lists
-// Uses Tesseract.js for raw OCR + medical context correction pipeline
+// MedEvac OCR Engine v3 — Entity-First Spatial Clustering
+// Handles: printed tables, handwritten lists, whiteboards, chaotic mixed layouts
+// Architecture: Image → OCR boxes → Entity Recognition → DBSCAN Clustering → Patient Assembly
 
-// ====== LAYER 1: IMAGE PREPROCESSING ======
+// ====== IMAGE PREPROCESSING ======
 const ImagePreprocessor = {
   async process(imageSource) {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     const img = await this.loadImage(imageSource);
 
-    canvas.width = img.width;
-    canvas.height = img.height;
-    ctx.drawImage(img, 0, 0);
+    // Downscale large images for performance (max 2000px on longest side)
+    const maxDim = 2000;
+    let w = img.width, h = img.height;
+    if (w > maxDim || h > maxDim) {
+      const scale = maxDim / Math.max(w, h);
+      w = Math.round(w * scale);
+      h = Math.round(h * scale);
+    }
+    canvas.width = w;
+    canvas.height = h;
+    ctx.drawImage(img, 0, 0, w, h);
 
     // Grayscale + contrast enhancement
-    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0, 0, w, h);
     const data = imageData.data;
-
     for (let i = 0; i < data.length; i += 4) {
-      // Grayscale
       const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-      // Contrast stretch
-      const enhanced = Math.min(255, Math.max(0, (gray - 128) * 1.5 + 128));
+      const enhanced = Math.min(255, Math.max(0, (gray - 128) * 1.4 + 128));
       data[i] = data[i + 1] = data[i + 2] = enhanced;
     }
-
-    // Adaptive threshold for binarization
-    this.adaptiveThreshold(data, canvas.width, canvas.height);
-
     ctx.putImageData(imageData, 0, 0);
     return canvas;
-  },
-
-  adaptiveThreshold(data, width, height, blockSize = 15, C = 10) {
-    const gray = new Uint8Array(width * height);
-    for (let i = 0; i < gray.length; i++) {
-      gray[i] = data[i * 4];
-    }
-
-    const half = Math.floor(blockSize / 2);
-    for (let y = 0; y < height; y++) {
-      for (let x = 0; x < width; x++) {
-        let sum = 0, count = 0;
-        for (let dy = -half; dy <= half; dy++) {
-          for (let dx = -half; dx <= half; dx++) {
-            const ny = y + dy, nx = x + dx;
-            if (ny >= 0 && ny < height && nx >= 0 && nx < width) {
-              sum += gray[ny * width + nx];
-              count++;
-            }
-          }
-        }
-        const threshold = sum / count - C;
-        const idx = (y * width + x) * 4;
-        const val = gray[y * width + x] > threshold ? 255 : 0;
-        data[idx] = data[idx + 1] = data[idx + 2] = val;
-      }
-    }
   },
 
   loadImage(source) {
@@ -74,22 +48,21 @@ const ImagePreprocessor = {
         source.onerror = reject;
         return;
       }
-      // Blob or File
       const img = new Image();
       img.onload = () => { URL.revokeObjectURL(img.src); resolve(img); };
       img.onerror = reject;
       if (source instanceof Blob) {
         img.src = URL.createObjectURL(source);
       } else if (typeof source === 'string') {
-        img.src = source; // data URL or path
+        img.src = source;
       } else {
         reject(new Error('Unsupported image source'));
       }
     });
-  }
+  },
 };
 
-// ====== LAYER 3b: MEDICAL VOCABULARY ======
+// ====== MEDICAL VOCABULARY ======
 const MedicalVocabulary = {
   MEDICAL_TERMS: {
     // Cardiovascular
@@ -213,11 +186,11 @@ const MedicalVocabulary = {
     return dp[m][n];
   },
 
-  correctTerm(rawText, vocabulary, maxDistance = 2) {
+  correctTerm(rawText, maxDistance = 2) {
     const upper = rawText.toUpperCase().trim();
-    if (vocabulary[upper]) return { term: upper, distance: 0, confidence: 1.0 };
+    if (this.MEDICAL_TERMS[upper]) return { term: upper, distance: 0, confidence: 1.0, info: this.MEDICAL_TERMS[upper] };
     let bestMatch = null, bestDistance = Infinity;
-    for (const term of Object.keys(vocabulary)) {
+    for (const term of Object.keys(this.MEDICAL_TERMS)) {
       const dist = this.levenshtein(upper, term);
       if (dist < bestDistance && dist <= maxDistance) {
         bestDistance = dist;
@@ -225,7 +198,7 @@ const MedicalVocabulary = {
       }
     }
     if (bestMatch) {
-      return { term: bestMatch, distance: bestDistance, confidence: 1 - (bestDistance / Math.max(rawText.length, bestMatch.length)) };
+      return { term: bestMatch, distance: bestDistance, confidence: 1 - (bestDistance / Math.max(rawText.length, bestMatch.length)), info: this.MEDICAL_TERMS[bestMatch] };
     }
     return null;
   },
@@ -246,94 +219,361 @@ const MedicalVocabulary = {
     return null;
   },
 
-  isMedicalTerm(text) {
-    const upper = text.toUpperCase().trim();
-    if (this.MEDICAL_TERMS[upper]) return true;
-    const correction = this.correctTerm(upper, this.MEDICAL_TERMS, 1);
-    return correction !== null;
+  lookupName(text) {
+    // Check against Arabic name databases
+    const stripped = text.replace(/[\u064B-\u065F\u0670]/g, '');
+    const normalized = stripped.replace(/[\u0623\u0625\u0622]/g, '\u0627').replace(/\u0629/g, '\u0647').replace(/\u0649/g, '\u064A');
+    for (const name of this.ARABIC_FIRST_NAMES) {
+      const normName = name.replace(/[\u0623\u0625\u0622]/g, '\u0627').replace(/\u0629/g, '\u0647').replace(/\u0649/g, '\u064A');
+      if (normName === normalized) return { confidence: 1.0 };
+      if (this.levenshtein(normalized, normName) <= 1) return { confidence: 0.8 };
+    }
+    for (const name of this.FAMILY_NAMES) {
+      if (typeof name === 'string') {
+        const normName = /[\u0600-\u06FF]/.test(name)
+          ? name.replace(/[\u0623\u0625\u0622]/g, '\u0627').replace(/\u0629/g, '\u0647').replace(/\u0649/g, '\u064A')
+          : name.toLowerCase();
+        const compare = /[\u0600-\u06FF]/.test(text) ? normalized : text.toLowerCase();
+        if (normName === compare) return { confidence: 1.0 };
+        if (this.levenshtein(compare, normName) <= 1) return { confidence: 0.7 };
+      }
+    }
+    return null;
   },
 };
 
-// ====== LAYER 3c: SEQUENTIAL CONTEXT PREDICTOR ======
-const SequentialContextPredictor = {
-  parseLine(text) {
-    const tokens = this.tokenize(text);
-    const fields = {};
-    let state = 'START';
-    const diagTokens = [];
-    const medTokens = [];
+// ====== STEP 1: ENTITY RECOGNIZER ======
+// Each OCR detection gets classified as an entity type with confidence
+const EntityRecognizer = {
+  classify(detection) {
+    const { text, box } = detection;
+    const t = text.trim();
+    const upper = t.toUpperCase();
+    const result = { text: t, box, entity: null, confidence: 0, corrected: t, meta: {} };
 
-    for (const token of tokens) {
-      const classification = this.classifyToken(token, state);
-      switch (classification.type) {
-        case 'BED':
-          fields.bed = token; state = 'AFTER_BED'; break;
-        case 'NAME':
-          fields.fullName = fields.fullName ? fields.fullName + ' ' + token : token;
-          state = 'IN_NAME'; break;
-        case 'AGE_GENDER': {
-          const match = token.match(/(\d+)\s*[/\\]?\s*([MFmf])/);
-          if (match) { fields.age = parseInt(match[1]); fields.gender = match[2].toUpperCase(); }
-          state = 'AFTER_AGE'; break;
-        }
-        case 'AGE': fields.age = parseInt(token); state = 'AFTER_AGE'; break;
-        case 'GENDER': fields.gender = token.toUpperCase(); state = 'AFTER_AGE'; break;
-        case 'MEDICAL_TERM': diagTokens.push(token); state = 'IN_DIAGNOSIS'; break;
-        case 'MEDICATION': medTokens.push(token); state = 'IN_MEDICATIONS'; break;
-        default:
-          if (state === 'AFTER_BED' || state === 'START') {
-            fields.fullName = fields.fullName ? fields.fullName + ' ' + token : token;
-            state = 'IN_NAME';
-          } else if (state === 'IN_NAME') {
-            if (/^\d{1,3}$/.test(token) && parseInt(token) > 0 && parseInt(token) < 130) {
-              fields.age = parseInt(token); state = 'AFTER_AGE';
-            } else {
-              fields.fullName += ' ' + token;
-            }
-          } else if (state === 'IN_DIAGNOSIS' || state === 'AFTER_AGE') {
-            const correction = MedicalVocabulary.correctTerm(token, MedicalVocabulary.MEDICAL_TERMS, 2);
-            if (correction) { diagTokens.push(correction.term); state = 'IN_DIAGNOSIS'; }
-            else {
-              const medCorrection = MedicalVocabulary.correctMedication(token, 3);
-              if (medCorrection) { medTokens.push(medCorrection.term); state = 'IN_MEDICATIONS'; }
-            }
+    if (t.length === 0 || /^[.,;:!?\-\u2013\u2014]+$/.test(t)) {
+      result.entity = 'NOISE';
+      return result;
+    }
+
+    const candidates = [
+      this.scoreBed(t),
+      this.scoreAgeGender(t),
+      this.scoreAge(t),
+      this.scoreGender(t),
+      this.scoreName(t),
+      this.scoreDiagnosis(upper),
+      this.scoreMedication(t),
+      this.scoreStatus(upper),
+      this.scoreAllergy(upper),
+    ].filter(c => c.confidence > 0.3);
+
+    if (candidates.length === 0) {
+      result.entity = 'UNKNOWN';
+      result.confidence = 0.2;
+      return result;
+    }
+
+    candidates.sort((a, b) => b.confidence - a.confidence);
+    const best = candidates[0];
+    result.entity = best.entity;
+    result.confidence = best.confidence;
+    result.corrected = best.corrected || t;
+    result.meta = best.meta || {};
+    return result;
+  },
+
+  scoreBed(t) {
+    if (/^[A-E]-[MF]-\d{1,2}$/i.test(t))
+      return { entity: 'BED', confidence: 0.99, corrected: t.toUpperCase() };
+    if (/^(?:bed|rm|room|\u0633\u0631\u064A\u0631|\u063A\u0631\u0641\u0629)\s*#?\s*(\d{1,3})/i.test(t))
+      return { entity: 'BED', confidence: 0.9, corrected: t };
+    if (/^[A-E]\d{1,2}$/i.test(t))
+      return { entity: 'BED', confidence: 0.7, corrected: t.toUpperCase() };
+    return { entity: 'BED', confidence: 0 };
+  },
+
+  scoreAgeGender(t) {
+    let m;
+    if ((m = t.match(/^(\d{1,3})\s*[/\\,\- ]?\s*([MFmf])$/))) {
+      const age = parseInt(m[1]);
+      if (age > 0 && age < 130)
+        return { entity: 'AGE_GENDER', confidence: 0.95, meta: { age, gender: m[2].toUpperCase() } };
+    }
+    if ((m = t.match(/^([MFmf])\s*[/\\,\- ]?\s*(\d{1,3})$/))) {
+      const age = parseInt(m[2]);
+      if (age > 0 && age < 130)
+        return { entity: 'AGE_GENDER', confidence: 0.95, meta: { age, gender: m[1].toUpperCase() } };
+    }
+    return { entity: 'AGE_GENDER', confidence: 0 };
+  },
+
+  scoreAge(t) {
+    if (/^\d{1,3}$/.test(t)) {
+      const age = parseInt(t);
+      if (age >= 1 && age <= 120) {
+        const conf = (age >= 18 && age <= 100) ? 0.5 : 0.3;
+        return { entity: 'AGE', confidence: conf, meta: { age } };
+      }
+    }
+    if (/^(\d{1,3})\s*(?:y(?:rs?|ears?)?(?:\s*old)?|\u0633\u0646\u0629)$/i.test(t)) {
+      return { entity: 'AGE', confidence: 0.9, meta: { age: parseInt(t) } };
+    }
+    return { entity: 'AGE', confidence: 0 };
+  },
+
+  scoreGender(t) {
+    if (/^[MF]$/i.test(t)) return { entity: 'GENDER', confidence: 0.6, meta: { gender: t.toUpperCase() } };
+    if (/^(male|female|\u0630\u0643\u0631|\u0623\u0646\u062B\u0649)$/i.test(t)) {
+      const g = /^(male|\u0630\u0643\u0631)$/i.test(t) ? 'M' : 'F';
+      return { entity: 'GENDER', confidence: 0.95, meta: { gender: g } };
+    }
+    return { entity: 'GENDER', confidence: 0 };
+  },
+
+  scoreName(t) {
+    let conf = 0;
+
+    // Arabic text >= 2 chars
+    if (/[\u0600-\u06FF]/.test(t) && t.replace(/[^\u0600-\u06FF]/g, '').length >= 2) {
+      conf = 0.75;
+      const match = MedicalVocabulary.lookupName(t);
+      if (match && match.confidence > 0.6) conf = 0.9;
+    }
+
+    // Capitalized English word
+    if (/^[A-Z][a-z]{1,20}$/.test(t)) {
+      conf = Math.max(conf, 0.45);
+      if (/^Al[- ]?[A-Z]/.test(t)) conf = 0.8;
+    }
+
+    // Multi-word with capitals
+    if (/^[A-Z][a-z]+\s+(?:Al[- ])?[A-Z][a-z]+/.test(t)) conf = 0.85;
+
+    // Penalize if it matches a medical term
+    const medMatch = MedicalVocabulary.correctTerm(t, 0);
+    if (medMatch) conf *= 0.3;
+
+    return { entity: 'NAME', confidence: conf };
+  },
+
+  scoreDiagnosis(upper) {
+    const match = MedicalVocabulary.correctTerm(upper, 1);
+    if (!match) return { entity: 'DIAGNOSIS', confidence: 0 };
+    return {
+      entity: 'DIAGNOSIS',
+      confidence: 0.6 + match.confidence * 0.4,
+      corrected: match.term,
+      meta: match.info,
+    };
+  },
+
+  scoreMedication(t) {
+    const match = MedicalVocabulary.correctMedication(t, 2);
+    if (!match) return { entity: 'MEDICATION', confidence: 0 };
+    return {
+      entity: 'MEDICATION',
+      confidence: 0.55 + match.confidence * 0.45,
+      corrected: match.term,
+    };
+  },
+
+  scoreStatus(upper) {
+    const statuses = { 'DNR': 1, 'DNAR': 1, 'FULL CODE': 1, 'COMFORT': 0.9, 'NFR': 0.9 };
+    const conf = statuses[upper] || 0;
+    return { entity: 'STATUS', confidence: conf, corrected: upper };
+  },
+
+  scoreAllergy(upper) {
+    if (upper === 'NKDA') return { entity: 'ALLERGY', confidence: 1.0, corrected: 'NKDA' };
+    if (/^ALLERG/i.test(upper)) return { entity: 'ALLERGY', confidence: 0.8 };
+    const allergens = ['PENICILLIN', 'SULFA', 'ASPIRIN', 'IODINE', 'LATEX', 'NSAID', 'CODEINE', 'MORPHINE', 'PCN'];
+    if (allergens.includes(upper)) return { entity: 'ALLERGY', confidence: 0.6, corrected: upper };
+    return { entity: 'ALLERGY', confidence: 0 };
+  },
+};
+
+// ====== STEP 2: SPATIAL CLUSTERING (DBSCAN) ======
+const SpatialClusterer = {
+  cluster(entities, imageWidth, imageHeight) {
+    const meaningful = entities.filter(e => e.entity !== 'NOISE');
+    if (meaningful.length === 0) return [];
+
+    const eps = this.estimateEps(meaningful, imageHeight);
+    const clusters = this.dbscan(meaningful, eps, 1);
+
+    // Sort clusters top-to-bottom
+    clusters.sort((a, b) => {
+      const aY = a.reduce((s, e) => s + e.box.cy, 0) / a.length;
+      const bY = b.reduce((s, e) => s + e.box.cy, 0) / b.length;
+      return aY - bY;
+    });
+
+    return clusters;
+  },
+
+  estimateEps(entities, imgH) {
+    if (entities.length <= 1) return imgH * 0.1;
+
+    const yCenters = entities.map(e => e.box.cy).sort((a, b) => a - b);
+    const gaps = [];
+    for (let i = 1; i < yCenters.length; i++) {
+      gaps.push(yCenters[i] - yCenters[i - 1]);
+    }
+    gaps.sort((a, b) => a - b);
+
+    if (gaps.length === 0) return imgH * 0.1;
+
+    const medianGap = gaps[Math.floor(gaps.length / 2)];
+    const minEps = imgH * 0.03;
+    const maxEps = imgH * 0.15;
+    return Math.max(minEps, Math.min(maxEps, medianGap * 2.5));
+  },
+
+  dbscan(entities, eps, minPoints) {
+    const n = entities.length;
+    const labels = new Int32Array(n).fill(-1);
+    let clusterId = 0;
+
+    for (let i = 0; i < n; i++) {
+      if (labels[i] !== -1) continue;
+      const neighbors = this.rangeQuery(entities, i, eps);
+
+      if (neighbors.length < minPoints) {
+        labels[i] = -2;
+        continue;
+      }
+
+      labels[i] = clusterId;
+      const seeds = [...neighbors];
+
+      for (let j = 0; j < seeds.length; j++) {
+        const q = seeds[j];
+        if (labels[q] === -2) labels[q] = clusterId;
+        if (labels[q] !== -1) continue;
+
+        labels[q] = clusterId;
+        const qNeighbors = this.rangeQuery(entities, q, eps);
+        if (qNeighbors.length >= minPoints) {
+          for (const nb of qNeighbors) {
+            if (!seeds.includes(nb)) seeds.push(nb);
           }
+        }
+      }
+      clusterId++;
+    }
+
+    const clusters = {};
+    for (let i = 0; i < n; i++) {
+      const label = labels[i];
+      if (label < 0) continue;
+      if (!clusters[label]) clusters[label] = [];
+      clusters[label].push(entities[i]);
+    }
+    return Object.values(clusters);
+  },
+
+  rangeQuery(entities, idx, eps) {
+    const neighbors = [];
+    const e = entities[idx];
+    for (let i = 0; i < entities.length; i++) {
+      if (i === idx) continue;
+      if (this.entityDistance(e, entities[i]) <= eps) neighbors.push(i);
+    }
+    return neighbors;
+  },
+
+  // Weighted distance: horizontal proximity matters less (same line = same patient)
+  entityDistance(a, b) {
+    const dx = Math.abs(a.box.cx - b.box.cx) * 0.3;
+    const dy = Math.abs(a.box.cy - b.box.cy) * 1.0;
+    return Math.sqrt(dx * dx + dy * dy);
+  },
+};
+
+// ====== STEP 3: PATIENT ASSEMBLY ======
+const PatientAssembler = {
+  assemble(cluster) {
+    const patient = {
+      fullName: null, age: null, gender: null, bed: null,
+      dx: null, meds: null, allergies: null, code: null,
+      confidence: 0, warnings: [], flags: [],
+    };
+
+    const names = [];
+    const diagnoses = [];
+    const medications = [];
+    const unknowns = [];
+    let totalConf = 0, entityCount = 0;
+
+    for (const entity of cluster) {
+      totalConf += entity.confidence;
+      entityCount++;
+
+      switch (entity.entity) {
+        case 'BED':
+          if (!patient.bed || entity.confidence > 0.5) patient.bed = entity.corrected;
+          break;
+        case 'NAME': names.push(entity); break;
+        case 'AGE_GENDER':
+          patient.age = entity.meta.age;
+          patient.gender = entity.meta.gender;
+          break;
+        case 'AGE':
+          if (!patient.age) patient.age = entity.meta.age;
+          break;
+        case 'GENDER':
+          if (!patient.gender) patient.gender = entity.meta.gender;
+          break;
+        case 'DIAGNOSIS': diagnoses.push(entity.corrected); break;
+        case 'MEDICATION': medications.push(entity.corrected); break;
+        case 'ALLERGY': patient.allergies = entity.corrected; break;
+        case 'STATUS': patient.code = entity.corrected; break;
+        case 'UNKNOWN': unknowns.push(entity); break;
       }
     }
 
-    if (diagTokens.length > 0) fields.dx = diagTokens.join(', ');
-    if (medTokens.length > 0) fields.meds = medTokens.join(', ');
-    return fields;
+    // Resolve unknowns by spatial proximity
+    for (const unk of unknowns) {
+      const nearName = this.findNearest(unk, cluster.filter(e => e.entity === 'NAME'));
+      const nearDx = this.findNearest(unk, cluster.filter(e => e.entity === 'DIAGNOSIS'));
+
+      if (nearName && (!nearDx || nearName.dist < nearDx.dist)) {
+        names.push(unk); // Absorb into name
+      } else if (nearDx) {
+        diagnoses.push(unk.corrected);
+      }
+    }
+
+    // Assemble name from spatial order
+    if (names.length > 0) {
+      const isArabic = /[\u0600-\u06FF]/.test(names[0].corrected || names[0].text);
+      const sorted = [...names].sort((a, b) =>
+        isArabic ? b.box.cx - a.box.cx : a.box.cx - b.box.cx
+      );
+      patient.fullName = sorted.map(e => e.corrected || e.text).join(' ');
+    }
+
+    if (diagnoses.length > 0) patient.dx = [...new Set(diagnoses)].join(', ');
+    if (medications.length > 0) patient.meds = [...new Set(medications)].join(', ');
+    patient.confidence = entityCount > 0 ? totalConf / entityCount : 0;
+
+    if (!patient.fullName && !patient.bed && diagnoses.length === 0) return null;
+    return patient;
   },
 
-  classifyToken(token, currentState) {
-    const clean = token.trim();
-    if (/^[A-E]-[MF]-\d{1,2}$/i.test(clean)) return { type: 'BED' };
-    if (/^#?\d{1,3}$/.test(clean) && currentState === 'START') return { type: 'BED' };
-    if (/^\d{1,3}\s*[/\\]?\s*[MFmf]$/i.test(clean)) return { type: 'AGE_GENDER' };
-    if (/^[MFmf]\s*[/\\]?\s*\d{1,3}$/i.test(clean)) return { type: 'AGE_GENDER' };
-    if (/^[MFmf]$/.test(clean)) return { type: 'GENDER' };
-    const medMatch = MedicalVocabulary.correctTerm(clean, MedicalVocabulary.MEDICAL_TERMS, 1);
-    if (medMatch && medMatch.confidence >= 0.8) return { type: 'MEDICAL_TERM' };
-    const medName = MedicalVocabulary.correctMedication(clean, 2);
-    if (medName && medName.confidence >= 0.7) return { type: 'MEDICATION' };
-    if (/[\u0600-\u06FF]/.test(clean) && clean.length >= 2) return { type: 'NAME' };
-    if (/^[A-Z][a-z]+$/.test(clean) && (currentState === 'START' || currentState === 'AFTER_BED' || currentState === 'IN_NAME')) {
-      return { type: 'NAME' };
+  findNearest(target, candidates) {
+    if (candidates.length === 0) return null;
+    let best = null, bestDist = Infinity;
+    for (const c of candidates) {
+      const dist = SpatialClusterer.entityDistance(target, c);
+      if (dist < bestDist) { bestDist = dist; best = c; }
     }
-    if (/^\d{1,3}$/.test(clean)) {
-      const num = parseInt(clean);
-      if (num > 0 && num < 130 && (currentState === 'IN_NAME' || currentState === 'AFTER_BED')) return { type: 'AGE' };
-    }
-    return { type: 'UNKNOWN' };
-  },
-
-  tokenize(text) {
-    return text.replace(/[,;|]/g, ' ').split(/\s+/).filter(t => t.length > 0);
+    return { entity: best, dist: bestDist };
   },
 };
 
-// ====== LAYER 3d: CLINICAL VALIDATOR ======
+// ====== CLINICAL VALIDATOR ======
 const ClinicalValidator = {
   validate(patient) {
     const warnings = [];
@@ -343,8 +583,7 @@ const ClinicalValidator = {
         warnings.push({ field: 'age', message: `Age ${patient.age} is implausible`, severity: 'ERROR' });
       }
       if (patient.age < 18 && patient.dx) {
-        const adultDx = ['NSTEMI', 'STEMI', 'MI', 'CAD', 'AF', 'COPD', 'AAA'];
-        for (const dx of adultDx) {
+        for (const dx of ['NSTEMI', 'STEMI', 'MI', 'CAD', 'AF', 'COPD', 'AAA']) {
           if (patient.dx.includes(dx)) {
             warnings.push({ field: 'diagnosis', message: `${dx} is unusual in a ${patient.age}-year-old`, severity: 'WARN' });
           }
@@ -354,47 +593,43 @@ const ClinicalValidator = {
 
     if (patient.gender && patient.dx) {
       const dx = patient.dx.toUpperCase();
-      if (patient.gender === 'M' && /\bovarian\b|\bectopic pregnancy\b|\bendometri/i.test(dx)) {
-        warnings.push({ field: 'gender', message: 'Female-specific diagnosis listed for male patient', severity: 'ERROR' });
-      }
-      if (patient.gender === 'F' && /\bprostate\b|\btesticular\b/i.test(dx)) {
-        warnings.push({ field: 'gender', message: 'Male-specific diagnosis listed for female patient', severity: 'ERROR' });
-      }
+      if (patient.gender === 'M' && /\bovarian\b|\bectopic pregnancy\b|\bendometri/i.test(dx))
+        warnings.push({ field: 'gender', message: 'Female-specific diagnosis for male patient', severity: 'ERROR' });
+      if (patient.gender === 'F' && /\bprostate\b|\btesticular\b/i.test(dx))
+        warnings.push({ field: 'gender', message: 'Male-specific diagnosis for female patient', severity: 'ERROR' });
     }
 
     if (patient.meds && patient.dx) {
-      if (/METFORMIN/i.test(patient.meds) && /(CKD5|ESRD)/i.test(patient.dx)) {
+      if (/METFORMIN/i.test(patient.meds) && /(CKD5|ESRD)/i.test(patient.dx))
         warnings.push({ field: 'medications', message: 'Metformin contraindicated in CKD5/ESRD', severity: 'CLINICAL_ALERT' });
-      }
-      if (/INSULIN|GLARGINE|ASPART|LISPRO/i.test(patient.meds) && !/DM|DIABET|DKA|HHS/i.test(patient.dx)) {
+      if (/INSULIN|GLARGINE|ASPART|LISPRO/i.test(patient.meds) && !/DM|DIABET|DKA|HHS/i.test(patient.dx))
         warnings.push({ field: 'diagnosis', message: 'Insulin prescribed but no diabetes in diagnosis', severity: 'WARN' });
-      }
+      if (/HEPARIN|ENOXAPARIN/i.test(patient.meds) && !/DVT|PE|ACS|NSTEMI|STEMI|AF|VTE/i.test(patient.dx))
+        warnings.push({ field: 'diagnosis', message: 'Anticoagulation without clear indication', severity: 'WARN' });
     }
 
-    // Triage auto-suggestion
+    // Auto-suggest triage
     if (patient.dx) {
       const dx = patient.dx.toUpperCase();
-      if (/STEMI|CARDIAC ARREST|STATUS EPILEPT|ARDS|SEPTIC SHOCK|DKA|CVA|SAH|VF/i.test(dx)) {
+      if (/STEMI|CARDIAC ARREST|STATUS EPILEPT|ARDS|SEPTIC SHOCK|DKA|CVA|SAH|VF/i.test(dx))
         patient.suggestedTriage = 'RED';
-      } else if (/NSTEMI|ACS|PE|DVT|AKI|ADHF|CHF|CAP|HAP|AECOPD|UGIB|SEPSIS|SBO/i.test(dx)) {
+      else if (/NSTEMI|ACS|PE|DVT|AKI|ADHF|CHF|CAP|HAP|AECOPD|UGIB|SEPSIS|SBO/i.test(dx))
         patient.suggestedTriage = 'YELLOW';
-      } else if (/UTI|CELLULITIS|HTN|DM[12]?$|CKD[1-3]|COPD$|GORD/i.test(dx)) {
+      else if (/UTI|CELLULITIS|HTN|DM[12]?$|CKD[1-3]|COPD$|GORD/i.test(dx))
         patient.suggestedTriage = 'GREEN';
-      }
     }
 
-    // Mobility auto-suggestion
+    // Auto-suggest mobility
     if (patient.dx) {
       const dx = patient.dx.toUpperCase();
-      if (/VENTILAT|INTUBAT|ARDS|CARDIAC ARREST|ICU/i.test(dx)) {
+      if (/VENTILAT|INTUBAT|ARDS|CARDIAC ARREST|ICU/i.test(dx))
         patient.suggestedMobility = 'CRITICAL_TRANSPORT';
-      } else if (/CVA|STROKE|SAH|ICH|FRACTURE|GBS/i.test(dx)) {
+      else if (/CVA|STROKE|SAH|ICH|FRACTURE|GBS/i.test(dx))
         patient.suggestedMobility = 'STRETCHER';
-      } else if (/CHF|ADHF|PE|COPD|AECOPD|CAP|O2/i.test(dx)) {
+      else if (/CHF|ADHF|PE|COPD|AECOPD|CAP|O2/i.test(dx))
         patient.suggestedMobility = 'WHEELCHAIR';
-      } else {
+      else
         patient.suggestedMobility = 'AMBULATORY';
-      }
     }
 
     patient.warnings = warnings;
@@ -402,31 +637,112 @@ const ClinicalValidator = {
   },
 };
 
-// ====== LAYER 3e: ARABIC HANDLER ======
-const ArabicHandler = {
-  stripHarakat(text) {
-    return text.replace(/[\u064B-\u065F\u0670]/g, '');
-  },
-  normalizeArabic(text) {
-    let n = this.stripHarakat(text);
-    n = n.replace(/[\u0623\u0625\u0622]/g, '\u0627');
-    n = n.replace(/\u0629/g, '\u0647');
-    n = n.replace(/\u0649/g, '\u064A');
-    return n;
-  },
-  isRTL(text) {
-    const arabicChars = (text.match(/[\u0600-\u06FF]/g) || []).length;
-    return arabicChars > text.length * 0.3;
-  },
-};
+// ====== BOX NORMALIZATION ======
+function normalizeBox(box) {
+  // Tesseract.js word bbox: {x0, y0, x1, y1}
+  if (box.x0 !== undefined) {
+    const w = box.x1 - box.x0;
+    const h = box.y1 - box.y0;
+    return { x: box.x0, y: box.y0, w, h, cx: box.x0 + w / 2, cy: box.y0 + h / 2 };
+  }
+  // Array of 4 corner points (PaddleOCR)
+  if (Array.isArray(box) && box.length === 4 && Array.isArray(box[0])) {
+    const xs = box.map(p => p[0]), ys = box.map(p => p[1]);
+    const x = Math.min(...xs), y = Math.min(...ys);
+    const w = Math.max(...xs) - x, h = Math.max(...ys) - y;
+    return { x, y, w, h, cx: x + w / 2, cy: y + h / 2 };
+  }
+  // {x, y, w, h}
+  if (box.x !== undefined && box.w !== undefined) {
+    return { ...box, cx: box.x + box.w / 2, cy: box.y + box.h / 2 };
+  }
+  // {left, top, width, height}
+  if (box.left !== undefined) {
+    return { x: box.left, y: box.top, w: box.width, h: box.height, cx: box.left + box.width / 2, cy: box.top + box.height / 2 };
+  }
+  return { x: 0, y: 0, w: 10, h: 10, cx: 5, cy: 5 };
+}
 
-// ====== TESSERACT LOADER (CDN) ======
+// ====== DETECTION SPLITTING ======
+// "67/M NSTEMI DM2 HTN" as one OCR box → 4 separate entities
+function splitDetections(detections) {
+  const result = [];
+  for (const det of detections) {
+    const parts = det.text.split(/\s+/).filter(t => t.length > 0);
+    if (parts.length <= 1) {
+      result.push(det);
+      continue;
+    }
+    const boxW = det.box.w / parts.length;
+    parts.forEach((part, i) => {
+      result.push({
+        text: part,
+        box: {
+          x: det.box.x + i * boxW, y: det.box.y,
+          w: boxW, h: det.box.h,
+          cx: det.box.x + (i + 0.5) * boxW, cy: det.box.cy,
+        },
+        confidence: det.confidence,
+      });
+    });
+  }
+  return result;
+}
+
+// ====== DEDUPLICATION ======
+function deduplicatePatients(patients) {
+  const merged = [];
+  const used = new Set();
+
+  for (let i = 0; i < patients.length; i++) {
+    if (used.has(i)) continue;
+    let current = { ...patients[i] };
+
+    for (let j = i + 1; j < patients.length; j++) {
+      if (used.has(j)) continue;
+      if (shouldMerge(current, patients[j])) {
+        current = mergePatients(current, patients[j]);
+        used.add(j);
+      }
+    }
+    merged.push(current);
+    used.add(i);
+  }
+  return merged;
+}
+
+function shouldMerge(a, b) {
+  if (a.bed && b.bed && a.bed === b.bed) return true;
+  if (a.fullName && b.fullName) {
+    const dist = MedicalVocabulary.levenshtein(a.fullName.toUpperCase(), b.fullName.toUpperCase());
+    if (dist < 3) return true;
+  }
+  return false;
+}
+
+function mergePatients(a, b) {
+  return {
+    fullName: (a.confidence >= b.confidence ? a.fullName : b.fullName) || a.fullName || b.fullName,
+    age: a.age || b.age,
+    gender: a.gender || b.gender,
+    bed: a.bed || b.bed,
+    dx: [a.dx, b.dx].filter(Boolean).join(', '),
+    meds: [a.meds, b.meds].filter(Boolean).join(', '),
+    allergies: a.allergies || b.allergies || 'NKDA',
+    code: a.code || b.code || 'FULL',
+    confidence: Math.max(a.confidence, b.confidence),
+    warnings: [...(a.warnings || []), ...(b.warnings || [])],
+    suggestedTriage: a.suggestedTriage || b.suggestedTriage,
+    suggestedMobility: a.suggestedMobility || b.suggestedMobility,
+  };
+}
+
+// ====== TESSERACT LOADER ======
 let tesseractWorker = null;
 
 async function loadTesseract() {
   if (tesseractWorker) return tesseractWorker;
 
-  // Load Tesseract.js from CDN
   if (!window.Tesseract) {
     await new Promise((resolve, reject) => {
       const script = document.createElement('script');
@@ -444,23 +760,78 @@ async function loadTesseract() {
   return tesseractWorker;
 }
 
-// ====== SPATIAL LAYOUT ANALYZER ======
-function analyzeRawText(rawText) {
-  const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 2);
-  const patients = [];
+// ====== v3 PIPELINE: ENTITY-FIRST SPATIAL CLUSTERING ======
+function processWithSpatialClustering(words, imageWidth, imageHeight) {
+  // 1. Normalize bounding boxes
+  const detections = words
+    .filter(w => w.text && w.text.trim().length > 0)
+    .map(w => ({
+      text: w.text.trim(),
+      box: normalizeBox(w.bbox || w),
+      confidence: w.confidence || 0.5,
+    }));
 
-  for (const line of lines) {
-    const parsed = SequentialContextPredictor.parseLine(line);
-    if (parsed.fullName || parsed.bed) {
-      const validated = ClinicalValidator.validate(parsed);
-      patients.push(validated);
+  if (detections.length === 0) return [];
+
+  // 2. Split multi-term detections
+  const split = splitDetections(detections);
+
+  // 3. Classify every detection as an entity type
+  const entities = split.map(d => EntityRecognizer.classify(d));
+
+  // 4. Spatial clustering — group entities into patients
+  const clusters = SpatialClusterer.cluster(entities, imageWidth, imageHeight);
+
+  // 5. Assemble each cluster into a patient record
+  const patients = clusters
+    .map(cluster => PatientAssembler.assemble(cluster))
+    .filter(p => p !== null);
+
+  // 6. Clinical validation
+  patients.forEach(p => ClinicalValidator.validate(p));
+
+  // 7. Deduplicate
+  return deduplicatePatients(patients);
+}
+
+// ====== FALLBACK: LINE-BASED PARSING (for plain text without boxes) ======
+function parseFromPlainText(rawText) {
+  const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 2);
+  // Create synthetic detections with estimated positions
+  const lineHeight = 30;
+  const detections = [];
+
+  for (let lineIdx = 0; lineIdx < lines.length; lineIdx++) {
+    const words = lines[lineIdx].split(/\s+/);
+    let xPos = 0;
+    for (const word of words) {
+      if (word.length === 0) continue;
+      const wordWidth = word.length * 10;
+      detections.push({
+        text: word,
+        box: {
+          x: xPos, y: lineIdx * lineHeight,
+          w: wordWidth, h: lineHeight - 4,
+          cx: xPos + wordWidth / 2,
+          cy: lineIdx * lineHeight + (lineHeight - 4) / 2,
+        },
+        confidence: 0.5,
+      });
+      xPos += wordWidth + 10;
     }
   }
 
-  return patients;
+  // Run through same entity/clustering pipeline
+  const entities = detections.map(d => EntityRecognizer.classify(d));
+  const clusters = SpatialClusterer.cluster(entities, 1000, lines.length * lineHeight);
+  const patients = clusters
+    .map(cluster => PatientAssembler.assemble(cluster))
+    .filter(p => p !== null);
+  patients.forEach(p => ClinicalValidator.validate(p));
+  return deduplicatePatients(patients);
 }
 
-// ====== MAIN OCR FUNCTION ======
+// ====== MAIN EXPORT ======
 export async function processPatientListImage(imageSource, onProgress) {
   const startTime = performance.now();
   onProgress?.('Preprocessing image...');
@@ -470,7 +841,6 @@ export async function processPatientListImage(imageSource, onProgress) {
   try {
     processedCanvas = await ImagePreprocessor.process(imageSource);
   } catch {
-    // If preprocessing fails, use raw image
     processedCanvas = imageSource;
   }
 
@@ -480,34 +850,68 @@ export async function processPatientListImage(imageSource, onProgress) {
 
   onProgress?.('Recognizing text...');
   const { data } = await worker.recognize(processedCanvas);
-  const rawText = data.text;
 
-  if (!rawText || rawText.trim().length < 3) {
-    return { patients: [], rawText: '', processingTime: performance.now() - startTime, engine: 'tesseract' };
+  if (!data.text || data.text.trim().length < 3) {
+    return { patients: [], rawText: '', processingTime: performance.now() - startTime, engine: 'tesseract-v3', entityCount: 0, clusterCount: 0 };
   }
 
-  // Step 3: Apply medical context engine
-  onProgress?.('Applying medical context...');
-  const patients = analyzeRawText(rawText);
+  // Step 3: v3 Entity-First Pipeline
+  onProgress?.('Analyzing entities & clustering...');
+  let patients;
+  let entityCount = 0;
+  let clusterCount = 0;
 
-  // Step 4: Set defaults
+  // Use word-level bounding boxes if available (Tesseract provides these)
+  if (data.words && data.words.length > 0) {
+    const words = data.words.filter(w => w.text && w.text.trim().length > 0 && w.confidence > 20);
+    const imgW = processedCanvas.width || 1000;
+    const imgH = processedCanvas.height || 1000;
+
+    // Normalize and split
+    const detections = words.map(w => ({
+      text: w.text.trim(),
+      box: normalizeBox(w.bbox),
+      confidence: w.confidence / 100,
+    }));
+    const split = splitDetections(detections);
+    const entities = split.map(d => EntityRecognizer.classify(d));
+    entityCount = entities.filter(e => e.entity !== 'NOISE').length;
+
+    const clusters = SpatialClusterer.cluster(entities, imgW, imgH);
+    clusterCount = clusters.length;
+
+    patients = clusters
+      .map(cluster => PatientAssembler.assemble(cluster))
+      .filter(p => p !== null);
+    patients.forEach(p => ClinicalValidator.validate(p));
+    patients = deduplicatePatients(patients);
+  } else {
+    // Fallback: plain text parsing with synthetic positions
+    patients = parseFromPlainText(data.text);
+    entityCount = patients.length;
+    clusterCount = patients.length;
+  }
+
+  // Step 4: Set defaults for import
   for (const p of patients) {
     p.triage = p.suggestedTriage || 'GREEN';
     p.mobility = p.suggestedMobility || 'AMBULATORY';
-    p.o2 = 'NONE';
-    p.iso = 'NONE';
-    p.code = 'FULL';
-    p.allergies = 'NKDA';
+    p.o2 = p.o2 || 'NONE';
+    p.iso = p.iso || 'NONE';
+    p.code = p.code || 'FULL';
+    p.allergies = p.allergies || 'NKDA';
     p.evac = 'IN_WARD';
     p.ocrImported = true;
   }
 
   return {
     patients,
-    rawText,
+    rawText: data.text,
     processingTime: performance.now() - startTime,
-    engine: 'tesseract',
+    engine: 'tesseract-v3',
+    entityCount,
+    clusterCount,
   };
 }
 
-export { MedicalVocabulary, ClinicalValidator, ArabicHandler };
+export { MedicalVocabulary, ClinicalValidator };
