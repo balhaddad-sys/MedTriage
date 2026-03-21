@@ -4,13 +4,21 @@
 
 // ====== IMAGE PREPROCESSING ======
 const ImagePreprocessor = {
+  async prepareVariants(imageSource) {
+    const baseCanvas = await this.process(imageSource);
+    return OCR_PROFILES.map(profile => ({
+      ...profile,
+      canvas: this.applyProfile(baseCanvas, profile.id),
+    }));
+  },
+
   async process(imageSource) {
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d');
     const img = await this.loadImage(imageSource);
 
-    // Downscale large images for performance (max 2000px on longest side)
-    const maxDim = 2000;
+    // Downscale large images for performance (max 2200px on longest side)
+    const maxDim = 2200;
     let w = img.width, h = img.height;
     if (w > maxDim || h > maxDim) {
       const scale = maxDim / Math.max(w, h);
@@ -21,14 +29,66 @@ const ImagePreprocessor = {
     canvas.height = h;
     ctx.drawImage(img, 0, 0, w, h);
 
-    // Grayscale + contrast enhancement
-    const imageData = ctx.getImageData(0, 0, w, h);
-    const data = imageData.data;
-    for (let i = 0; i < data.length; i += 4) {
-      const gray = 0.299 * data[i] + 0.587 * data[i + 1] + 0.114 * data[i + 2];
-      const enhanced = Math.min(255, Math.max(0, (gray - 128) * 1.4 + 128));
-      data[i] = data[i + 1] = data[i + 2] = enhanced;
+    return canvas;
+  },
+
+  cloneCanvas(source) {
+    const canvas = document.createElement('canvas');
+    canvas.width = source.width;
+    canvas.height = source.height;
+    canvas.getContext('2d').drawImage(source, 0, 0);
+    return canvas;
+  },
+
+  buildGrayBuffer(imageData) {
+    const gray = new Uint8ClampedArray(imageData.data.length / 4);
+    let sum = 0;
+    let sumSquares = 0;
+
+    for (let i = 0, j = 0; i < imageData.data.length; i += 4, j++) {
+      const value = Math.round(
+        (imageData.data[i] * 0.299) +
+        (imageData.data[i + 1] * 0.587) +
+        (imageData.data[i + 2] * 0.114)
+      );
+      gray[j] = value;
+      sum += value;
+      sumSquares += value * value;
     }
+
+    const mean = gray.length ? sum / gray.length : 128;
+    const variance = gray.length ? Math.max(0, (sumSquares / gray.length) - (mean * mean)) : 0;
+    return { gray, mean, stdev: Math.sqrt(variance) };
+  },
+
+  paintGray(imageData, grayValues, mapper) {
+    for (let i = 0, j = 0; i < imageData.data.length; i += 4, j++) {
+      const value = Math.max(0, Math.min(255, mapper(grayValues[j], j)));
+      imageData.data[i] = value;
+      imageData.data[i + 1] = value;
+      imageData.data[i + 2] = value;
+    }
+  },
+
+  applyProfile(baseCanvas, profileId) {
+    const canvas = this.cloneCanvas(baseCanvas);
+    if (profileId === 'source') return canvas;
+
+    const ctx = canvas.getContext('2d');
+    const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+    const { gray, mean, stdev } = this.buildGrayBuffer(imageData);
+
+    if (profileId === 'balanced') {
+      this.paintGray(imageData, gray, value => ((value - mean) * 1.45) + 150);
+    } else {
+      const threshold = Math.max(82, Math.min(190, mean - (stdev * 0.2)));
+      this.paintGray(imageData, gray, value => {
+        if (value < threshold - 18) return 0;
+        if (value > threshold + 24) return 255;
+        return ((value - threshold) * 3.2) + 128;
+      });
+    }
+
     ctx.putImageData(imageData, 0, 0);
     return canvas;
   },
@@ -49,7 +109,10 @@ const ImagePreprocessor = {
         return;
       }
       const img = new Image();
-      img.onload = () => { URL.revokeObjectURL(img.src); resolve(img); };
+      img.onload = () => {
+        if (typeof img.src === 'string' && img.src.startsWith('blob:')) URL.revokeObjectURL(img.src);
+        resolve(img);
+      };
       img.onerror = reject;
       if (source instanceof Blob) {
         img.src = URL.createObjectURL(source);
@@ -61,6 +124,94 @@ const ImagePreprocessor = {
     });
   },
 };
+
+const OCR_PROFILES = [
+  { id: 'source', label: 'Source image' },
+  { id: 'balanced', label: 'Balanced cleanup' },
+  { id: 'high-contrast', label: 'High contrast' },
+];
+
+const REVIEW_PRIORITY = { READY: 0, REVIEW: 1, VERIFY: 2 };
+const HEADER_PATTERNS = [
+  /^(name|patient|pt|bed|room|rm|age|sex|gender|diagnosis|diag|dx|meds?|medications?|allerg(?:y|ies)|code|status|ward|location|notes?|id|mrn)$/i,
+  /^(اسم|المريض|سرير|غرفة|العمر|الجنس|التشخيص|أدوية|ادوية|حساسية|الحالة|الرقم|ملاحظات)$/i,
+];
+
+function clamp(value, min = 0, max = 1) {
+  return Math.min(max, Math.max(min, value));
+}
+
+function average(values, fallback = 0) {
+  const valid = values.filter(v => Number.isFinite(v));
+  if (valid.length === 0) return fallback;
+  return valid.reduce((sum, value) => sum + value, 0) / valid.length;
+}
+
+function weightedAverage(items, fallback = 0) {
+  const valid = items.filter(item => Number.isFinite(item?.value) && Number.isFinite(item?.weight) && item.weight > 0);
+  if (valid.length === 0) return fallback;
+  const totalWeight = valid.reduce((sum, item) => sum + item.weight, 0);
+  const weighted = valid.reduce((sum, item) => sum + (item.value * item.weight), 0);
+  return weighted / totalWeight;
+}
+
+function confidenceBand(score) {
+  if (score >= 0.85) return 'HIGH';
+  if (score >= 0.7) return 'MEDIUM';
+  return 'LOW';
+}
+
+function isHeaderLike(text) {
+  const cleaned = `${text || ''}`.trim().replace(/[:\-]+$/, '');
+  return HEADER_PATTERNS.some(pattern => pattern.test(cleaned));
+}
+
+function dedupeWarnings(warnings) {
+  const seen = new Set();
+  return warnings.filter(warning => {
+    const key = `${warning.field}|${warning.message}|${warning.severity}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function normalizeNameForMerge(name) {
+  return `${name || ''}`.replace(/[^A-Za-z\u0600-\u06FF]/g, '').toUpperCase();
+}
+
+function mergeListValues(a, b) {
+  return [...new Set([...(a ? a.split(/\s*,\s*/) : []), ...(b ? b.split(/\s*,\s*/) : [])].filter(Boolean))].join(', ');
+}
+
+function scoreTextDensity(rawText) {
+  const compact = `${rawText || ''}`.replace(/\s+/g, '');
+  if (!compact) return 0;
+  const useful = (compact.match(/[A-Za-z0-9\u0600-\u06FF]/g) || []).length;
+  return clamp(useful / compact.length);
+}
+
+function enrichPatientForReview(patient) {
+  const identifierCount = (patient.fullName ? 1 : 0) + (patient.bed ? 1 : 0) + ((patient.age != null || patient.gender) ? 1 : 0);
+  const severeWarning = (patient.warnings || []).some(w => ['ERROR', 'CLINICAL_ALERT'].includes(w.severity));
+  const reasons = [];
+
+  if (identifierCount < 2) reasons.push('Partial identifiers captured');
+  if (patient.fullName && (patient.fieldConfidence?.fullName || 0) < 0.6) reasons.push('Name needs confirmation');
+  if (patient.bed && (patient.fieldConfidence?.bed || 0) < 0.65) reasons.push('Bed needs confirmation');
+  if ((patient.rawEntityCount || 0) <= 2) reasons.push('Sparse OCR evidence');
+  if ((patient.confidence || 0) < 0.62) reasons.push('Low OCR confidence');
+  if (severeWarning) reasons.push('Clinical cross-check flagged this record');
+
+  let reviewLevel = 'READY';
+  if (severeWarning || (patient.confidence || 0) < 0.52 || identifierCount === 0) reviewLevel = 'VERIFY';
+  else if (reasons.length > 0 || (patient.warnings || []).length > 0 || (patient.confidence || 0) < 0.8) reviewLevel = 'REVIEW';
+
+  patient.identifierCount = identifierCount;
+  patient.reviewLevel = reviewLevel;
+  patient.reviewReasons = [...new Set(reasons)];
+  return patient;
+}
 
 // ====== MEDICAL VOCABULARY ======
 const MedicalVocabulary = {
@@ -249,10 +400,17 @@ const EntityRecognizer = {
     const { text, box } = detection;
     const t = text.trim();
     const upper = t.toUpperCase();
-    const result = { text: t, box, entity: null, confidence: 0, corrected: t, meta: {} };
+    const sourceConfidence = clamp(Number.isFinite(detection.confidence) ? detection.confidence : 0.5);
+    const result = { text: t, box, entity: null, confidence: 0, corrected: t, meta: {}, sourceConfidence };
 
     if (t.length === 0 || /^[.,;:!?\-\u2013\u2014]+$/.test(t)) {
       result.entity = 'NOISE';
+      return result;
+    }
+
+    if (isHeaderLike(t)) {
+      result.entity = 'HEADER';
+      result.confidence = 0.98;
       return result;
     }
 
@@ -262,7 +420,7 @@ const EntityRecognizer = {
       this.scoreAge(t),
       this.scoreGender(t),
       this.scoreName(t),
-      this.scoreDiagnosis(upper),
+      this.scoreDiagnosis(t),
       this.scoreMedication(t),
       this.scoreStatus(upper),
       this.scoreAllergy(upper),
@@ -270,14 +428,14 @@ const EntityRecognizer = {
 
     if (candidates.length === 0) {
       result.entity = 'UNKNOWN';
-      result.confidence = 0.2;
+      result.confidence = 0.2 + (sourceConfidence * 0.15);
       return result;
     }
 
     candidates.sort((a, b) => b.confidence - a.confidence);
     const best = candidates[0];
     result.entity = best.entity;
-    result.confidence = best.confidence;
+    result.confidence = clamp((best.confidence * 0.8) + (sourceConfidence * 0.2));
     result.corrected = best.corrected || t;
     result.meta = best.meta || {};
     return result;
@@ -333,6 +491,7 @@ const EntityRecognizer = {
 
   scoreName(t) {
     let conf = 0;
+    if (/\d/.test(t) || isHeaderLike(t)) return { entity: 'NAME', confidence: 0 };
 
     // Arabic text >= 2 chars
     if (/[\u0600-\u06FF]/.test(t) && t.replace(/[^\u0600-\u06FF]/g, '').length >= 2) {
@@ -357,7 +516,11 @@ const EntityRecognizer = {
     return { entity: 'NAME', confidence: conf };
   },
 
-  scoreDiagnosis(upper) {
+  scoreDiagnosis(rawText) {
+    const upper = rawText.toUpperCase();
+    if (/^[A-Z][a-z]{2,}$/.test(rawText) && !MedicalVocabulary.MEDICAL_TERMS[upper]) {
+      return { entity: 'DIAGNOSIS', confidence: 0 };
+    }
     const match = MedicalVocabulary.correctTerm(upper, 1);
     if (!match) return { entity: 'DIAGNOSIS', confidence: 0 };
     return {
@@ -396,11 +559,11 @@ const EntityRecognizer = {
 // ====== STEP 2: SPATIAL CLUSTERING (DBSCAN) ======
 const SpatialClusterer = {
   cluster(entities, imageWidth, imageHeight) {
-    const meaningful = entities.filter(e => e.entity !== 'NOISE');
+    const meaningful = entities.filter(e => e.entity !== 'NOISE' && e.entity !== 'HEADER');
     if (meaningful.length === 0) return [];
 
-    const eps = this.estimateEps(meaningful, imageHeight);
-    const clusters = this.dbscan(meaningful, eps, 1);
+    const eps = this.estimateEps(meaningful, imageWidth, imageHeight);
+    const clusters = this.dbscan(meaningful, eps, 1).flatMap(cluster => this.splitClusterRows(cluster));
 
     // Sort clusters top-to-bottom
     clusters.sort((a, b) => {
@@ -412,8 +575,8 @@ const SpatialClusterer = {
     return clusters;
   },
 
-  estimateEps(entities, imgH) {
-    if (entities.length <= 1) return imgH * 0.1;
+  estimateEps(entities, imgW, imgH) {
+    if (entities.length <= 1) return Math.max(imgH * 0.1, average(entities.map(e => e.box.w), 30) * 1.5);
 
     const yCenters = entities.map(e => e.box.cy).sort((a, b) => a - b);
     const gaps = [];
@@ -422,11 +585,12 @@ const SpatialClusterer = {
     }
     gaps.sort((a, b) => a - b);
 
-    if (gaps.length === 0) return imgH * 0.1;
+    if (gaps.length === 0) return Math.max(imgH * 0.1, average(entities.map(e => e.box.w), 30) * 1.5);
 
     const medianGap = gaps[Math.floor(gaps.length / 2)];
-    const minEps = imgH * 0.03;
-    const maxEps = imgH * 0.15;
+    const medianWidth = average(entities.map(e => e.box.w), imgW * 0.03);
+    const minEps = Math.max(imgH * 0.03, medianWidth * 1.6);
+    const maxEps = Math.max(imgH * 0.15, medianWidth * 4);
     return Math.max(minEps, Math.min(maxEps, medianGap * 2.5));
   },
 
@@ -489,6 +653,53 @@ const SpatialClusterer = {
     const dy = Math.abs(a.box.cy - b.box.cy) * 1.0;
     return Math.sqrt(dx * dx + dy * dy);
   },
+
+  splitClusterRows(cluster) {
+    if (cluster.length <= 4) return [cluster];
+
+    const sorted = [...cluster].sort((a, b) => a.box.cy - b.box.cy || a.box.cx - b.box.cx);
+    const rowGap = Math.max(average(sorted.map(e => e.box.h), 20) * 0.8, 18);
+    const rows = [];
+
+    for (const entity of sorted) {
+      const current = rows[rows.length - 1];
+      if (!current || Math.abs(entity.box.cy - current.centerY) > rowGap) {
+        rows.push({ entities: [entity], centerY: entity.box.cy });
+        continue;
+      }
+      current.entities.push(entity);
+      current.centerY = average(current.entities.map(item => item.box.cy), current.centerY);
+    }
+
+    const identityScore = (row) => {
+      let score = 0;
+      if (row.entities.some(entity => entity.entity === 'BED')) score += 1.2;
+      if (row.entities.some(entity => entity.entity === 'NAME')) score += 1;
+      if (row.entities.some(entity => entity.entity === 'AGE_GENDER')) score += 1;
+      if (row.entities.some(entity => entity.entity === 'AGE')) score += 0.3;
+      if (row.entities.some(entity => entity.entity === 'GENDER')) score += 0.2;
+      return score;
+    };
+
+    const strongRows = rows.filter(row => identityScore(row) >= 1.2);
+    if (strongRows.length < 2) return [cluster];
+
+    const mergedRows = [];
+    for (const row of rows) {
+      const previous = mergedRows[mergedRows.length - 1];
+      if (!previous) {
+        mergedRows.push({ ...row, entities: [...row.entities] });
+        continue;
+      }
+      if (identityScore(row) < 0.6) {
+        previous.entities.push(...row.entities);
+      } else {
+        mergedRows.push({ ...row, entities: [...row.entities] });
+      }
+    }
+
+    return mergedRows.map(row => row.entities);
+  },
 };
 
 // ====== STEP 3: PATIENT ASSEMBLY ======
@@ -498,6 +709,7 @@ const PatientAssembler = {
       fullName: null, age: null, gender: null, bed: null,
       dx: null, meds: null, allergies: null, code: null,
       confidence: 0, warnings: [], flags: [],
+      fieldConfidence: {}, rawEntityCount: cluster.length,
     };
 
     const names = [];
@@ -512,23 +724,45 @@ const PatientAssembler = {
 
       switch (entity.entity) {
         case 'BED':
-          if (!patient.bed || entity.confidence > 0.5) patient.bed = entity.corrected;
+          if (!patient.bed || entity.confidence > (patient.fieldConfidence.bed || 0)) {
+            patient.bed = entity.corrected;
+            patient.fieldConfidence.bed = entity.confidence;
+          }
           break;
         case 'NAME': names.push(entity); break;
         case 'AGE_GENDER':
           patient.age = entity.meta.age;
           patient.gender = entity.meta.gender;
+          patient.fieldConfidence.age = entity.confidence;
+          patient.fieldConfidence.gender = entity.confidence;
+          patient.fieldConfidence.ageGender = entity.confidence;
           break;
         case 'AGE':
-          if (!patient.age) patient.age = entity.meta.age;
+          if (!patient.age) {
+            patient.age = entity.meta.age;
+            patient.fieldConfidence.age = entity.confidence;
+          }
           break;
         case 'GENDER':
-          if (!patient.gender) patient.gender = entity.meta.gender;
+          if (!patient.gender) {
+            patient.gender = entity.meta.gender;
+            patient.fieldConfidence.gender = entity.confidence;
+          }
           break;
-        case 'DIAGNOSIS': diagnoses.push(entity.corrected); break;
-        case 'MEDICATION': medications.push(entity.corrected); break;
-        case 'ALLERGY': patient.allergies = entity.corrected; break;
-        case 'STATUS': patient.code = entity.corrected; break;
+        case 'DIAGNOSIS': diagnoses.push(entity); break;
+        case 'MEDICATION': medications.push(entity); break;
+        case 'ALLERGY':
+          if (!patient.allergies || entity.confidence > (patient.fieldConfidence.allergies || 0)) {
+            patient.allergies = entity.corrected;
+            patient.fieldConfidence.allergies = entity.confidence;
+          }
+          break;
+        case 'STATUS':
+          if (!patient.code || entity.confidence > (patient.fieldConfidence.code || 0)) {
+            patient.code = entity.corrected;
+            patient.fieldConfidence.code = entity.confidence;
+          }
+          break;
         case 'UNKNOWN': unknowns.push(entity); break;
       }
     }
@@ -538,10 +772,10 @@ const PatientAssembler = {
       const nearName = this.findNearest(unk, cluster.filter(e => e.entity === 'NAME'));
       const nearDx = this.findNearest(unk, cluster.filter(e => e.entity === 'DIAGNOSIS'));
 
-      if (nearName && (!nearDx || nearName.dist < nearDx.dist)) {
+      if (nearName && (!nearDx || nearName.dist < nearDx.dist) && /[A-Za-z\u0600-\u06FF]/.test(unk.text)) {
         names.push(unk); // Absorb into name
-      } else if (nearDx) {
-        diagnoses.push(unk.corrected);
+      } else if (nearDx && /[A-Z]{2,}|\d/.test(unk.text)) {
+        diagnoses.push(unk);
       }
     }
 
@@ -551,12 +785,31 @@ const PatientAssembler = {
       const sorted = [...names].sort((a, b) =>
         isArabic ? b.box.cx - a.box.cx : a.box.cx - b.box.cx
       );
-      patient.fullName = sorted.map(e => e.corrected || e.text).join(' ');
+      patient.fullName = [...new Set(sorted.map(e => (e.corrected || e.text).trim()).filter(Boolean))].join(' ');
+      patient.fieldConfidence.fullName = average(names.map(e => e.confidence), 0.45);
     }
 
-    if (diagnoses.length > 0) patient.dx = [...new Set(diagnoses)].join(', ');
-    if (medications.length > 0) patient.meds = [...new Set(medications)].join(', ');
-    patient.confidence = entityCount > 0 ? totalConf / entityCount : 0;
+    if (diagnoses.length > 0) {
+      patient.dx = [...new Set(diagnoses.map(e => e.corrected || e.text))].join(', ');
+      patient.fieldConfidence.dx = average(diagnoses.map(e => e.confidence), 0.5);
+    }
+    if (medications.length > 0) {
+      patient.meds = [...new Set(medications.map(e => e.corrected || e.text))].join(', ');
+      patient.fieldConfidence.meds = average(medications.map(e => e.confidence), 0.5);
+    }
+
+    const baseConfidence = entityCount > 0 ? totalConf / entityCount : 0;
+    patient.confidence = clamp(weightedAverage([
+      { value: patient.fieldConfidence.fullName, weight: 3 },
+      { value: patient.fieldConfidence.bed, weight: 2.5 },
+      { value: patient.fieldConfidence.ageGender, weight: 2.1 },
+      { value: patient.fieldConfidence.age, weight: patient.gender ? 0.4 : 1.1 },
+      { value: patient.fieldConfidence.gender, weight: patient.age ? 0.4 : 1.1 },
+      { value: patient.fieldConfidence.dx, weight: 1.7 },
+      { value: patient.fieldConfidence.meds, weight: 1.1 },
+      { value: patient.fieldConfidence.allergies, weight: 0.7 },
+      { value: patient.fieldConfidence.code, weight: 0.6 },
+    ], baseConfidence) + (Math.min(cluster.length, 6) / 6 * 0.08));
 
     if (!patient.fullName && !patient.bed && diagnoses.length === 0) return null;
     return patient;
@@ -632,7 +885,7 @@ const ClinicalValidator = {
         patient.suggestedMobility = 'AMBULATORY';
     }
 
-    patient.warnings = warnings;
+    patient.warnings = dedupeWarnings(warnings);
     return patient;
   },
 };
@@ -668,7 +921,23 @@ function normalizeBox(box) {
 function splitDetections(detections) {
   const result = [];
   for (const det of detections) {
-    const parts = det.text.split(/\s+/).filter(t => t.length > 0);
+    const parts = det.text
+      .replace(/[;,|]+/g, ' ')
+      .replace(/\u060C/g, ' ')
+      .replace(/\u061B/g, ' ')
+      .split(/\s+/)
+      .flatMap(token => {
+        const cleaned = token.replace(/^[`"'~.,:!?()[\]{}<>]+|[`"'~.,:!?()[\]{}<>]+$/g, '');
+        if (!cleaned) return [];
+        if (/^[A-E]-[MF]-\d{1,2}$/i.test(cleaned) || /^[A-E]\d{1,2}$/i.test(cleaned)) return [cleaned];
+        if (/^(?:\d{1,3}\s*[/\\-]?\s*[MFmf]|[MFmf]\s*[/\\-]?\s*\d{1,3})$/.test(cleaned)) return [cleaned];
+        if (cleaned.includes('/')) {
+          const slashParts = cleaned.split('/').filter(Boolean);
+          if (slashParts.length > 1 && !slashParts.some(part => /^(?:\d{1,3}|[MFmf])$/.test(part))) return slashParts;
+        }
+        return [cleaned];
+      })
+      .filter(t => t.length > 0);
     if (parts.length <= 1) {
       result.push(det);
       continue;
@@ -714,26 +983,33 @@ function deduplicatePatients(patients) {
 function shouldMerge(a, b) {
   if (a.bed && b.bed && a.bed === b.bed) return true;
   if (a.fullName && b.fullName) {
-    const dist = MedicalVocabulary.levenshtein(a.fullName.toUpperCase(), b.fullName.toUpperCase());
+    const dist = MedicalVocabulary.levenshtein(normalizeNameForMerge(a.fullName), normalizeNameForMerge(b.fullName));
     if (dist < 3) return true;
   }
   return false;
 }
 
 function mergePatients(a, b) {
+  const reviewLevel = (REVIEW_PRIORITY[a.reviewLevel] ?? 0) >= (REVIEW_PRIORITY[b.reviewLevel] ?? 0)
+    ? a.reviewLevel
+    : b.reviewLevel;
   return {
     fullName: (a.confidence >= b.confidence ? a.fullName : b.fullName) || a.fullName || b.fullName,
     age: a.age || b.age,
     gender: a.gender || b.gender,
     bed: a.bed || b.bed,
-    dx: [a.dx, b.dx].filter(Boolean).join(', '),
-    meds: [a.meds, b.meds].filter(Boolean).join(', '),
+    dx: mergeListValues(a.dx, b.dx),
+    meds: mergeListValues(a.meds, b.meds),
     allergies: a.allergies || b.allergies || 'NKDA',
     code: a.code || b.code || 'FULL',
     confidence: Math.max(a.confidence, b.confidence),
-    warnings: [...(a.warnings || []), ...(b.warnings || [])],
+    warnings: dedupeWarnings([...(a.warnings || []), ...(b.warnings || [])]),
     suggestedTriage: a.suggestedTriage || b.suggestedTriage,
     suggestedMobility: a.suggestedMobility || b.suggestedMobility,
+    fieldConfidence: { ...(a.fieldConfidence || {}), ...(b.fieldConfidence || {}) },
+    rawEntityCount: (a.rawEntityCount || 0) + (b.rawEntityCount || 0),
+    reviewLevel,
+    reviewReasons: [...new Set([...(a.reviewReasons || []), ...(b.reviewReasons || [])])],
   };
 }
 
@@ -750,6 +1026,8 @@ async function loadTesseract() {
       script.onload = resolve;
       script.onerror = reject;
       document.head.appendChild(script);
+    }).catch(() => {
+      throw new Error('OCR runtime failed to load. Connect once to load the engine or bundle Tesseract locally before deployment.');
     });
   }
 
@@ -761,23 +1039,31 @@ async function loadTesseract() {
 }
 
 // ====== v3 PIPELINE: ENTITY-FIRST SPATIAL CLUSTERING ======
-function processWithSpatialClustering(words, imageWidth, imageHeight) {
+function finalizePatients(patients) {
+  patients.forEach(p => ClinicalValidator.validate(p));
+  return deduplicatePatients(patients).map(p => enrichPatientForReview(ClinicalValidator.validate(p)));
+}
+
+export function analyzeOcrWords(words, imageWidth, imageHeight) {
   // 1. Normalize bounding boxes
   const detections = words
     .filter(w => w.text && w.text.trim().length > 0)
     .map(w => ({
       text: w.text.trim(),
       box: normalizeBox(w.bbox || w),
-      confidence: w.confidence || 0.5,
+      confidence: Number.isFinite(w.confidence)
+        ? (w.confidence > 1 ? w.confidence / 100 : w.confidence)
+        : 0.5,
     }));
 
-  if (detections.length === 0) return [];
+  if (detections.length === 0) return { patients: [], entityCount: 0, clusterCount: 0, analysisScore: 0 };
 
   // 2. Split multi-term detections
   const split = splitDetections(detections);
 
   // 3. Classify every detection as an entity type
   const entities = split.map(d => EntityRecognizer.classify(d));
+  const entityCount = entities.filter(e => e.entity !== 'NOISE' && e.entity !== 'HEADER').length;
 
   // 4. Spatial clustering — group entities into patients
   const clusters = SpatialClusterer.cluster(entities, imageWidth, imageHeight);
@@ -787,15 +1073,17 @@ function processWithSpatialClustering(words, imageWidth, imageHeight) {
     .map(cluster => PatientAssembler.assemble(cluster))
     .filter(p => p !== null);
 
-  // 6. Clinical validation
-  patients.forEach(p => ClinicalValidator.validate(p));
-
-  // 7. Deduplicate
-  return deduplicatePatients(patients);
+  const finalized = finalizePatients(patients);
+  const analysisScore = clamp(
+    (average(finalized.map(p => p.confidence), 0) * 0.62) +
+    ((finalized.filter(p => p.reviewLevel === 'READY').length / Math.max(finalized.length, 1)) * 0.2) +
+    (scoreTextDensity(finalized.map(p => [p.fullName, p.bed, p.dx].filter(Boolean).join(' ')).join(' ')) * 0.18)
+  );
+  return { patients: finalized, entityCount, clusterCount: clusters.length, analysisScore };
 }
 
 // ====== FALLBACK: LINE-BASED PARSING (for plain text without boxes) ======
-function parseFromPlainText(rawText) {
+export function parseFromPlainText(rawText) {
   const lines = rawText.split('\n').map(l => l.trim()).filter(l => l.length > 2);
   // Create synthetic detections with estimated positions
   const lineHeight = 30;
@@ -821,96 +1109,133 @@ function parseFromPlainText(rawText) {
     }
   }
 
-  // Run through same entity/clustering pipeline
-  const entities = detections.map(d => EntityRecognizer.classify(d));
-  const clusters = SpatialClusterer.cluster(entities, 1000, lines.length * lineHeight);
-  const patients = clusters
-    .map(cluster => PatientAssembler.assemble(cluster))
-    .filter(p => p !== null);
-  patients.forEach(p => ClinicalValidator.validate(p));
-  return deduplicatePatients(patients);
+  return analyzeOcrWords(detections, 1000, Math.max(lines.length * lineHeight, 300));
+}
+
+function buildPassCandidate(data, canvas, profileId) {
+  const words = data.words && data.words.length > 0
+    ? data.words.filter(w => w.text && w.text.trim().length > 0 && w.confidence > 12)
+    : [];
+  const analysis = words.length > 0
+    ? analyzeOcrWords(words, canvas.width || 1000, canvas.height || 1000)
+    : parseFromPlainText(data.text || '');
+  const wordConfidence = average(
+    words.map(w => Number.isFinite(w.confidence) ? w.confidence / 100 : 0),
+    Number.isFinite(data.confidence) ? data.confidence / 100 : 0.4
+  );
+  const qualityScore = clamp((analysis.analysisScore * 0.62) + (wordConfidence * 0.24) + (scoreTextDensity(data.text || '') * 0.14));
+  return {
+    profileId,
+    rawText: data.text || '',
+    wordConfidence,
+    qualityScore,
+    qualityBand: confidenceBand(qualityScore),
+    reviewCount: analysis.patients.filter(p => p.reviewLevel !== 'READY').length,
+    ...analysis,
+  };
+}
+
+function pickBestCandidate(candidates) {
+  return [...candidates].sort((a, b) => {
+    if (b.qualityScore !== a.qualityScore) return b.qualityScore - a.qualityScore;
+    if (b.patients.length !== a.patients.length) return b.patients.length - a.patients.length;
+    return b.wordConfidence - a.wordConfidence;
+  })[0];
 }
 
 // ====== MAIN EXPORT ======
 export async function processPatientListImage(imageSource, onProgress) {
   const startTime = performance.now();
-  onProgress?.('Preprocessing image...');
+  onProgress?.('Preparing image variants...');
 
-  // Step 1: Preprocess
-  let processedCanvas;
+  let variants;
   try {
-    processedCanvas = await ImagePreprocessor.process(imageSource);
+    variants = await ImagePreprocessor.prepareVariants(imageSource);
   } catch {
-    processedCanvas = imageSource;
+    variants = [{ id: 'source', label: 'Source image', canvas: imageSource }];
   }
 
-  // Step 2: OCR with Tesseract.js
   onProgress?.('Loading OCR engine...');
   const worker = await loadTesseract();
+  const candidates = [];
 
-  onProgress?.('Recognizing text...');
-  const { data } = await worker.recognize(processedCanvas);
+  for (let i = 0; i < variants.length; i++) {
+    const variant = variants[i];
+    onProgress?.(`Recognizing text (${variant.label}, pass ${i + 1}/${variants.length})...`);
+    const { data } = await worker.recognize(variant.canvas);
+    onProgress?.(`Analyzing patient structure (${variant.label})...`);
+    const candidate = buildPassCandidate(data, variant.canvas, variant.id);
+    candidates.push(candidate);
 
-  if (!data.text || data.text.trim().length < 3) {
-    return { patients: [], rawText: '', processingTime: performance.now() - startTime, engine: 'tesseract-v3', entityCount: 0, clusterCount: 0 };
+    const reviewThreshold = Math.ceil(Math.max(candidate.patients.length, 1) * 0.4);
+    if (candidate.patients.length > 0 && candidate.qualityScore >= 0.86 && candidate.reviewCount <= reviewThreshold) {
+      break;
+    }
   }
 
-  // Step 3: v3 Entity-First Pipeline
-  onProgress?.('Analyzing entities & clustering...');
-  let patients;
-  let entityCount = 0;
-  let clusterCount = 0;
-
-  // Use word-level bounding boxes if available (Tesseract provides these)
-  if (data.words && data.words.length > 0) {
-    const words = data.words.filter(w => w.text && w.text.trim().length > 0 && w.confidence > 20);
-    const imgW = processedCanvas.width || 1000;
-    const imgH = processedCanvas.height || 1000;
-
-    // Normalize and split
-    const detections = words.map(w => ({
-      text: w.text.trim(),
-      box: normalizeBox(w.bbox),
-      confidence: w.confidence / 100,
-    }));
-    const split = splitDetections(detections);
-    const entities = split.map(d => EntityRecognizer.classify(d));
-    entityCount = entities.filter(e => e.entity !== 'NOISE').length;
-
-    const clusters = SpatialClusterer.cluster(entities, imgW, imgH);
-    clusterCount = clusters.length;
-
-    patients = clusters
-      .map(cluster => PatientAssembler.assemble(cluster))
-      .filter(p => p !== null);
-    patients.forEach(p => ClinicalValidator.validate(p));
-    patients = deduplicatePatients(patients);
-  } else {
-    // Fallback: plain text parsing with synthetic positions
-    patients = parseFromPlainText(data.text);
-    entityCount = patients.length;
-    clusterCount = patients.length;
+  const best = pickBestCandidate(candidates);
+  if (!best || (!best.rawText.trim() && best.patients.length === 0)) {
+    return {
+      patients: [],
+      rawText: '',
+      processingTime: performance.now() - startTime,
+      engine: 'tesseract-v3-pro',
+      entityCount: 0,
+      clusterCount: 0,
+      qualityScore: 0,
+      qualityBand: 'LOW',
+      profile: 'source',
+      reviewCount: 0,
+      passes: candidates.map(candidate => ({
+        profile: candidate.profileId,
+        qualityScore: candidate.qualityScore,
+        qualityBand: candidate.qualityBand,
+        patients: candidate.patients.length,
+      })),
+    };
   }
 
-  // Step 4: Set defaults for import
-  for (const p of patients) {
-    p.triage = p.suggestedTriage || 'GREEN';
-    p.mobility = p.suggestedMobility || 'AMBULATORY';
-    p.o2 = p.o2 || 'NONE';
-    p.iso = p.iso || 'NONE';
-    p.code = p.code || 'FULL';
-    p.allergies = p.allergies || 'NKDA';
-    p.evac = 'IN_WARD';
-    p.ocrImported = true;
-  }
+  const capturedAt = new Date().toISOString();
+  const patients = best.patients.map(p => ({
+    ...p,
+    triage: p.suggestedTriage || 'GREEN',
+    mobility: p.suggestedMobility || 'AMBULATORY',
+    o2: p.o2 || 'NONE',
+    iso: p.iso || 'NONE',
+    code: p.code || 'FULL',
+    allergies: p.allergies || 'NKDA',
+    evac: 'IN_WARD',
+    ocrImported: true,
+    ocrMeta: {
+      engine: 'tesseract-v3-pro',
+      profile: best.profileId,
+      qualityScore: best.qualityScore,
+      qualityBand: best.qualityBand,
+      wordConfidence: best.wordConfidence,
+      capturedAt,
+      reviewLevel: p.reviewLevel,
+    },
+  }));
 
   return {
     patients,
-    rawText: data.text,
+    rawText: best.rawText,
     processingTime: performance.now() - startTime,
-    engine: 'tesseract-v3',
-    entityCount,
-    clusterCount,
+    engine: 'tesseract-v3-pro',
+    entityCount: best.entityCount,
+    clusterCount: best.clusterCount,
+    qualityScore: best.qualityScore,
+    qualityBand: best.qualityBand,
+    wordConfidence: best.wordConfidence,
+    profile: best.profileId,
+    reviewCount: best.reviewCount,
+    passes: candidates.map(candidate => ({
+      profile: candidate.profileId,
+      qualityScore: candidate.qualityScore,
+      qualityBand: candidate.qualityBand,
+      patients: candidate.patients.length,
+      reviewCount: candidate.reviewCount,
+    })),
   };
 }
 
