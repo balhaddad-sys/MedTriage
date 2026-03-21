@@ -247,10 +247,10 @@ export function wrapCommandAPDU(ksEnc, ksMac, ssc, cla, ins, p1, p2, data, le) {
   }
 
   // Build MAC input: SSC || padded header || DO'87 || DO'97
+  // retailMac handles ISO 9797-1 padding internally — do NOT pad here
   let macInput = concat(currentSSC, paddedHeader);
   if (doEncrypted) macInput = concat(macInput, doEncrypted);
   if (doLe) macInput = concat(macInput, doLe);
-  macInput = padISO9797(macInput);
 
   const mac = retailMac(ksMac, macInput);
   // DO'8E: MAC (always 8 bytes)
@@ -317,10 +317,9 @@ export function unwrapResponseAPDU(ksEnc, ksMac, ssc, response) {
     }
   }
 
-  // Verify MAC
+  // Verify MAC — retailMac handles ISO 9797-1 padding internally
   if (receivedMac) {
-    const paddedMacInput = padISO9797(concat(macInput, macData));
-    const computedMac = retailMac(ksMac, paddedMacInput);
+    const computedMac = retailMac(ksMac, concat(macInput, macData));
     for (let i = 0; i < 8; i++) {
       if (i < receivedMac.length && receivedMac[i] !== computedMac[i]) {
         throw new Error('SM: MAC verification failed on response');
