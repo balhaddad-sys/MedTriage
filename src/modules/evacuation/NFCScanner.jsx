@@ -54,6 +54,12 @@ const styles = {
     fontSize: '13px', color: colors.green, fontWeight: 600,
     display: 'flex', alignItems: 'center', gap: '8px',
   },
+  metaBox: {
+    width: '100%', padding: '10px', borderRadius: '8px',
+    background: colors.bg2, border: `1px solid ${colors.border}`,
+    display: 'flex', flexDirection: 'column', gap: '6px',
+  },
+  metaText: { fontSize: '11px', color: colors.text3, fontFamily: fonts.mono, wordBreak: 'break-word' },
   divider: {
     width: '100%', display: 'flex', alignItems: 'center', gap: '12px',
     margin: '4px 0',
@@ -67,6 +73,7 @@ export default function NFCScanner({ onClose }) {
   const nfcInfo = getNfcPlatformInfo();
   const [scanning, setScanning] = useState(false);
   const [nfcData, setNfcData] = useState(null);
+  const [scanMeta, setScanMeta] = useState(null);
   const [error, setError] = useState(null);
   const [civilId, setCivilId] = useState('');
   const [civilIdError, setCivilIdError] = useState('');
@@ -79,16 +86,18 @@ export default function NFCScanner({ onClose }) {
     setScanning(true);
     setError(null);
     setCardDetected(false);
+    setScanMeta(null);
 
     const abort = await scanNFC(
       (data) => {
         setScanning(false);
+        setScanMeta(data);
         if (data.civilId) {
-          // Full read — rare but possible
           setNfcData(data);
-        } else {
-          // Card detected but no data (ISO 7816)
+        } else if (data.tagDetected) {
           setCardDetected(true);
+        } else {
+          setError('NFC tag detected but could not be classified.');
         }
       },
       (err) => {
@@ -114,14 +123,16 @@ export default function NFCScanner({ onClose }) {
       return;
     }
     setNfcData({
+      ...(scanMeta || {}),
       civilId: result.civilId,
       age: result.age,
-      fullName: '',
-      gender: '',
-      nfcBackend: cardDetected ? 'webnfc' : 'manual',
-      tagDetected: cardDetected,
+      fullName: scanMeta?.fullName || scanMeta?.fullNameArabic || '',
+      gender: scanMeta?.gender || '',
+      nfcBackend: scanMeta?.nfcBackend || (cardDetected ? 'webnfc' : 'manual'),
+      tagDetected: !!scanMeta?.tagDetected || cardDetected,
+      needsManualId: false,
     });
-  }, [civilId, cardDetected]);
+  }, [civilId, cardDetected, scanMeta]);
 
   const handleAddPatient = useCallback(async () => {
     if (!nfcData) return;
@@ -144,9 +155,19 @@ export default function NFCScanner({ onClose }) {
       nfcScanned: !!nfcData.tagDetected,
       nfcBackend: nfcData.nfcBackend || 'unknown',
       nfcSerial: nfcData.serialNumber || '',
+      nfcTagType: nfcData.tagType || '',
+      nfcTechTypes: Array.isArray(nfcData.techTypes) ? nfcData.techTypes : [],
+      nfcLikelyCivilId: !!nfcData.likelyCivilId,
     };
     const saved = await addPatient(patient);
-    await logAction('NFC_IMPORT', 'patient', saved.id);
+    await logAction('NFC_IMPORT', 'patient', saved.id, {
+      newValue: {
+        nfcBackend: patient.nfcBackend,
+        nfcSerial: patient.nfcSerial,
+        nfcTagType: patient.nfcTagType,
+        nfcLikelyCivilId: patient.nfcLikelyCivilId,
+      },
+    });
     onClose();
   }, [nfcData, addPatient, auth, onClose]);
 
@@ -184,6 +205,18 @@ export default function NFCScanner({ onClose }) {
               <div style={styles.resultRow}>
                 <span style={styles.resultLabel}>Gender</span>
                 <span style={styles.resultValue}>{nfcData.gender === 'M' ? 'Male' : 'Female'}</span>
+              </div>
+            )}
+            {nfcData.serialNumber && (
+              <div style={styles.resultRow}>
+                <span style={styles.resultLabel}>Tag UID</span>
+                <span style={{ ...styles.resultValue, fontSize: '12px' }}>{nfcData.serialNumber}</span>
+              </div>
+            )}
+            {nfcData.tagType && (
+              <div style={styles.resultRow}>
+                <span style={styles.resultLabel}>Tag Type</span>
+                <span style={{ ...styles.resultValue, fontSize: '12px' }}>{nfcData.tagType}</span>
               </div>
             )}
           </div>
@@ -227,16 +260,27 @@ export default function NFCScanner({ onClose }) {
             <span style={styles.statusText}>
               {scanning ? 'Tap Civil ID on back of phone...' : 'NFC Ready'}
             </span>
+            <span style={styles.subText}>{nfcInfo.hint}</span>
             {error && <div style={styles.errorBox}>{error}</div>}
           </div>
         )}
 
         {/* Card detected via NFC */}
         {cardDetected && (
-          <div style={styles.successBox}>
-            <CheckIcon size={16} color={colors.green} />
-            Card detected! Enter Civil ID below.
-          </div>
+          <>
+            <div style={styles.successBox}>
+              <CheckIcon size={16} color={colors.green} />
+              {scanMeta?.likelyCivilId ? 'Kuwait Civil ID tag detected.' : 'NFC tag detected.'} Enter Civil ID below.
+            </div>
+            <div style={styles.metaBox}>
+              <span style={styles.metaText}>Backend: {scanMeta?.nfcBackend || 'unknown'}</span>
+              {scanMeta?.tagType && <span style={styles.metaText}>Tag type: {scanMeta.tagType}</span>}
+              {scanMeta?.serialNumber && <span style={styles.metaText}>UID: {scanMeta.serialNumber}</span>}
+              {scanMeta?.techTypes?.length > 0 && (
+                <span style={styles.metaText}>Tech: {scanMeta.techTypes.join(', ')}</span>
+              )}
+            </div>
+          </>
         )}
 
         {/* Divider */}
@@ -283,6 +327,20 @@ export default function NFCScanner({ onClose }) {
             disabled={civilId.length !== 12}>
             Validate & Add Patient
           </button>
+          {nfcInfo.supported && (
+            <button
+              style={{ ...styles.btnSmall, background: colors.bg2, color: colors.text0 }}
+              onClick={() => {
+                abortRef.current?.();
+                setNfcData(null);
+                setCardDetected(false);
+                setScanMeta(null);
+                setError(null);
+                startScan();
+              }}>
+              Scan Again
+            </button>
+          )}
         </div>
       </div>
     </Modal>

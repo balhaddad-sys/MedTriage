@@ -331,10 +331,13 @@ export default function OCRScanner({ onClose, onImport }) {
 
                     <div style={{ display: 'flex', gap: '12px', flexWrap: 'wrap' }}>
                       {p.bed && <span style={styles.resultField}>Bed: {p.bed}</span>}
-                      {p.age && <span style={styles.resultField}>Age: {p.age}</span>}
+                      {p.age != null && <span style={styles.resultField}>Age: {p.age}</span>}
                       {p.gender && <span style={styles.resultField}>Gender: {p.gender}</span>}
+                      {p.civilId && <span style={styles.resultField}>ID: {p.civilId}</span>}
                       {p.dx && <span style={styles.resultField}>Dx: {p.dx}</span>}
                       {p.meds && <span style={styles.resultField}>Meds: {p.meds}</span>}
+                      {p.o2 && p.o2 !== 'NONE' && <span style={styles.resultField}>O2: {p.o2}</span>}
+                      {p.iso && p.iso !== 'NONE' && <span style={{ ...styles.resultField, color: colors.amber }}>ISO: {p.iso}</span>}
                     </div>
 
                     {p.reviewReasons?.length > 0 && p.reviewReasons.map((reason, ri) => (

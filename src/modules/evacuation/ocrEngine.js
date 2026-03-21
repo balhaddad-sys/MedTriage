@@ -192,7 +192,7 @@ function scoreTextDensity(rawText) {
 }
 
 function enrichPatientForReview(patient) {
-  const identifierCount = (patient.fullName ? 1 : 0) + (patient.bed ? 1 : 0) + ((patient.age != null || patient.gender) ? 1 : 0);
+  const identifierCount = (patient.fullName ? 1 : 0) + (patient.bed ? 1 : 0) + ((patient.age != null || patient.gender) ? 1 : 0) + (patient.civilId ? 1 : 0);
   const severeWarning = (patient.warnings || []).some(w => ['ERROR', 'CLINICAL_ALERT'].includes(w.severity));
   const reasons = [];
 
@@ -217,7 +217,7 @@ function enrichPatientForReview(patient) {
 const MedicalVocabulary = {
   MEDICAL_TERMS: {
     // Cardiovascular
-    'NSTEMI': { category: 'cardio', severity: 'RED' }, 'STEMI': { category: 'cardio', severity: 'RED' },
+    'NSTEMI': { category: 'cardio', severity: 'YELLOW' }, 'STEMI': { category: 'cardio', severity: 'RED' },
     'MI': { category: 'cardio', severity: 'RED' }, 'ACS': { category: 'cardio', severity: 'RED' },
     'AF': { category: 'cardio', severity: 'YELLOW' }, 'SVT': { category: 'cardio', severity: 'YELLOW' },
     'VT': { category: 'cardio', severity: 'RED' }, 'VF': { category: 'cardio', severity: 'RED' },
@@ -228,19 +228,35 @@ const MedicalVocabulary = {
     'AFL': { category: 'cardio', severity: 'YELLOW' }, 'PVD': { category: 'cardio', severity: 'GREEN' },
     'AS': { category: 'cardio', severity: 'YELLOW' }, 'MR': { category: 'cardio', severity: 'YELLOW' },
     'IE': { category: 'cardio', severity: 'RED' },
+    'TAVR': { category: 'cardio', severity: 'YELLOW' }, 'PCI': { category: 'cardio', severity: 'YELLOW' },
+    'CABG': { category: 'cardio', severity: 'YELLOW' }, 'CCF': { category: 'cardio', severity: 'YELLOW' },
+    'LBBB': { category: 'cardio', severity: 'YELLOW' }, 'RBBB': { category: 'cardio', severity: 'GREEN' },
+    'PPM': { category: 'cardio', severity: 'GREEN' }, 'ICD': { category: 'cardio', severity: 'GREEN' },
+    'AVNRT': { category: 'cardio', severity: 'YELLOW' }, 'WPW': { category: 'cardio', severity: 'YELLOW' },
+    'HOCM': { category: 'cardio', severity: 'YELLOW' }, 'DCM': { category: 'cardio', severity: 'YELLOW' },
+    'AR': { category: 'cardio', severity: 'YELLOW' }, 'TR': { category: 'cardio', severity: 'GREEN' },
+    'MVP': { category: 'cardio', severity: 'GREEN' },
     // Endocrine
     'DM': { category: 'endo', severity: 'GREEN' }, 'DM1': { category: 'endo', severity: 'GREEN' },
     'DM2': { category: 'endo', severity: 'GREEN' }, 'T1DM': { category: 'endo', severity: 'GREEN' },
     'T2DM': { category: 'endo', severity: 'GREEN' }, 'DKA': { category: 'endo', severity: 'RED' },
     'HHS': { category: 'endo', severity: 'RED' }, 'HONK': { category: 'endo', severity: 'RED' },
     'HYPO': { category: 'endo', severity: 'YELLOW' },
+    'THYROTOXICOSIS': { category: 'endo', severity: 'YELLOW' },
+    'MYXEDEMA': { category: 'endo', severity: 'RED' },
+    'ADDISON': { category: 'endo', severity: 'YELLOW' }, 'CUSHING': { category: 'endo', severity: 'GREEN' },
+    'PHEOCHROMOCYTOMA': { category: 'endo', severity: 'YELLOW' },
+    'HYPOGLYCEMIA': { category: 'endo', severity: 'YELLOW' },
     // Renal
     'CKD': { category: 'renal', severity: 'GREEN' }, 'CKD1': { category: 'renal', severity: 'GREEN' },
     'CKD2': { category: 'renal', severity: 'GREEN' }, 'CKD3': { category: 'renal', severity: 'GREEN' },
     'CKD3A': { category: 'renal', severity: 'GREEN' }, 'CKD3B': { category: 'renal', severity: 'YELLOW' },
     'CKD4': { category: 'renal', severity: 'YELLOW' }, 'CKD5': { category: 'renal', severity: 'RED' },
     'AKI': { category: 'renal', severity: 'RED' }, 'ESRD': { category: 'renal', severity: 'YELLOW' },
-    'HD': { category: 'renal', severity: 'YELLOW' },
+    'HD': { category: 'renal', severity: 'YELLOW' }, 'PD': { category: 'renal', severity: 'YELLOW' },
+    'RTA': { category: 'renal', severity: 'YELLOW' }, 'RPGN': { category: 'renal', severity: 'RED' },
+    'HUS': { category: 'renal', severity: 'RED' }, 'ATN': { category: 'renal', severity: 'RED' },
+    'NS': { category: 'renal', severity: 'YELLOW' },
     // Respiratory
     'COPD': { category: 'resp', severity: 'GREEN' }, 'AECOPD': { category: 'resp', severity: 'YELLOW' },
     'CAP': { category: 'resp', severity: 'YELLOW' }, 'HAP': { category: 'resp', severity: 'YELLOW' },
@@ -248,26 +264,83 @@ const MedicalVocabulary = {
     'PTX': { category: 'resp', severity: 'RED' }, 'OSA': { category: 'resp', severity: 'GREEN' },
     'TB': { category: 'resp', severity: 'YELLOW' }, 'ILD': { category: 'resp', severity: 'YELLOW' },
     'LRTI': { category: 'resp', severity: 'YELLOW' },
+    'ASTHMA': { category: 'resp', severity: 'GREEN' }, 'IPF': { category: 'resp', severity: 'YELLOW' },
+    'HEMOPTYSIS': { category: 'resp', severity: 'RED' }, 'EMPYEMA': { category: 'resp', severity: 'RED' },
+    'PNEUMONITIS': { category: 'resp', severity: 'YELLOW' },
+    'RESP FAILURE': { category: 'resp', severity: 'RED' }, 'TYPE 1 RF': { category: 'resp', severity: 'RED' },
+    'TYPE 2 RF': { category: 'resp', severity: 'RED' },
     // Neurological
     'CVA': { category: 'neuro', severity: 'RED' }, 'TIA': { category: 'neuro', severity: 'YELLOW' },
     'SAH': { category: 'neuro', severity: 'RED' }, 'ICH': { category: 'neuro', severity: 'RED' },
     'SDH': { category: 'neuro', severity: 'RED' }, 'EDH': { category: 'neuro', severity: 'RED' },
     'SE': { category: 'neuro', severity: 'RED' }, 'GBS': { category: 'neuro', severity: 'RED' },
     'MG': { category: 'neuro', severity: 'YELLOW' }, 'MS': { category: 'neuro', severity: 'YELLOW' },
+    'MENINGITIS': { category: 'neuro', severity: 'RED' }, 'ENCEPHALITIS': { category: 'neuro', severity: 'RED' },
+    'EPILEPSY': { category: 'neuro', severity: 'GREEN' }, 'SEIZURE': { category: 'neuro', severity: 'YELLOW' },
+    'MCA': { category: 'neuro', severity: 'RED' }, 'ACA': { category: 'neuro', severity: 'RED' },
+    'PCA': { category: 'neuro', severity: 'RED' },
+    'PARKINSON': { category: 'neuro', severity: 'GREEN' }, 'DEMENTIA': { category: 'neuro', severity: 'GREEN' },
     // GI
     'UGIB': { category: 'gi', severity: 'RED' }, 'LGIB': { category: 'gi', severity: 'YELLOW' },
     'SBO': { category: 'gi', severity: 'YELLOW' }, 'LBO': { category: 'gi', severity: 'YELLOW' },
     'IBD': { category: 'gi', severity: 'YELLOW' }, 'UC': { category: 'gi', severity: 'YELLOW' },
     'CD': { category: 'gi', severity: 'YELLOW' }, 'SBP': { category: 'gi', severity: 'RED' },
     'HE': { category: 'gi', severity: 'YELLOW' }, 'GORD': { category: 'gi', severity: 'GREEN' },
-    'PUD': { category: 'gi', severity: 'GREEN' },
+    'PUD': { category: 'gi', severity: 'GREEN' }, 'GIB': { category: 'gi', severity: 'YELLOW' },
+    'CHOLECYSTITIS': { category: 'gi', severity: 'YELLOW' }, 'CHOLANGITIS': { category: 'gi', severity: 'RED' },
+    'PANCREATITIS': { category: 'gi', severity: 'YELLOW' },
+    'CIRRHOSIS': { category: 'gi', severity: 'YELLOW' }, 'ASCITES': { category: 'gi', severity: 'YELLOW' },
+    'VARICES': { category: 'gi', severity: 'RED' },
     // Infectious
     'UTI': { category: 'infect', severity: 'GREEN' }, 'SEPSIS': { category: 'infect', severity: 'RED' },
     'SIRS': { category: 'infect', severity: 'YELLOW' }, 'MRSA': { category: 'infect', severity: 'YELLOW' },
     'CDI': { category: 'infect', severity: 'YELLOW' }, 'COVID': { category: 'infect', severity: 'YELLOW' },
+    'VRE': { category: 'infect', severity: 'YELLOW' }, 'ESBL': { category: 'infect', severity: 'YELLOW' },
+    'CRE': { category: 'infect', severity: 'YELLOW' },
+    'CELLULITIS': { category: 'infect', severity: 'GREEN' }, 'ABSCESS': { category: 'infect', severity: 'YELLOW' },
+    'OSTEOMYELITIS': { category: 'infect', severity: 'YELLOW' },
+    'ENDOCARDITIS': { category: 'infect', severity: 'RED' },
+    'BACTEREMIA': { category: 'infect', severity: 'RED' },
+    // Hematology
+    'ANEMIA': { category: 'heme', severity: 'GREEN' }, 'IDA': { category: 'heme', severity: 'GREEN' },
+    'SCD': { category: 'heme', severity: 'YELLOW' }, 'SICKLE': { category: 'heme', severity: 'YELLOW' },
+    'THALASSEMIA': { category: 'heme', severity: 'GREEN' },
+    'DIC': { category: 'heme', severity: 'RED' }, 'TTP': { category: 'heme', severity: 'RED' },
+    'HIT': { category: 'heme', severity: 'RED' }, 'ITP': { category: 'heme', severity: 'YELLOW' },
+    'PANCYTOPENIA': { category: 'heme', severity: 'YELLOW' },
+    'FEBRILE NEUTROPENIA': { category: 'heme', severity: 'RED' },
+    'LEUKEMIA': { category: 'heme', severity: 'YELLOW' }, 'LYMPHOMA': { category: 'heme', severity: 'YELLOW' },
+    'MYELOMA': { category: 'heme', severity: 'YELLOW' },
+    'AML': { category: 'heme', severity: 'RED' }, 'ALL': { category: 'heme', severity: 'RED' },
+    'CML': { category: 'heme', severity: 'YELLOW' }, 'CLL': { category: 'heme', severity: 'GREEN' },
+    'MDS': { category: 'heme', severity: 'YELLOW' },
+    // Oncology
+    'CA': { category: 'onc', severity: 'YELLOW' }, 'METS': { category: 'onc', severity: 'YELLOW' },
+    'PALLIATIVE': { category: 'onc', severity: 'GREEN' },
+    'LUNG CA': { category: 'onc', severity: 'YELLOW' }, 'BREAST CA': { category: 'onc', severity: 'YELLOW' },
+    'COLON CA': { category: 'onc', severity: 'YELLOW' }, 'PROSTATE CA': { category: 'onc', severity: 'YELLOW' },
+    'PANCREATIC CA': { category: 'onc', severity: 'YELLOW' },
+    'HCC': { category: 'onc', severity: 'YELLOW' }, 'RCC': { category: 'onc', severity: 'YELLOW' },
+    'GIST': { category: 'onc', severity: 'YELLOW' },
+    // Orthopedic / Surgical
+    'NOF': { category: 'ortho', severity: 'YELLOW' },
+    'THR': { category: 'ortho', severity: 'YELLOW' }, 'TKR': { category: 'ortho', severity: 'YELLOW' },
+    'POST-OP': { category: 'surg', severity: 'YELLOW' }, 'PRE-OP': { category: 'surg', severity: 'GREEN' },
+    'APPENDICITIS': { category: 'surg', severity: 'YELLOW' },
+    'HERNIA': { category: 'surg', severity: 'GREEN' },
+    // Psychiatry
+    'OVERDOSE': { category: 'psych', severity: 'RED' }, 'OD': { category: 'psych', severity: 'RED' },
+    'SUICIDAL': { category: 'psych', severity: 'RED' },
+    'DELIRIUM': { category: 'psych', severity: 'YELLOW' },
+    'PSYCHOSIS': { category: 'psych', severity: 'YELLOW' },
+    // Obstetrics
+    'ECLAMPSIA': { category: 'obs', severity: 'RED' },
+    'PRE-ECLAMPSIA': { category: 'obs', severity: 'YELLOW' },
+    'PPH': { category: 'obs', severity: 'RED' },
+    'ECTOPIC': { category: 'obs', severity: 'RED' },
     // Status
     'NKDA': { category: 'status' }, 'DNR': { category: 'status' }, 'DNAR': { category: 'status' },
-    'FULL': { category: 'status' },
+    'FULL': { category: 'status' }, 'NFR': { category: 'status' }, 'COMFORT': { category: 'status' },
   },
 
   MEDICATIONS: new Set([
@@ -296,6 +369,41 @@ const MedicalVocabulary = {
     'Adrenaline', 'Epinephrine', 'Noradrenaline', 'Atropine', 'Dopamine',
     'Dobutamine', 'Nitroglycerin', 'Nitroprusside',
     'Alteplase', 'Tenecteplase',
+    // Additional hospital formulary
+    'Rosuvastatin', 'Simvastatin', 'Pravastatin', 'Ezetimibe', 'Fenofibrate',
+    'Perindopril', 'Telmisartan', 'Irbesartan', 'Olmesartan', 'Sacubitril-Valsartan',
+    'Ivabradine', 'Ranolazine', 'Isosorbide', 'Hydralazine', 'Diltiazem', 'Verapamil',
+    'Nifedipine', 'Felodipine', 'Prazosin', 'Clonidine', 'Methyldopa',
+    'Dabigatran', 'Edoxaban', 'Fondaparinux', 'Protamine', 'Tranexamic',
+    'Glipizide', 'Glimepiride', 'Pioglitazone', 'Canagliflozin', 'Dulaglutide',
+    'Exenatide', 'Saxagliptin', 'Linagliptin', 'Vildagliptin', 'Acarbose',
+    'Levothyroxine', 'Carbimazole', 'Propylthiouracil',
+    'Erythromycin', 'Clindamycin', 'Linezolid', 'Colistin', 'Tigecycline',
+    'Cefazolin', 'Cefepime', 'Ertapenem', 'Imipenem', 'Doripenem',
+    'Amphotericin', 'Voriconazole', 'Caspofungin', 'Micafungin', 'Acyclovir',
+    'Ganciclovir', 'Oseltamivir', 'Remdesivir',
+    'Sulfasalazine', 'Mesalazine', 'Azathioprine', 'Mycophenolate',
+    'Tacrolimus', 'Cyclosporine', 'Methotrexate', 'Rituximab', 'Infliximab',
+    'Adalimumab', 'Tocilizumab',
+    'Olanzapine', 'Quetiapine', 'Risperidone', 'Haloperidol', 'Chlorpromazine',
+    'Sertraline', 'Fluoxetine', 'Escitalopram', 'Citalopram', 'Venlafaxine',
+    'Duloxetine', 'Mirtazapine', 'Trazodone', 'Lithium', 'Valproate',
+    'Clonazepam', 'Alprazolam', 'Zolpidem', 'Hydroxyzine',
+    'Oxycodone', 'Hydromorphone', 'Buprenorphine', 'Naloxone', 'Ketamine',
+    'Propofol', 'Etomidate', 'Rocuronium', 'Succinylcholine', 'Sugammadex',
+    'Dantrolene', 'Neostigmine',
+    'Mannitol', 'Acetazolamide', 'Torsemide', 'Eplerenone', 'Amiloride',
+    'Allopurinol', 'Febuxostat', 'Colchicine',
+    'Enema', 'Bisacodyl', 'Senna', 'Docusate', 'PEG',
+    'Ranitidine', 'Famotidine', 'Esomeprazole', 'Lansoprazole', 'Sucralfate',
+    'Octreotide', 'Terlipressin', 'Vasopressin',
+    'Filgrastim', 'Darbepoetin', 'Erythropoietin', 'Iron-Sucrose', 'Ferric-Carboxymaltose',
+    'Phytomenadione', 'Vitamin-K',
+    'Calcium-Gluconate', 'Potassium-Chloride', 'Sodium-Bicarbonate', 'Magnesium-Sulphate',
+    'Dextrose', 'Normal-Saline', 'Ringers-Lactate', 'Albumin',
+    'Prochlorperazine', 'Domperidone', 'Granisetron', 'Aprepitant',
+    'Cetirizine', 'Loratadine', 'Fexofenadine', 'Chlorpheniramine', 'Promethazine',
+    'Tamsulosin', 'Finasteride', 'Sildenafil', 'Tadalafil',
   ]),
 
   ARABIC_FIRST_NAMES: new Set([
@@ -419,6 +527,10 @@ const EntityRecognizer = {
       this.scoreAgeGender(t),
       this.scoreAge(t),
       this.scoreGender(t),
+      this.scoreCivilId(t),
+      this.scoreWard(t),
+      this.scoreO2(t),
+      this.scoreIsolation(upper),
       this.scoreName(t),
       this.scoreDiagnosis(t),
       this.scoreMedication(t),
@@ -487,6 +599,64 @@ const EntityRecognizer = {
       return { entity: 'GENDER', confidence: 0.95, meta: { gender: g } };
     }
     return { entity: 'GENDER', confidence: 0 };
+  },
+
+  scoreCivilId(t) {
+    // Kuwait Civil ID: 12 digits starting with 2 or 3
+    const clean = t.replace(/[\s\-]/g, '');
+    if (/^[23]\d{11}$/.test(clean))
+      return { entity: 'CIVIL_ID', confidence: 0.97, corrected: clean, meta: { civilId: clean } };
+    // MRN patterns: 6-10 digits, sometimes prefixed
+    if (/^(?:MRN|mrn|ID|id)[:\s#]*(\d{6,10})$/.test(t)) {
+      const mrn = t.match(/(\d{6,10})/)[1];
+      return { entity: 'CIVIL_ID', confidence: 0.85, corrected: mrn, meta: { civilId: mrn } };
+    }
+    return { entity: 'CIVIL_ID', confidence: 0 };
+  },
+
+  scoreWard(t) {
+    const upper = t.toUpperCase().trim();
+    // ICU/CCU/NICU/PICU etc.
+    if (/^(?:ICU|MICU|SICU|CCU|NICU|PICU|HDU|MAU|AMU|ACU|EDW|ED|ER|OT|OR|PACU|RECOVERY)$/i.test(upper))
+      return { entity: 'WARD', confidence: 0.92, corrected: upper, meta: { ward: upper } };
+    // Ward with number: "Ward 5", "W5"
+    if (/^(?:ward|w)\s*#?\s*\d{1,2}$/i.test(t))
+      return { entity: 'WARD', confidence: 0.88, corrected: t, meta: { ward: t } };
+    // Arabic ward names
+    if (/^(?:\u0648\u062D\u062F\u0629|\u062C\u0646\u0627\u062D|\u0639\u0646\u0627\u064A\u0629\s*\u0645\u0631\u0643\u0632\u0629)/i.test(t))
+      return { entity: 'WARD', confidence: 0.85, corrected: t, meta: { ward: t } };
+    return { entity: 'WARD', confidence: 0 };
+  },
+
+  scoreO2(t) {
+    // "O2 2L NC", "RA", "NRB", "HFNC 40L", "Vent", "BiPAP"
+    if (/^(?:RA|ROOM AIR)$/i.test(t))
+      return { entity: 'O2', confidence: 0.85, corrected: 'NONE', meta: { o2: 'NONE' } };
+    if (/^(?:NC|NASAL\s*CANNULA)/i.test(t))
+      return { entity: 'O2', confidence: 0.9, corrected: 'NASAL_CANNULA', meta: { o2: 'NASAL_CANNULA' } };
+    if (/^(?:FM|FACE\s*MASK|SM|SIMPLE\s*MASK)/i.test(t))
+      return { entity: 'O2', confidence: 0.88, corrected: 'FACE_MASK', meta: { o2: 'FACE_MASK' } };
+    if (/^(?:NRB|NON[- ]?REBREATHER)/i.test(t))
+      return { entity: 'O2', confidence: 0.9, corrected: 'NON_REBREATHER', meta: { o2: 'NON_REBREATHER' } };
+    if (/^(?:BIPAP|CPAP|NIV)/i.test(t))
+      return { entity: 'O2', confidence: 0.92, corrected: 'BIPAP', meta: { o2: 'BIPAP' } };
+    if (/^(?:VENT|VENTILAT|INTUBAT|ETT|HFNC)/i.test(t))
+      return { entity: 'O2', confidence: 0.95, corrected: 'VENTILATOR', meta: { o2: 'VENTILATOR' } };
+    if (/^O2\s+\d+L?/i.test(t))
+      return { entity: 'O2', confidence: 0.88, corrected: 'NASAL_CANNULA', meta: { o2: 'NASAL_CANNULA' } };
+    return { entity: 'O2', confidence: 0 };
+  },
+
+  scoreIsolation(upper) {
+    if (/^(?:CONTACT|CONTACT\s*ISO|CONTACT\s*PRECAUTION)/i.test(upper))
+      return { entity: 'ISOLATION', confidence: 0.92, corrected: 'CONTACT', meta: { iso: 'CONTACT' } };
+    if (/^(?:DROPLET|DROPLET\s*ISO)/i.test(upper))
+      return { entity: 'ISOLATION', confidence: 0.92, corrected: 'DROPLET', meta: { iso: 'DROPLET' } };
+    if (/^(?:AIRBORNE|AIRBORNE\s*ISO|AFB\s*ISO)/i.test(upper))
+      return { entity: 'ISOLATION', confidence: 0.92, corrected: 'AIRBORNE', meta: { iso: 'AIRBORNE' } };
+    if (/^(?:NEUTROPENIC|REVERSE\s*ISO)/i.test(upper))
+      return { entity: 'ISOLATION', confidence: 0.88, corrected: 'AIRBORNE', meta: { iso: 'AIRBORNE' } };
+    return { entity: 'ISOLATION', confidence: 0 };
   },
 
   scoreName(t) {
@@ -763,6 +933,30 @@ const PatientAssembler = {
             patient.fieldConfidence.code = entity.confidence;
           }
           break;
+        case 'CIVIL_ID':
+          if (!patient.civilId || entity.confidence > (patient.fieldConfidence.civilId || 0)) {
+            patient.civilId = entity.corrected;
+            patient.fieldConfidence.civilId = entity.confidence;
+          }
+          break;
+        case 'WARD':
+          if (!patient.ward || entity.confidence > (patient.fieldConfidence.ward || 0)) {
+            patient.ward = entity.meta.ward || entity.corrected;
+            patient.fieldConfidence.ward = entity.confidence;
+          }
+          break;
+        case 'O2':
+          if (!patient.o2 || patient.o2 === 'NONE' || entity.confidence > (patient.fieldConfidence.o2 || 0)) {
+            patient.o2 = entity.meta.o2 || entity.corrected;
+            patient.fieldConfidence.o2 = entity.confidence;
+          }
+          break;
+        case 'ISOLATION':
+          if (!patient.iso || patient.iso === 'NONE' || entity.confidence > (patient.fieldConfidence.iso || 0)) {
+            patient.iso = entity.meta.iso || entity.corrected;
+            patient.fieldConfidence.iso = entity.confidence;
+          }
+          break;
         case 'UNKNOWN': unknowns.push(entity); break;
       }
     }
@@ -861,25 +1055,29 @@ const ClinicalValidator = {
         warnings.push({ field: 'diagnosis', message: 'Anticoagulation without clear indication', severity: 'WARN' });
     }
 
-    // Auto-suggest triage
+    // Auto-suggest triage (order matters: check YELLOW before RED to handle NSTEMI vs STEMI)
     if (patient.dx) {
       const dx = patient.dx.toUpperCase();
-      if (/STEMI|CARDIAC ARREST|STATUS EPILEPT|ARDS|SEPTIC SHOCK|DKA|CVA|SAH|VF/i.test(dx))
-        patient.suggestedTriage = 'RED';
-      else if (/NSTEMI|ACS|PE|DVT|AKI|ADHF|CHF|CAP|HAP|AECOPD|UGIB|SEPSIS|SBO/i.test(dx))
+      // YELLOW first — must check before RED to avoid NSTEMI triggering STEMI match
+      if (/\bNSTEMI\b|ACS|(?<![A-Z])PE(?![A-Z])|DVT|AKI|ADHF|CHF|CAP(?!\w)|HAP|AECOPD|UGIB|SEPSIS(?!\s*SHOCK)|SBO/i.test(dx))
         patient.suggestedTriage = 'YELLOW';
-      else if (/UTI|CELLULITIS|HTN|DM[12]?$|CKD[1-3]|COPD$|GORD/i.test(dx))
+      // RED — exact STEMI (not NSTEMI), cardiac arrest, DKA, etc.
+      if (/\bSTEMI\b(?!.*\bNSTEMI\b)|CARDIAC ARREST|STATUS EPILEPT|ARDS|SEPTIC SHOCK|DKA|CVA|SAH|\bVF\b|OVERDOSE|\bOD\b|ECLAMPSIA|DIC|PPH|VARICES|CHOLANGITIS|MENINGITIS|BACTEREMIA|HEMOPTYSIS|RESP FAILURE/i.test(dx))
+        patient.suggestedTriage = 'RED';
+      // GREEN — stable chronic conditions
+      else if (!patient.suggestedTriage && /UTI|CELLULITIS|HTN|DM[12]?$|CKD[1-3]|COPD$|GORD|ASTHMA|OSA|ANEMIA|IDA|EPILEPSY|HERNIA|PARKINSON|DEMENTIA/i.test(dx))
         patient.suggestedTriage = 'GREEN';
     }
 
-    // Auto-suggest mobility
-    if (patient.dx) {
-      const dx = patient.dx.toUpperCase();
-      if (/VENTILAT|INTUBAT|ARDS|CARDIAC ARREST|ICU/i.test(dx))
+    // Auto-suggest mobility (also consider O2 status)
+    if (patient.dx || patient.o2) {
+      const dx = (patient.dx || '').toUpperCase();
+      const o2 = (patient.o2 || '').toUpperCase();
+      if (/VENTILAT|INTUBAT|ARDS|CARDIAC ARREST|ICU|ETT/i.test(dx) || o2 === 'VENTILATOR')
         patient.suggestedMobility = 'CRITICAL_TRANSPORT';
-      else if (/CVA|STROKE|SAH|ICH|FRACTURE|GBS/i.test(dx))
+      else if (/CVA|STROKE|SAH|ICH|FRACTURE|GBS|NOF|SDH|EDH|POST.?OP|PARAPL|QUADRI/i.test(dx))
         patient.suggestedMobility = 'STRETCHER';
-      else if (/CHF|ADHF|PE|COPD|AECOPD|CAP|O2/i.test(dx))
+      else if (/CHF|ADHF|PE|COPD|AECOPD|CAP|O2/i.test(dx) || ['BIPAP', 'NON_REBREATHER'].includes(o2))
         patient.suggestedMobility = 'WHEELCHAIR';
       else
         patient.suggestedMobility = 'AMBULATORY';
