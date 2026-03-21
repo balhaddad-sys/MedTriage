@@ -3,6 +3,7 @@ import { useApp } from '../../app.jsx';
 import { colors, fonts, triageColors, triageTextColors } from '../../design/tokens.js';
 import Modal from '../../shared/Modal.jsx';
 import { logAction } from '../../data/audit.js';
+import { BLOOD_TYPES } from './mrzParser.js';
 
 const TRIAGE_LIST = ['RED', 'YELLOW', 'GREEN', 'GRAY', 'BLACK'];
 const MOBILITY = ['AMBULATORY', 'WHEELCHAIR', 'STRETCHER', 'CRITICAL_TRANSPORT'];
@@ -64,6 +65,7 @@ export default function QuickAdd({ onClose }) {
     iso: 'NONE',
     code: 'FULL',
     civilId: '',
+    bloodType: '',
     allergies: 'NKDA',
     meds: '',
     notes: '',
@@ -204,6 +206,20 @@ export default function QuickAdd({ onClose }) {
                 <div style={styles.label}>Allergies</div>
                 <input style={styles.input} placeholder="NKDA"
                   value={form.allergies} onChange={e => set('allergies', e.target.value)} />
+              </div>
+            </div>
+            <div>
+              <div style={styles.label}>Blood Type</div>
+              <div style={styles.segmented}>
+                {BLOOD_TYPES.map(bt => (
+                  <button key={bt}
+                    style={{
+                      ...styles.segBtn,
+                      ...(form.bloodType === bt ? { background: colors.red + '22', borderColor: colors.red, color: colors.red } : {}),
+                      fontSize: '10px',
+                    }}
+                    onClick={() => set('bloodType', form.bloodType === bt ? '' : bt)}>{bt}</button>
+                ))}
               </div>
             </div>
             <div>

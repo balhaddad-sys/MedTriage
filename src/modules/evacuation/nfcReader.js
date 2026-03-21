@@ -1,10 +1,24 @@
 // Kuwait Civil ID NFC reader
 //
-// Kuwait Civil ID cards behave like smart cards, not simple NDEF tags.
-// In this app we support two useful levels of NFC:
-// 1. Native Capacitor app: detect the raw tag, capture UID/tech types, and use
-//    manual Civil ID entry when structured data is not exposed by the plugin.
-// 2. Web NFC: detect a tap when possible, then validate manual Civil ID entry.
+// Kuwait Civil ID cards are ICAO 9303 compliant smart cards (dual-interface chip)
+// with both contact (ISO 7816) and contactless (ISO 14443 / NFC) interfaces.
+//
+// Three levels of NFC reading:
+// 1. ICAO MRTD: Full protocol read via APDU transceive (DG1, DG2, DG11)
+//    — requires BAC/PACE authentication with MRZ-derived key
+// 2. Native Capacitor: detect raw tag, capture UID/tech types, attempt ICAO read
+// 3. Web NFC: detect a tap when possible, then validate manual Civil ID entry
+//
+// Data available via NFC (ICAO data groups):
+//   DG1: MRZ data (name, DOB, sex, nationality, document number)
+//   DG2: Facial photograph (JPEG or JP2)
+//   DG11: Additional personal details (Arabic name, place of birth)
+//
+// NOT available via NFC (requires PACI contact interface):
+//   Blood type, address, phone number, sponsor info
+
+import { attemptICAORead } from './icaoReader.js';
+import { parseTD1, getNationalityLabel } from './mrzParser.js';
 
 function isCapacitorNative() {
   return typeof window !== 'undefined' &&
@@ -92,9 +106,9 @@ export function getNfcPlatformInfo() {
     return {
       supported: true,
       backend,
-      label: 'Native NFC',
+      label: 'Native NFC (ICAO)',
       hint: 'Hold Kuwait Civil ID near the back of the device',
-      canReadCard: false,
+      canReadCard: true,
       canDetectCard: true,
       diagnostic: '',
     };
@@ -273,7 +287,55 @@ async function scanCapacitorNfc(onResult, onError, onReading) {
       if (closed) return;
       closed = true;
       onReading?.();
-      const parsed = parseCapacitorEvent(event);
+
+      // First try ICAO MRTD protocol read (reads chip data groups)
+      let icaoData = null;
+      try {
+        icaoData = await attemptICAORead(plugin);
+      } catch {
+        // ICAO read failed — fall back to basic tag parsing
+      }
+
+      let parsed = parseCapacitorEvent(event);
+
+      // If ICAO read succeeded and returned MRZ, parse it for richer data
+      if (icaoData?.mrz) {
+        const mrzText = icaoData.mrz;
+        // TD1 MRZ: 90 chars = 3 lines × 30
+        if (mrzText.length >= 88) {
+          const line1 = mrzText.substring(0, 30);
+          const line2 = mrzText.substring(30, 60);
+          const line3 = mrzText.substring(60, 90);
+          const mrzParsed = parseTD1(line1, line2, line3);
+          if (mrzParsed) {
+            parsed.fullName = mrzParsed.fullName || parsed.fullName;
+            parsed.gender = mrzParsed.sex || parsed.gender;
+            parsed.age = mrzParsed.age ?? parsed.age;
+            parsed.nationality = getNationalityLabel(mrzParsed.nationality) || parsed.nationality;
+            parsed.nationalityCode = mrzParsed.nationality;
+            parsed.documentNumber = mrzParsed.documentNumber;
+            parsed.dateOfBirth = mrzParsed.dateOfBirth;
+            parsed.dateOfExpiry = mrzParsed.dateOfExpiry;
+            parsed.issuingState = mrzParsed.issuingState;
+            parsed.mrzValid = mrzParsed.valid;
+            parsed.needsManualId = !parsed.civilId && !mrzParsed.documentNumber;
+          }
+        }
+      }
+
+      // Attach ICAO metadata
+      if (icaoData) {
+        parsed.icaoDetected = true;
+        parsed.icaoNeedsBAC = icaoData.needsBAC || false;
+        parsed.icaoGroups = icaoData.availableGroups || [];
+        if (icaoData.additionalDetails?.fullNameNative) {
+          parsed.fullNameArabic = icaoData.additionalDetails.fullNameNative;
+        }
+        if (icaoData.photo) {
+          parsed.photo = icaoData.photo;
+        }
+      }
+
       await cleanup(listener);
       onResult?.(parsed);
     });
@@ -394,4 +456,25 @@ export function validateCivilId(input) {
   }
 
   return { valid: true, ...parsed };
+}
+
+// Find existing patient by Civil ID to prevent duplicates
+export function findExistingPatient(patients, civilId) {
+  if (!civilId || !Array.isArray(patients)) return null;
+  const clean = `${civilId}`.replace(/\D/g, '');
+  if (!clean) return null;
+  return patients.find(p => p.civilId && p.civilId.replace(/\D/g, '') === clean) || null;
+}
+
+// Convert ICAO photo data to displayable data URL
+export function photoToDataUrl(photoData) {
+  if (!photoData || !photoData.data) return null;
+  try {
+    const bytes = photoData.data instanceof Uint8Array ? photoData.data : new Uint8Array(photoData.data);
+    const mime = photoData.format === 'jp2' ? 'image/jp2' : 'image/jpeg';
+    const base64 = btoa(String.fromCharCode(...bytes));
+    return `data:${mime};base64,${base64}`;
+  } catch {
+    return null;
+  }
 }

@@ -3,7 +3,8 @@ import { useApp } from '../../app.jsx';
 import { colors, fonts } from '../../design/tokens.js';
 import Modal from '../../shared/Modal.jsx';
 import { CheckIcon } from '../../design/icons.jsx';
-import { scanNFC, validateCivilId, getNfcPlatformInfo } from './nfcReader.js';
+import { scanNFC, validateCivilId, getNfcPlatformInfo, findExistingPatient, photoToDataUrl } from './nfcReader.js';
+import { BLOOD_TYPES, getNationalityLabel } from './mrzParser.js';
 import { logAction } from '../../data/audit.js';
 
 const styles = {
@@ -48,6 +49,12 @@ const styles = {
     background: colors.red + '15', border: `1px solid ${colors.red}33`,
     fontSize: '12px', color: colors.red, fontWeight: 600,
   },
+  warningBox: {
+    width: '100%', padding: '10px', borderRadius: '8px',
+    background: colors.amber + '15', border: `1px solid ${colors.amber}33`,
+    fontSize: '12px', color: colors.amber, fontWeight: 600,
+    display: 'flex', alignItems: 'center', gap: '8px',
+  },
   successBox: {
     width: '100%', padding: '10px', borderRadius: '8px',
     background: colors.green + '15', border: `1px solid ${colors.green}33`,
@@ -66,10 +73,33 @@ const styles = {
   },
   dividerLine: { flex: 1, height: '1px', background: colors.border },
   dividerText: { fontSize: '11px', fontWeight: 700, color: colors.text3, textTransform: 'uppercase' },
+  photo: {
+    width: '64px', height: '80px', borderRadius: '6px',
+    objectFit: 'cover', border: `2px solid ${colors.green}44`,
+  },
+  bloodTypeRow: {
+    display: 'flex', gap: '6px', flexWrap: 'wrap',
+  },
+  bloodTypeBtn: {
+    padding: '6px 10px', borderRadius: '6px',
+    border: `1px solid ${colors.border}`, background: colors.bg2,
+    color: colors.text2, fontSize: '12px', fontWeight: 700,
+    cursor: 'pointer', fontFamily: fonts.mono,
+    transition: 'all 100ms',
+  },
+  bloodTypeBtnActive: {
+    background: colors.red + '22', borderColor: colors.red, color: colors.red,
+  },
+  selectInput: {
+    width: '100%', padding: '10px', borderRadius: '8px',
+    border: `1px solid ${colors.border}`, background: colors.bg2,
+    color: colors.text0, fontSize: '14px', fontFamily: fonts.sans,
+    outline: 'none',
+  },
 };
 
 export default function NFCScanner({ onClose }) {
-  const { addPatient, auth } = useApp();
+  const { addPatient, updatePatient, patients, auth } = useApp();
   const nfcInfo = getNfcPlatformInfo();
   const [scanning, setScanning] = useState(false);
   const [nfcData, setNfcData] = useState(null);
@@ -78,6 +108,8 @@ export default function NFCScanner({ onClose }) {
   const [civilId, setCivilId] = useState('');
   const [civilIdError, setCivilIdError] = useState('');
   const [cardDetected, setCardDetected] = useState(false);
+  const [bloodType, setBloodType] = useState('');
+  const [duplicatePatient, setDuplicatePatient] = useState(null);
   const abortRef = useRef(null);
 
   // Start NFC scan if supported
@@ -87,12 +119,16 @@ export default function NFCScanner({ onClose }) {
     setError(null);
     setCardDetected(false);
     setScanMeta(null);
+    setDuplicatePatient(null);
 
     const abort = await scanNFC(
       (data) => {
         setScanning(false);
         setScanMeta(data);
         if (data.civilId) {
+          // Check for duplicate
+          const existing = findExistingPatient(patients, data.civilId);
+          if (existing) setDuplicatePatient(existing);
           setNfcData(data);
         } else if (data.tagDetected) {
           setCardDetected(true);
@@ -107,7 +143,7 @@ export default function NFCScanner({ onClose }) {
       () => {}
     );
     abortRef.current = abort;
-  }, [nfcInfo.supported]);
+  }, [nfcInfo.supported, patients]);
 
   // Auto-start NFC on mount
   useEffect(() => {
@@ -122,6 +158,10 @@ export default function NFCScanner({ onClose }) {
       setCivilIdError(result.error);
       return;
     }
+    // Check for duplicate
+    const existing = findExistingPatient(patients, result.civilId);
+    if (existing) setDuplicatePatient(existing);
+
     setNfcData({
       ...(scanMeta || {}),
       civilId: result.civilId,
@@ -132,13 +172,14 @@ export default function NFCScanner({ onClose }) {
       tagDetected: !!scanMeta?.tagDetected || cardDetected,
       needsManualId: false,
     });
-  }, [civilId, cardDetected, scanMeta]);
+  }, [civilId, cardDetected, scanMeta, patients]);
 
   const handleAddPatient = useCallback(async () => {
     if (!nfcData) return;
     const patient = {
       civilId: nfcData.civilId || '',
       fullName: nfcData.fullName || nfcData.fullNameArabic || '',
+      fullNameArabic: nfcData.fullNameArabic || '',
       age: nfcData.age,
       gender: nfcData.gender || 'M',
       triage: 'GREEN',
@@ -150,6 +191,8 @@ export default function NFCScanner({ onClose }) {
       dx: '',
       meds: '',
       notes: nfcData.nationality ? `Nationality: ${nfcData.nationality}` : '',
+      nationality: nfcData.nationalityCode || nfcData.nationality || '',
+      bloodType: bloodType || '',
       ward: auth?.ward?.name || '',
       evac: 'IN_WARD',
       nfcScanned: !!nfcData.tagDetected,
@@ -158,6 +201,8 @@ export default function NFCScanner({ onClose }) {
       nfcTagType: nfcData.tagType || '',
       nfcTechTypes: Array.isArray(nfcData.techTypes) ? nfcData.techTypes : [],
       nfcLikelyCivilId: !!nfcData.likelyCivilId,
+      icaoDetected: nfcData.icaoDetected || false,
+      icaoGroups: nfcData.icaoGroups || [],
     };
     const saved = await addPatient(patient);
     await logAction('NFC_IMPORT', 'patient', saved.id, {
@@ -166,70 +211,156 @@ export default function NFCScanner({ onClose }) {
         nfcSerial: patient.nfcSerial,
         nfcTagType: patient.nfcTagType,
         nfcLikelyCivilId: patient.nfcLikelyCivilId,
+        icaoDetected: patient.icaoDetected,
+        bloodType: patient.bloodType,
       },
     });
     onClose();
-  }, [nfcData, addPatient, auth, onClose]);
+  }, [nfcData, bloodType, addPatient, auth, onClose]);
+
+  const handleUpdateExisting = useCallback(async () => {
+    if (!duplicatePatient || !nfcData) return;
+    const updated = {
+      ...duplicatePatient,
+      fullName: nfcData.fullName || duplicatePatient.fullName,
+      fullNameArabic: nfcData.fullNameArabic || duplicatePatient.fullNameArabic || '',
+      age: nfcData.age ?? duplicatePatient.age,
+      gender: nfcData.gender || duplicatePatient.gender,
+      nationality: nfcData.nationalityCode || nfcData.nationality || duplicatePatient.nationality || '',
+      bloodType: bloodType || duplicatePatient.bloodType || '',
+      nfcScanned: true,
+      nfcBackend: nfcData.nfcBackend || duplicatePatient.nfcBackend || 'unknown',
+      nfcSerial: nfcData.serialNumber || duplicatePatient.nfcSerial || '',
+      icaoDetected: nfcData.icaoDetected || duplicatePatient.icaoDetected || false,
+    };
+    await updatePatient(updated);
+    await logAction('NFC_UPDATE', 'patient', updated.id, {
+      newValue: { nfcBackend: updated.nfcBackend, nfcSerial: updated.nfcSerial },
+    });
+    onClose();
+  }, [duplicatePatient, nfcData, bloodType, updatePatient, onClose]);
+
+  // Photo data URL from ICAO DG2
+  const photoUrl = nfcData?.photo ? photoToDataUrl(nfcData.photo) : null;
 
   // Already got full data from NFC — show result
   if (nfcData) {
     return (
       <Modal title="Civil ID Scanner" onClose={onClose}>
         <div style={styles.container}>
-          <div style={styles.resultCard}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-              <CheckIcon size={18} color={colors.green} />
-              <span style={{ fontSize: '14px', fontWeight: 700, color: colors.green }}>
-                Civil ID Verified
-              </span>
+          {/* Duplicate warning */}
+          {duplicatePatient && (
+            <div style={styles.warningBox}>
+              Patient already registered: {duplicatePatient.fullName || duplicatePatient.civilId}
+              {' '}(Ward: {duplicatePatient.ward || '—'}, Bed: {duplicatePatient.bed || '—'})
             </div>
-            {nfcData.civilId && (
-              <div style={styles.resultRow}>
-                <span style={styles.resultLabel}>Civil ID</span>
-                <span style={styles.resultValue}>{nfcData.civilId}</span>
+          )}
+
+          <div style={styles.resultCard}>
+            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
+              <div style={{ flex: 1 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                  <CheckIcon size={18} color={colors.green} />
+                  <span style={{ fontSize: '14px', fontWeight: 700, color: colors.green }}>
+                    Civil ID {nfcData.icaoDetected ? '(ICAO)' : ''} Verified
+                  </span>
+                </div>
+                {nfcData.civilId && (
+                  <div style={styles.resultRow}>
+                    <span style={styles.resultLabel}>Civil ID</span>
+                    <span style={styles.resultValue}>{nfcData.civilId}</span>
+                  </div>
+                )}
+                {nfcData.age != null && (
+                  <div style={styles.resultRow}>
+                    <span style={styles.resultLabel}>Age</span>
+                    <span style={styles.resultValue}>{nfcData.age} years</span>
+                  </div>
+                )}
+                {nfcData.fullName && (
+                  <div style={styles.resultRow}>
+                    <span style={styles.resultLabel}>Name</span>
+                    <span style={{ ...styles.resultValue, fontFamily: fonts.sans }}>{nfcData.fullName}</span>
+                  </div>
+                )}
+                {nfcData.fullNameArabic && nfcData.fullNameArabic !== nfcData.fullName && (
+                  <div style={styles.resultRow}>
+                    <span style={styles.resultLabel}>Arabic</span>
+                    <span style={{ ...styles.resultValue, fontFamily: fonts.sans, direction: 'rtl' }}>{nfcData.fullNameArabic}</span>
+                  </div>
+                )}
+                {nfcData.gender && (
+                  <div style={styles.resultRow}>
+                    <span style={styles.resultLabel}>Gender</span>
+                    <span style={styles.resultValue}>{nfcData.gender === 'M' ? 'Male' : 'Female'}</span>
+                  </div>
+                )}
+                {(nfcData.nationality || nfcData.nationalityCode) && (
+                  <div style={styles.resultRow}>
+                    <span style={styles.resultLabel}>Nationality</span>
+                    <span style={styles.resultValue}>
+                      {nfcData.nationality || getNationalityLabel(nfcData.nationalityCode)}
+                    </span>
+                  </div>
+                )}
               </div>
-            )}
-            {nfcData.age != null && (
-              <div style={styles.resultRow}>
-                <span style={styles.resultLabel}>Age</span>
-                <span style={styles.resultValue}>{nfcData.age} years</span>
-              </div>
-            )}
-            {nfcData.fullName && (
-              <div style={styles.resultRow}>
-                <span style={styles.resultLabel}>Name</span>
-                <span style={{ ...styles.resultValue, fontFamily: fonts.sans }}>{nfcData.fullName}</span>
-              </div>
-            )}
-            {nfcData.gender && (
-              <div style={styles.resultRow}>
-                <span style={styles.resultLabel}>Gender</span>
-                <span style={styles.resultValue}>{nfcData.gender === 'M' ? 'Male' : 'Female'}</span>
-              </div>
-            )}
+              {/* Photo from ICAO DG2 */}
+              {photoUrl && (
+                <img src={photoUrl} alt="Patient photo" style={styles.photo} />
+              )}
+            </div>
             {nfcData.serialNumber && (
               <div style={styles.resultRow}>
                 <span style={styles.resultLabel}>Tag UID</span>
                 <span style={{ ...styles.resultValue, fontSize: '12px' }}>{nfcData.serialNumber}</span>
               </div>
             )}
-            {nfcData.tagType && (
+            {nfcData.icaoDetected && nfcData.icaoGroups?.length > 0 && (
               <div style={styles.resultRow}>
-                <span style={styles.resultLabel}>Tag Type</span>
-                <span style={{ ...styles.resultValue, fontSize: '12px' }}>{nfcData.tagType}</span>
+                <span style={styles.resultLabel}>ICAO Data</span>
+                <span style={{ ...styles.resultValue, fontSize: '11px' }}>{nfcData.icaoGroups.join(', ')}</span>
               </div>
             )}
           </div>
 
+          {/* Blood type — NOT available via NFC, must be entered manually */}
+          <div style={{ width: '100%' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: colors.text3, textTransform: 'uppercase', display: 'block', marginBottom: '6px' }}>
+              Blood Type (manual — not on NFC chip)
+            </span>
+            <div style={styles.bloodTypeRow}>
+              {BLOOD_TYPES.map(bt => (
+                <button key={bt}
+                  style={{ ...styles.bloodTypeBtn, ...(bloodType === bt ? styles.bloodTypeBtnActive : {}) }}
+                  onClick={() => setBloodType(bloodType === bt ? '' : bt)}>
+                  {bt}
+                </button>
+              ))}
+            </div>
+          </div>
+
           <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
             <button style={{ ...styles.btn, flex: 1, background: colors.bg2, color: colors.text0 }}
-              onClick={() => { setNfcData(null); setCivilId(''); setCardDetected(false); if (nfcInfo.supported) startScan(); }}>
+              onClick={() => { setNfcData(null); setCivilId(''); setCardDetected(false); setBloodType(''); setDuplicatePatient(null); if (nfcInfo.supported) startScan(); }}>
               Start Over
             </button>
-            <button style={{ ...styles.btn, flex: 1, background: colors.green, color: '#fff' }}
-              onClick={handleAddPatient}>
-              Add Patient
-            </button>
+            {duplicatePatient ? (
+              <>
+                <button style={{ ...styles.btn, flex: 1, background: colors.amber, color: '#000' }}
+                  onClick={handleUpdateExisting}>
+                  Update Existing
+                </button>
+                <button style={{ ...styles.btn, flex: 1, background: colors.green, color: '#fff' }}
+                  onClick={handleAddPatient}>
+                  Add New
+                </button>
+              </>
+            ) : (
+              <button style={{ ...styles.btn, flex: 1, background: colors.green, color: '#fff' }}
+                onClick={handleAddPatient}>
+                Add Patient
+              </button>
+            )}
           </div>
         </div>
       </Modal>
@@ -261,6 +392,11 @@ export default function NFCScanner({ onClose }) {
               {scanning ? 'Tap Civil ID on back of phone...' : 'NFC Ready'}
             </span>
             <span style={styles.subText}>{nfcInfo.hint}</span>
+            {nfcInfo.canReadCard && (
+              <span style={{ fontSize: '10px', color: colors.green, fontWeight: 600 }}>
+                ICAO chip reading enabled — hold card steady for 3-5 seconds
+              </span>
+            )}
             {error && <div style={styles.errorBox}>{error}</div>}
           </div>
         )}
@@ -270,7 +406,9 @@ export default function NFCScanner({ onClose }) {
           <>
             <div style={styles.successBox}>
               <CheckIcon size={16} color={colors.green} />
-              {scanMeta?.likelyCivilId ? 'Kuwait Civil ID tag detected.' : 'NFC tag detected.'} Enter Civil ID below.
+              {scanMeta?.likelyCivilId ? 'Kuwait Civil ID tag detected.' : 'NFC tag detected.'}
+              {scanMeta?.icaoDetected && scanMeta?.icaoNeedsBAC && ' BAC authentication required — enter Civil ID below.'}
+              {!scanMeta?.icaoDetected && ' Enter Civil ID below.'}
             </div>
             <div style={styles.metaBox}>
               <span style={styles.metaText}>Backend: {scanMeta?.nfcBackend || 'unknown'}</span>
@@ -278,6 +416,9 @@ export default function NFCScanner({ onClose }) {
               {scanMeta?.serialNumber && <span style={styles.metaText}>UID: {scanMeta.serialNumber}</span>}
               {scanMeta?.techTypes?.length > 0 && (
                 <span style={styles.metaText}>Tech: {scanMeta.techTypes.join(', ')}</span>
+              )}
+              {scanMeta?.icaoDetected && (
+                <span style={{ ...styles.metaText, color: colors.green }}>ICAO MRTD applet detected</span>
               )}
             </div>
           </>
@@ -336,6 +477,7 @@ export default function NFCScanner({ onClose }) {
                 setCardDetected(false);
                 setScanMeta(null);
                 setError(null);
+                setDuplicatePatient(null);
                 startScan();
               }}>
               Scan Again
