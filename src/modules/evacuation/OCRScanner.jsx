@@ -258,6 +258,7 @@ export default function OCRScanner({ onClose, onImport }) {
                 {result.backend && <span style={styles.metaPill}>Backend {result.backend}</span>}
                 {result.profile && <span style={styles.metaPill}>Profile {result.profile}</span>}
                 {result.strategy && <span style={styles.metaPill}>Strategy {result.strategy}</span>}
+                {result.consensusPasses > 1 && <span style={styles.metaPill}>Consensus {result.consensusPasses} passes</span>}
                 {result.qualityBand && <span style={styles.metaPill}>Quality {result.qualityBand}</span>}
                 {Number.isFinite(result.qualityScore) && (
                   <span style={styles.metaPill}>Score {Math.round(result.qualityScore * 100)}%</span>

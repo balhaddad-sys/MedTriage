@@ -273,6 +273,275 @@ function mergeListValues(a, b) {
   return [...new Set([...(a ? a.split(/\s*,\s*/) : []), ...(b ? b.split(/\s*,\s*/) : [])].filter(Boolean))].join(', ');
 }
 
+function normalizeBedForMatch(bed) {
+  return `${bed || ''}`
+    .toUpperCase()
+    .replace(/\s+/g, '')
+    .replace(/[OQ]/g, '0')
+    .replace(/[|IL]/g, '1');
+}
+
+function normalizeCivilIdForMatch(value) {
+  return `${value || ''}`
+    .replace(/[\s\-]/g, '')
+    .replace(/[Oo]/g, '0')
+    .replace(/[Il|]/g, '1');
+}
+
+const FIELD_CONFIDENCE_KEYS = {
+  fullName: 'fullName',
+  age: 'age',
+  gender: 'gender',
+  bed: 'bed',
+  civilId: 'civilId',
+  dx: 'dx',
+  meds: 'meds',
+  allergies: 'allergies',
+  code: 'code',
+  ward: 'ward',
+  o2: 'o2',
+  iso: 'iso',
+};
+
+function canonicalizeConsensusValue(field, value) {
+  const text = `${value ?? ''}`.trim();
+  if (!text) return '';
+
+  switch (field) {
+    case 'fullName':
+      return normalizeNameForMerge(text);
+    case 'bed':
+      return normalizeBedForMatch(text);
+    case 'civilId':
+      return normalizeCivilIdForMatch(text);
+    case 'age':
+      return /^\d+$/.test(text) ? text : `${parseInt(text, 10) || ''}`;
+    case 'gender':
+    case 'code':
+    case 'o2':
+    case 'iso':
+    case 'suggestedTriage':
+    case 'suggestedMobility':
+      return text.toUpperCase();
+    case 'dx':
+    case 'meds':
+    case 'allergies':
+    case 'ward':
+      return stripForLexicon(text) || text.toUpperCase();
+    default:
+      return text.toUpperCase();
+  }
+}
+
+function normalizeConsensusOutput(field, value) {
+  if (value == null || value === '') return null;
+  const text = `${value}`.trim();
+  if (!text) return null;
+
+  switch (field) {
+    case 'fullName':
+      return text.replace(/\s+/g, ' ');
+    case 'bed':
+      return normalizeBedForMatch(text) || text.toUpperCase();
+    case 'civilId':
+      return normalizeCivilIdForMatch(text) || text;
+    case 'age': {
+      const age = parseInt(text, 10);
+      return Number.isFinite(age) ? age : null;
+    }
+    case 'gender':
+    case 'code':
+    case 'o2':
+    case 'iso':
+    case 'suggestedTriage':
+    case 'suggestedMobility':
+      return text.toUpperCase();
+    default:
+      return text;
+  }
+}
+
+function fieldVoteScore(patient, field, value) {
+  const fieldKey = FIELD_CONFIDENCE_KEYS[field];
+  const fieldConfidence = fieldKey ? (patient.fieldConfidence?.[fieldKey] || 0) : 0;
+  const compactLength = typeof value === 'string' ? value.replace(/\s+/g, '').length : 0;
+  let completenessBonus = compactLength > 0 ? Math.min(compactLength, 18) / 180 : 0;
+  let noisePenalty = 0;
+
+  if (field === 'fullName') {
+    const tokenCount = typeof value === 'string' ? value.trim().split(/\s+/).filter(Boolean).length : 0;
+    completenessBonus = 0;
+    noisePenalty += Math.max(0, tokenCount - 2) * 0.04;
+    noisePenalty += Math.max(0, (patient.rawEntityCount || 0) - 6) * 0.035;
+  }
+
+  return clamp((fieldConfidence * 0.72) + ((patient.confidence || 0) * 0.28) + completenessBonus - noisePenalty, 0, 1.08);
+}
+
+function buildScalarFieldConsensus(patients, field) {
+  const votes = new Map();
+
+  for (const patient of patients) {
+    const rawValue = patient[field];
+    if (rawValue == null || rawValue === '') continue;
+
+    const key = canonicalizeConsensusValue(field, rawValue);
+    if (!key) continue;
+
+    const value = normalizeConsensusOutput(field, rawValue);
+    const weight = fieldVoteScore(patient, field, rawValue);
+    const existing = votes.get(key) || { value, weight: 0, count: 0, bestScore: -1 };
+
+    existing.weight += weight;
+    existing.count += 1;
+    if (weight > existing.bestScore || (Math.abs(weight - existing.bestScore) < 0.02 && `${value}`.length > `${existing.value}`.length)) {
+      existing.value = value;
+      existing.bestScore = weight;
+    }
+
+    votes.set(key, existing);
+  }
+
+  if (votes.size === 0) return { value: null, confidence: 0 };
+
+  const ranked = [...votes.values()].sort((a, b) => {
+    if (b.weight !== a.weight) return b.weight - a.weight;
+    if (b.count !== a.count) return b.count - a.count;
+    return b.bestScore - a.bestScore;
+  });
+
+  const best = ranked[0];
+  const totalWeight = ranked.reduce((sum, item) => sum + item.weight, 0);
+  return {
+    value: best.value,
+    confidence: clamp(weightedAverage([
+      { value: clamp(best.bestScore), weight: 0.7 },
+      { value: totalWeight > 0 ? best.weight / totalWeight : 0, weight: 0.3 },
+    ], best.bestScore)),
+  };
+}
+
+function splitListFieldValues(value) {
+  return `${value || ''}`.split(/\s*,\s*/).map(item => item.trim()).filter(Boolean);
+}
+
+function buildListFieldConsensus(patients, field) {
+  const votes = new Map();
+
+  for (const patient of patients) {
+    for (const rawValue of splitListFieldValues(patient[field])) {
+      const key = canonicalizeConsensusValue(field, rawValue);
+      if (!key) continue;
+
+      const value = normalizeConsensusOutput(field, rawValue);
+      const weight = fieldVoteScore(patient, field, rawValue);
+      const existing = votes.get(key) || { value, weight: 0, count: 0, bestScore: -1 };
+
+      existing.weight += weight;
+      existing.count += 1;
+      if (weight > existing.bestScore || (Math.abs(weight - existing.bestScore) < 0.02 && `${value}`.length > `${existing.value}`.length)) {
+        existing.value = value;
+        existing.bestScore = weight;
+      }
+
+      votes.set(key, existing);
+    }
+  }
+
+  if (votes.size === 0) return { value: null, confidence: 0 };
+
+  const ranked = [...votes.values()].sort((a, b) => {
+    if (b.weight !== a.weight) return b.weight - a.weight;
+    if (b.count !== a.count) return b.count - a.count;
+    return b.bestScore - a.bestScore;
+  });
+
+  const strongestWeight = ranked[0].weight;
+  const kept = ranked
+    .filter((item, index) => item.count > 1 || item.weight >= Math.max(0.58, strongestWeight * 0.5) || index === 0)
+    .slice(0, 6);
+
+  return {
+    value: kept.map(item => item.value).join(', '),
+    confidence: clamp(average(kept.map(item => weightedAverage([
+      { value: clamp(item.bestScore), weight: 0.65 },
+      { value: Math.min(1, item.count / Math.max(patients.length, 1)), weight: 0.35 },
+    ], item.bestScore)), 0)),
+  };
+}
+
+function consolidatePatientGroup(patients) {
+  if (patients.length === 0) return null;
+
+  const scalarFields = [
+    'fullName', 'age', 'gender', 'bed', 'civilId',
+    'allergies', 'code', 'ward', 'o2', 'iso',
+    'suggestedTriage', 'suggestedMobility',
+  ];
+  const listFields = ['dx', 'meds'];
+  const scalarConsensus = Object.fromEntries(scalarFields.map(field => [field, buildScalarFieldConsensus(patients, field)]));
+  const listConsensus = Object.fromEntries(listFields.map(field => [field, buildListFieldConsensus(patients, field)]));
+
+  const fieldConfidence = {};
+  Object.entries({ ...scalarConsensus, ...listConsensus }).forEach(([field, result]) => {
+    if (result.value == null || result.value === '') return;
+    const fieldKey = FIELD_CONFIDENCE_KEYS[field] || field;
+    fieldConfidence[fieldKey] = result.confidence;
+  });
+
+  const merged = {
+    fullName: scalarConsensus.fullName.value,
+    age: scalarConsensus.age.value,
+    gender: scalarConsensus.gender.value,
+    bed: scalarConsensus.bed.value,
+    civilId: scalarConsensus.civilId.value,
+    dx: listConsensus.dx.value,
+    meds: listConsensus.meds.value,
+    allergies: scalarConsensus.allergies.value,
+    code: scalarConsensus.code.value,
+    ward: scalarConsensus.ward.value,
+    o2: scalarConsensus.o2.value,
+    iso: scalarConsensus.iso.value,
+    suggestedTriage: scalarConsensus.suggestedTriage.value,
+    suggestedMobility: scalarConsensus.suggestedMobility.value,
+    warnings: dedupeWarnings(patients.flatMap(patient => patient.warnings || [])),
+    fieldConfidence,
+    rawEntityCount: patients.reduce((sum, patient) => sum + (patient.rawEntityCount || 0), 0),
+    supportVotes: patients.length,
+    reviewReasons: [...new Set(patients.flatMap(patient => patient.reviewReasons || []))],
+  };
+
+  const baseConfidence = average(patients.map(patient => patient.confidence), 0);
+  const ageGenderConfidence = weightedAverage([
+    { value: fieldConfidence.age, weight: 1 },
+    { value: fieldConfidence.gender, weight: 1 },
+  ], 0);
+  merged.confidence = clamp(weightedAverage([
+    { value: fieldConfidence.fullName, weight: 3 },
+    { value: fieldConfidence.bed, weight: 2.5 },
+    { value: ageGenderConfidence, weight: 2.1 },
+    { value: fieldConfidence.age, weight: merged.gender ? 0.4 : 1.1 },
+    { value: fieldConfidence.gender, weight: merged.age != null ? 0.4 : 1.1 },
+    { value: fieldConfidence.civilId, weight: 1.5 },
+    { value: fieldConfidence.dx, weight: 1.7 },
+    { value: fieldConfidence.meds, weight: 1.1 },
+    { value: fieldConfidence.allergies, weight: 0.7 },
+    { value: fieldConfidence.code, weight: 0.6 },
+    { value: fieldConfidence.o2, weight: 0.5 },
+    { value: fieldConfidence.iso, weight: 0.5 },
+  ], baseConfidence) + ((Math.min(patients.length, 4) - 1) * 0.02));
+
+  const reviewLevel = patients.reduce((current, patient) => (
+    (REVIEW_PRIORITY[patient.reviewLevel] ?? 0) > (REVIEW_PRIORITY[current] ?? 0)
+      ? patient.reviewLevel
+      : current
+  ), 'READY');
+  merged.reviewLevel = reviewLevel;
+
+  if (!merged.fullName && !merged.bed && !merged.dx && !merged.civilId) return null;
+  return merged;
+}
+
 function scoreTextDensity(rawText) {
   const compact = `${rawText || ''}`.replace(/\s+/g, '');
   if (!compact) return 0;
@@ -1381,52 +1650,55 @@ function deduplicatePatients(patients) {
 
   for (let i = 0; i < patients.length; i++) {
     if (used.has(i)) continue;
-    let current = { ...patients[i] };
+    const group = [patients[i]];
+    used.add(i);
 
-    for (let j = i + 1; j < patients.length; j++) {
-      if (used.has(j)) continue;
-      if (shouldMerge(current, patients[j])) {
-        current = mergePatients(current, patients[j]);
-        used.add(j);
+    let expanded = true;
+    while (expanded) {
+      expanded = false;
+      for (let j = i + 1; j < patients.length; j++) {
+        if (used.has(j)) continue;
+        if (group.some(existing => shouldMerge(existing, patients[j]))) {
+          group.push(patients[j]);
+          used.add(j);
+          expanded = true;
+        }
       }
     }
-    merged.push(current);
-    used.add(i);
+
+    const consolidated = consolidatePatientGroup(group);
+    if (consolidated) merged.push(consolidated);
   }
   return merged;
 }
 
 function shouldMerge(a, b) {
-  if (a.bed && b.bed && a.bed === b.bed) return true;
+  const aBed = normalizeBedForMatch(a.bed);
+  const bBed = normalizeBedForMatch(b.bed);
+  if (aBed && bBed && aBed !== bBed) return false;
+  if (aBed && bBed && aBed === bBed) return true;
+
+  const aCivilId = normalizeCivilIdForMatch(a.civilId);
+  const bCivilId = normalizeCivilIdForMatch(b.civilId);
+  if (aCivilId && bCivilId && aCivilId !== bCivilId) return false;
+  if (aCivilId && bCivilId && aCivilId === bCivilId) return true;
+
+  if (a.gender && b.gender && a.gender !== b.gender) return false;
+  if (a.age != null && b.age != null && Math.abs(a.age - b.age) > 8) return false;
+
   if (a.fullName && b.fullName) {
-    const dist = MedicalVocabulary.levenshtein(normalizeNameForMerge(a.fullName), normalizeNameForMerge(b.fullName));
+    const dist = ocrDistance(normalizeNameForMerge(a.fullName), normalizeNameForMerge(b.fullName));
     if (dist < 3) return true;
+
+    const agesCompatible = a.age == null || b.age == null || Math.abs(a.age - b.age) <= 2;
+    const gendersCompatible = !a.gender || !b.gender || a.gender === b.gender;
+    if (agesCompatible && gendersCompatible && dist <= 4) return true;
   }
   return false;
 }
 
 function mergePatients(a, b) {
-  const reviewLevel = (REVIEW_PRIORITY[a.reviewLevel] ?? 0) >= (REVIEW_PRIORITY[b.reviewLevel] ?? 0)
-    ? a.reviewLevel
-    : b.reviewLevel;
-  return {
-    fullName: (a.confidence >= b.confidence ? a.fullName : b.fullName) || a.fullName || b.fullName,
-    age: a.age || b.age,
-    gender: a.gender || b.gender,
-    bed: a.bed || b.bed,
-    dx: mergeListValues(a.dx, b.dx),
-    meds: mergeListValues(a.meds, b.meds),
-    allergies: a.allergies || b.allergies || 'NKDA',
-    code: a.code || b.code || 'FULL',
-    confidence: Math.max(a.confidence, b.confidence),
-    warnings: dedupeWarnings([...(a.warnings || []), ...(b.warnings || [])]),
-    suggestedTriage: a.suggestedTriage || b.suggestedTriage,
-    suggestedMobility: a.suggestedMobility || b.suggestedMobility,
-    fieldConfidence: { ...(a.fieldConfidence || {}), ...(b.fieldConfidence || {}) },
-    rawEntityCount: (a.rawEntityCount || 0) + (b.rawEntityCount || 0),
-    reviewLevel,
-    reviewReasons: [...new Set([...(a.reviewReasons || []), ...(b.reviewReasons || [])])],
-  };
+  return consolidatePatientGroup([a, b]) || a || b;
 }
 
 function entityFingerprint(entity) {
@@ -1582,6 +1854,144 @@ function applyRoleProjection(entity, role) {
   };
 }
 
+function resolveColumnRole(text) {
+  const existingRole = inferColumnRole(text);
+  if (existingRole) return existingRole;
+
+  const cleaned = `${text || ''}`.trim().replace(/[:\-]+$/, '');
+  if (/^(?:o2|oxygen|airway|resp|fio2)$/i.test(cleaned)) return 'O2';
+  if (/^(?:iso|isolation|precautions?)$/i.test(cleaned)) return 'ISOLATION';
+  return null;
+}
+
+function projectEntityByColumnRole(entity, role) {
+  if (role === 'O2') {
+    const projected = EntityRecognizer.scoreO2(entity.text);
+    if (projected.confidence > 0) {
+      return {
+        ...entity,
+        entity: projected.entity || entity.entity,
+        confidence: clamp(Math.max(entity.confidence, projected.confidence * 0.95)),
+        corrected: projected.corrected || entity.corrected || entity.text,
+        meta: { ...(entity.meta || {}), ...(projected.meta || {}), columnRole: role },
+      };
+    }
+  }
+
+  if (role === 'ISOLATION') {
+    const projected = EntityRecognizer.scoreIsolation(entity.text.toUpperCase());
+    if (projected.confidence > 0) {
+      return {
+        ...entity,
+        entity: projected.entity || entity.entity,
+        confidence: clamp(Math.max(entity.confidence, projected.confidence * 0.95)),
+        corrected: projected.corrected || entity.corrected || entity.text,
+        meta: { ...(entity.meta || {}), ...(projected.meta || {}), columnRole: role },
+      };
+    }
+  }
+
+  return applyRoleProjection(entity, role);
+}
+
+function mapEntityToColumnRole(entityType) {
+  switch (entityType) {
+    case 'BED':
+      return 'BED';
+    case 'NAME':
+      return 'NAME';
+    case 'AGE_GENDER':
+    case 'AGE':
+    case 'GENDER':
+      return 'AGE_GENDER';
+    case 'DIAGNOSIS':
+      return 'DIAGNOSIS';
+    case 'MEDICATION':
+      return 'MEDICATION';
+    case 'ALLERGY':
+      return 'ALLERGY';
+    case 'STATUS':
+      return 'STATUS';
+    case 'WARD':
+      return 'WARD';
+    case 'CIVIL_ID':
+      return 'CIVIL_ID';
+    case 'O2':
+      return 'O2';
+    case 'ISOLATION':
+      return 'ISOLATION';
+    default:
+      return null;
+  }
+}
+
+function inferColumnsFromRows(rows, imageWidth) {
+  const entities = rows.flat();
+  if (entities.length < 8) return [];
+
+  const sorted = [...entities].sort((a, b) => a.box.cx - b.box.cx);
+  const avgWidth = average(sorted.map(entity => entity.box.w), 28);
+  const groupingThreshold = Math.max(28, avgWidth * 1.35, imageWidth * 0.025);
+  const bands = [];
+
+  for (const entity of sorted) {
+    const current = bands[bands.length - 1];
+    if (!current || Math.abs(entity.box.cx - current.centerX) > groupingThreshold) {
+      bands.push({ centerX: entity.box.cx, entities: [entity] });
+      continue;
+    }
+    current.entities.push(entity);
+    current.centerX = average(current.entities.map(item => item.box.cx), current.centerX);
+  }
+
+  return bands
+    .map(band => {
+      const roleWeights = new Map();
+      band.entities.forEach(entity => {
+        const role = mapEntityToColumnRole(entity.entity);
+        if (!role) return;
+        roleWeights.set(role, (roleWeights.get(role) || 0) + Math.max(entity.confidence || 0, 0.2));
+      });
+
+      const rankedRoles = [...roleWeights.entries()].sort((a, b) => b[1] - a[1]);
+      if (rankedRoles.length === 0) return null;
+
+      const [role, weight] = rankedRoles[0];
+      const totalWeight = rankedRoles.reduce((sum, [, value]) => sum + value, 0);
+      const rowAnchors = new Set(band.entities.map(entity => Math.round(entity.box.cy / Math.max(entity.box.h, 18))));
+      const rowCoverage = rowAnchors.size / Math.max(rows.length, 1);
+
+      if (weight < 1.05) return null;
+      if (rankedRoles.length > 1 && (weight / Math.max(totalWeight, 1)) < 0.52) return null;
+      if (rowCoverage < 0.24 && band.entities.length < 3) return null;
+
+      return {
+        role,
+        centerX: band.centerX,
+        support: band.entities.length,
+        confidence: weight / Math.max(totalWeight, 1),
+        rowCoverage,
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.centerX - b.centerX);
+}
+
+function patientHasStrongIdentity(patient) {
+  return !!(patient?.bed && patient?.fullName && (patient?.age != null || patient?.gender));
+}
+
+function patientAddsMissingDetail(existing, incoming) {
+  return Boolean(
+    (!existing?.civilId && incoming?.civilId) ||
+    (!existing?.meds && incoming?.meds) ||
+    (!existing?.allergies && incoming?.allergies) ||
+    (!existing?.ward && incoming?.ward) ||
+    ((!existing?.o2 || existing.o2 === 'NONE') && incoming?.o2 && incoming.o2 !== 'NONE') ||
+    ((!existing?.iso || existing.iso === 'NONE') && incoming?.iso && incoming.iso !== 'NONE')
+  );
+}
+
 const TableHypothesisBuilder = {
   build(entities) {
     const rows = groupEntitiesIntoRows(entities);
@@ -1593,7 +2003,7 @@ const TableHypothesisBuilder = {
     const headerRow = rows[headerIndex];
     const columns = headerRow
       .map(entity => ({
-        role: inferColumnRole(entity.text),
+        role: resolveColumnRole(entity.text),
         centerX: entity.box.cx,
       }))
       .filter(column => column.role);
@@ -1606,7 +2016,7 @@ const TableHypothesisBuilder = {
           if (!best) return column;
           return Math.abs(column.centerX - entity.box.cx) < Math.abs(best.centerX - entity.box.cx) ? column : best;
         }, null);
-        return applyRoleProjection(entity, nearestColumn?.role || null);
+        return projectEntityByColumnRole(entity, nearestColumn?.role || null);
       });
 
       if (rowIdentityScore(projected) < 0.6 && clusters.length > 0) {
@@ -1624,6 +2034,39 @@ const TableHypothesisBuilder = {
       clusters,
       structuralScore: 0.94,
       coverage,
+    };
+  },
+};
+
+const InferredColumnHypothesisBuilder = {
+  build(entities, imageWidth) {
+    const meaningful = filterMeaningfulEntities(entities);
+    const rows = mergeWeakRows(groupEntitiesIntoRows(meaningful));
+    if (rows.length < 3) return null;
+
+    const anchorRows = rows.filter(row => rowIdentityScore(row) >= 1.15);
+    if (anchorRows.length < 2) return null;
+
+    const columns = inferColumnsFromRows(anchorRows, imageWidth);
+    const distinctRoles = new Set(columns.map(column => column.role));
+    if (columns.length < 2 || distinctRoles.size < 2) return null;
+
+    const projectedClusters = rows.map(row => row.map(entity => {
+      const nearestColumn = columns.reduce((best, column) => {
+        if (!best) return column;
+        return Math.abs(column.centerX - entity.box.cx) < Math.abs(best.centerX - entity.box.cx) ? column : best;
+      }, null);
+      return projectEntityByColumnRole(entity, nearestColumn?.role || null);
+    }));
+
+    const coverage = new Set(projectedClusters.flat().map(entityFingerprint)).size / Math.max(meaningful.length, 1);
+    const columnConfidence = average(columns.map(column => column.confidence), 0.55);
+    return {
+      id: 'schema-columns',
+      clusters: projectedClusters,
+      structuralScore: clamp(0.78 + ((distinctRoles.size - 2) * 0.025) + ((columnConfidence - 0.55) * 0.12), 0, 0.9),
+      coverage,
+      columnCount: columns.length,
     };
   },
 };
@@ -1652,6 +2095,9 @@ const LayoutHypothesisEngine = {
 
     const table = TableHypothesisBuilder.build(entities);
     if (table) hypotheses.push(table);
+
+    const inferredColumns = InferredColumnHypothesisBuilder.build(meaningful, imageWidth);
+    if (inferredColumns) hypotheses.push(inferredColumns);
 
     const laneRows = LaneRowHypothesisBuilder.build(meaningful, imageWidth);
     if (laneRows) hypotheses.push(laneRows);
@@ -1713,13 +2159,26 @@ const LayoutHypothesisEngine = {
 
     for (const hypothesis of hypotheses) {
       if (hypothesis.id === best.id) continue;
+      const conservativeFusion = (best.score || 0) >= 0.88 && (hypothesis.score || 0) <= (best.score || 0);
       for (const patient of hypothesis.patients) {
         const index = merged.findIndex(existing => shouldMerge(existing, patient));
         if (index === -1) {
           if ((patient.confidence || 0) >= 0.84) merged.push(patient);
           continue;
         }
-        merged[index] = mergePatients(merged[index], patient);
+
+        const existing = merged[index];
+        if (conservativeFusion) {
+          const incomingLooksBroader = (patient.rawEntityCount || 0) > ((existing.rawEntityCount || 0) + 2);
+          if (patientHasStrongIdentity(existing) && incomingLooksBroader && !patientAddsMissingDetail(existing, patient)) {
+            continue;
+          }
+          if (patientHasStrongIdentity(existing) && !patientAddsMissingDetail(existing, patient) && (patient.confidence || 0) < ((existing.confidence || 0) + 0.02)) {
+            continue;
+          }
+        }
+
+        merged[index] = mergePatients(existing, patient);
       }
     }
 
@@ -2151,11 +2610,12 @@ export async function processPatientListImage(imageSource, onProgress) {
 
   const runtime = await initContextOCR(onProgress);
 
-  // Step 2: Prepare image variants
   onProgress?.('Preparing image variants...');
+  let baseCanvas = null;
   let variants;
   try {
-    variants = await ImagePreprocessor.prepareVariants(imageSource);
+    baseCanvas = await ImagePreprocessor.process(imageSource);
+    variants = ImagePreprocessor.buildVariants(baseCanvas);
   } catch {
     variants = [{ id: 'source', label: 'Source image', canvas: imageSource }];
   }
@@ -2197,7 +2657,35 @@ export async function processPatientListImage(imageSource, onProgress) {
     }
   }
 
-  const best = pickBestCandidate(candidates);
+  const currentBest = pickBestCandidate(candidates);
+  if (baseCanvas && (!currentBest || currentBest.qualityScore < 0.82 || currentBest.reviewCount > Math.ceil(Math.max(currentBest.patients.length, 1) * 0.45))) {
+    const rescueVariants = ImagePreprocessor.buildRescueVariants(baseCanvas);
+    for (const variant of rescueVariants) {
+      onProgress?.(`Rescue OCR (${variant.label})...`);
+      const input = canvasToImageInput(variant.canvas);
+      const latinResults = await runtime.latin.recognize(input);
+      let candidate = buildPassCandidate(latinResults, variant.canvas, variant.id, {
+        backend: 'paddle-latin',
+        scripts: ['latin'],
+      });
+
+      if (shouldRunArabicAugment(candidate)) {
+        const arabicResults = await runtime.arabic.recognize(input);
+        const fusedResults = fuseRecognitionResults(latinResults, arabicResults);
+        const fusedCandidate = buildPassCandidate(fusedResults, variant.canvas, variant.id, {
+          backend: 'paddle-dual',
+          scripts: ['latin', 'arabic'],
+        });
+        if (fusedCandidate.qualityScore >= candidate.qualityScore) {
+          candidate = fusedCandidate;
+        }
+      }
+
+      candidates.push(candidate);
+    }
+  }
+
+  const best = fuseCandidatePasses(candidates);
   if (!best || (!best.rawText.trim() && best.patients.length === 0)) {
     return {
       patients: [],
@@ -2211,6 +2699,7 @@ export async function processPatientListImage(imageSource, onProgress) {
       qualityBand: 'LOW',
       profile: 'source',
       reviewCount: 0,
+      consensusPasses: 0,
       strategy: 'none',
       passes: candidates.map(c => ({
         profile: c.profileId, qualityScore: c.qualityScore,
@@ -2236,6 +2725,7 @@ export async function processPatientListImage(imageSource, onProgress) {
       backend: best.backend,
       profile: best.profileId,
       strategy: best.strategy,
+      consensusPasses: best.consensusPasses,
       qualityScore: best.qualityScore,
       qualityBand: best.qualityBand,
       wordConfidence: best.wordConfidence,
@@ -2257,6 +2747,7 @@ export async function processPatientListImage(imageSource, onProgress) {
     wordConfidence: best.wordConfidence,
     profile: best.profileId,
     reviewCount: best.reviewCount,
+    consensusPasses: best.consensusPasses,
     strategy: best.strategy,
     hypotheses: best.hypotheses,
     passes: candidates.map(c => ({

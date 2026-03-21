@@ -141,6 +141,7 @@ export default function NFCScanner({ onClose }) {
   const [scanMeta, setScanMeta] = useState(null);
   const [error, setError] = useState(null);
   const [cardDetected, setCardDetected] = useState(false);
+  const [chipProgress, setChipProgress] = useState('');
   const abortRef = useRef(null);
 
   // Input states
@@ -197,6 +198,7 @@ export default function NFCScanner({ onClose }) {
 
     const abort = await scanNFC(
       (data) => {
+        setChipProgress('');
         setScanning(false);
         setScanMeta(data);
 
@@ -230,6 +232,7 @@ export default function NFCScanner({ onClose }) {
         if (mrzData) setBacStatus('reading');
       },
       mrzData,
+      (stage) => setChipProgress(stage),
     );
     abortRef.current = abort;
   }, [nfcInfo.supported, patients]);
@@ -515,7 +518,8 @@ export default function NFCScanner({ onClose }) {
               </svg>
             </div>
             <span style={styles.statusText}>
-              {scanning && bacStatus === 'authenticating' ? 'Authenticating with chip (BAC)...' :
+              {chipProgress ? chipProgress :
+               scanning && bacStatus === 'authenticating' ? 'Authenticating with chip (BAC)...' :
                scanning && bacStatus === 'reading' ? 'Reading chip data...' :
                scanning ? 'Tap Civil ID on back of phone...' : 'NFC Ready'}
             </span>

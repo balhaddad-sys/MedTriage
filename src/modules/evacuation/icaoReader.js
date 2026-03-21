@@ -213,11 +213,14 @@ function checkSW(response) {
 export class ICAOReader {
   constructor(transceiveFn) {
     this.transceive = transceiveFn;
-    this.maxReadSize = 224;
+    this.maxReadSize = 0xE0; // 224 bytes — safe max for most chips
     // Secure messaging state (set after BAC)
     this.ksEnc = null;
     this.ksMac = null;
     this.ssc = null;
+    // Adaptive chunk sizing — start large, shrink on errors
+    this.readRetries = 3;
+    this.transceiveTimeout = 5000;
   }
 
   async selectMRTD() {
@@ -252,38 +255,88 @@ export class ICAOReader {
     return this.readFilePlain(fileId);
   }
 
+  // Transceive with retry logic for flaky NFC connections
+  async transceiveRetry(cmd, retries) {
+    const maxRetries = retries ?? this.readRetries;
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const resp = await this.transceive(cmd);
+        if (resp && resp.length >= 2) return resp;
+      } catch (err) {
+        if (attempt === maxRetries) throw err;
+      }
+    }
+    return [];
+  }
+
   // Read file without secure messaging (for unauthenticated access)
   async readFilePlain(fileId) {
     const selCmd = selectFile(fileId);
-    const selResp = await this.transceive(selCmd);
+    const selResp = await this.transceiveRetry(selCmd);
     const selResult = checkSW(selResp);
     if (!selResult.ok) return null;
 
-    const headerCmd = readBinary(0, 4);
-    const headerResp = await this.transceive(headerCmd);
+    // Read header to determine file size
+    const headerCmd = readBinary(0, 8);
+    const headerResp = await this.transceiveRetry(headerCmd);
     const headerResult = checkSW(headerResp);
-    if (!headerResult.ok || headerResult.data.length < 4) return null;
+    if (!headerResult.ok || headerResult.data.length < 2) return null;
 
-    const header = parseTLV(headerResult.data);
-    if (!header) return null;
+    const totalLength = this.parseTotalLength(headerResult.data);
+    if (totalLength === null || totalLength > 50000) return null;
 
-    const totalLength = header.endOffset + header.length;
-    if (totalLength > 50000) return null;
-
-    const data = [];
+    // Fast chunked read with adaptive sizing
+    const data = new Uint8Array(totalLength);
     let offset = 0;
+    let chunkSize = this.maxReadSize;
+
+    // Copy header data we already have
+    const headerBytes = Math.min(headerResult.data.length, totalLength);
+    data.set(headerResult.data.slice(0, headerBytes), 0);
+    offset = headerBytes;
+
     while (offset < totalLength) {
-      const chunkSize = Math.min(this.maxReadSize, totalLength - offset);
-      const cmd = readBinary(offset, chunkSize);
-      const resp = await this.transceive(cmd);
-      const result = checkSW(resp);
-      if (!result.ok) break;
-      data.push(...result.data);
-      offset += result.data.length;
-      if (result.data.length < chunkSize) break;
+      const remaining = totalLength - offset;
+      const readSize = Math.min(chunkSize, remaining);
+      const cmd = readBinary(offset, readSize);
+
+      try {
+        const resp = await this.transceiveRetry(cmd, 1);
+        const result = checkSW(resp);
+        if (!result.ok) {
+          // Try smaller chunks on failure
+          if (chunkSize > 32) { chunkSize = Math.floor(chunkSize / 2); continue; }
+          break;
+        }
+        data.set(result.data, offset);
+        offset += result.data.length;
+        if (result.data.length < readSize) break;
+      } catch {
+        if (chunkSize > 32) { chunkSize = Math.floor(chunkSize / 2); continue; }
+        break;
+      }
     }
 
-    return data;
+    return Array.from(data.slice(0, offset));
+  }
+
+  // Parse total file length from TLV header bytes
+  parseTotalLength(headerData) {
+    if (headerData.length < 2) return null;
+    const tag = headerData[0];
+    let lenOffset = 1;
+    // Multi-byte tag
+    if ((tag & 0x1F) === 0x1F) {
+      lenOffset = 2;
+      while (lenOffset < headerData.length && headerData[lenOffset - 1] & 0x80) lenOffset++;
+    }
+    if (lenOffset >= headerData.length) return null;
+
+    const firstLen = headerData[lenOffset];
+    if (firstLen < 0x80) return firstLen + lenOffset + 1;
+    if (firstLen === 0x81 && lenOffset + 1 < headerData.length) return headerData[lenOffset + 1] + lenOffset + 2;
+    if (firstLen === 0x82 && lenOffset + 2 < headerData.length) return ((headerData[lenOffset + 1] << 8) | headerData[lenOffset + 2]) + lenOffset + 3;
+    return null;
   }
 
   // Read file with secure messaging (after BAC authentication)
@@ -326,16 +379,33 @@ export class ICAOReader {
 
 // Attempt ICAO reading via Capacitor NFC transceive
 // mrzData: optional { documentNumber, dateOfBirth, dateOfExpiry } for BAC auth
+// onProgress: optional callback(stage: string) for UI updates
+// options: { readPhoto: false } to skip DG2 for speed
 // Returns null if transceive is not available or ICAO applet is not found
-export async function attemptICAORead(nfcPlugin, mrzData) {
+export async function attemptICAORead(nfcPlugin, mrzData, onProgress, options) {
   if (!nfcPlugin || typeof nfcPlugin.transceive !== 'function') {
     return null;
   }
 
+  const readPhoto = options?.readPhoto !== false; // default true
+
   const transceive = async (cmd) => {
     try {
-      const result = await nfcPlugin.transceive({ data: Array.from(cmd) });
-      return result?.response || [];
+      const cmdArray = Array.from(cmd);
+      const result = await Promise.race([
+        nfcPlugin.transceive({ data: cmdArray }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Transceive timeout')), 5000)),
+      ]);
+      // Handle both response formats:
+      // Custom IsoDep plugin: { response: JSArray }
+      // The response may be a JSArray (Capacitor bridge converts to regular array)
+      const resp = result?.response;
+      if (!resp) return [];
+      if (Array.isArray(resp)) return resp;
+      // JSArray-like object with numeric indices
+      const arr = [];
+      for (let i = 0; resp[i] !== undefined; i++) arr.push(resp[i]);
+      return arr.length > 0 ? arr : [];
     } catch {
       return [];
     }
@@ -344,7 +414,8 @@ export async function attemptICAORead(nfcPlugin, mrzData) {
   const reader = new ICAOReader(transceive);
 
   try {
-    // Step 1: Select MRTD applet
+    // Step 1: Select MRTD applet — must be fast
+    onProgress?.('Selecting MRTD applet...');
     const selectResult = await reader.selectMRTD();
     if (!selectResult.ok) {
       return null; // Not an ICAO-compliant document
@@ -361,11 +432,13 @@ export async function attemptICAORead(nfcPlugin, mrzData) {
     };
 
     // Step 2: Try unauthenticated read of EF.COM
+    onProgress?.('Reading chip directory...');
     let groups = await reader.readEfCOM();
 
     // Step 3: If unauthenticated read failed and we have MRZ data, try BAC
     if (groups.length === 0 && mrzData) {
       try {
+        onProgress?.('Authenticating (BAC)...');
         await reader.authenticateBAC(
           mrzData.documentNumber,
           mrzData.dateOfBirth,
@@ -385,18 +458,30 @@ export async function attemptICAORead(nfcPlugin, mrzData) {
 
     result.availableGroups = groups;
 
-    // Step 4: Read available data groups
+    // Step 4: Read DG1 first (small, ~200 bytes, <1 sec)
     if (groups.includes('DG1')) {
+      onProgress?.('Reading MRZ data...');
       result.mrz = await reader.readDG1();
     }
+
+    // Step 5: Read DG11 (Arabic name, small file)
     if (groups.includes('DG11')) {
+      onProgress?.('Reading personal details...');
       result.additionalDetails = await reader.readDG11();
     }
-    // DG2 (photo) is large — only read if other DGs succeeded
-    if (groups.includes('DG2') && result.mrz) {
-      result.photo = await reader.readDG2();
+
+    // Step 6: DG2 photo is 5-15KB — only if requested and MRZ succeeded
+    if (readPhoto && groups.includes('DG2') && result.mrz) {
+      onProgress?.('Reading photo (hold steady)...');
+      try {
+        result.photo = await reader.readDG2();
+      } catch {
+        // Photo read failed — not critical, continue
+        result.photoError = true;
+      }
     }
 
+    onProgress?.('Done');
     return result;
   } catch {
     return null;

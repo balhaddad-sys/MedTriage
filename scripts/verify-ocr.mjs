@@ -109,5 +109,41 @@ const lanePatients = analyzeOcrWords([
 
 assert.equal(lanePatients.patients.length, 4, 'expected lane splitting to recover four patients');
 assert.ok(lanePatients.hypotheses.some(h => /lane|spatial/i.test(h.id)), 'expected a lane-aware or spatial hypothesis');
+assert.deepEqual(
+  lanePatients.patients.map(patient => patient.bed).sort(),
+  ['E-M-01', 'E-M-02', 'E-M-21', 'E-M-22'],
+  'expected each lane row to remain a distinct patient'
+);
+assert.equal(lanePatients.patients.find(patient => patient.bed === 'E-M-01')?.age, 67);
+assert.match(lanePatients.patients.find(patient => patient.bed === 'E-M-21')?.fullName || '', /Noor/i);
+assert.match(lanePatients.patients.find(patient => patient.bed === 'E-M-21')?.dx || '', /UTI/i);
+
+// Test 6: Headerless aligned board should infer columns from repeated x-structure
+const inferredColumns = analyzeOcrWords([
+  word('E-M-15', 10, 20),
+  word('Nora', 110, 20),
+  word('Ali', 180, 20),
+  word('42/F', 290, 20),
+  word('CAP', 380, 20),
+  word('Azithr0mycin', 490, 20),
+  word('E-M-16', 10, 60),
+  word('Saif', 110, 60),
+  word('Jaber', 180, 60),
+  word('71/M', 290, 60),
+  word('CHF', 380, 60),
+  word('Fur0semide', 490, 60),
+  word('E-M-17', 10, 100),
+  word('Mariam', 110, 100),
+  word('Saleh', 205, 100),
+  word('29/F', 290, 100),
+  word('UTI', 380, 100),
+  word('Ceftriax0ne', 490, 100),
+], 780, 240);
+
+assert.equal(inferredColumns.patients.length, 3, 'expected three patients from a cropped headerless board');
+assert.ok(inferredColumns.hypotheses.some(h => h.id === 'schema-columns'), 'expected schema-columns hypothesis to be generated');
+assert.match(inferredColumns.patients[0].meds, /Azithromycin/i);
+assert.match(inferredColumns.patients[1].meds, /Furosemide/i);
+assert.match(inferredColumns.patients[2].meds, /Ceftriaxone/i);
 
 console.log('OCR verification passed');

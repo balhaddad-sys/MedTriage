@@ -33,8 +33,16 @@ function getCapacitorNfcPlugin() {
     : null;
 }
 
+// Custom IsoDep plugin for raw APDU transceive (Civil ID chip reading)
+function getIsoDepPlugin() {
+  return typeof window !== 'undefined'
+    ? window.Capacitor?.Plugins?.IsoDep || null
+    : null;
+}
+
 function hasCapacitorNfc() {
-  return isCapacitorNative() && !!getCapacitorNfcPlugin();
+  // Prefer our custom IsoDep plugin, fall back to Capgo
+  return isCapacitorNative() && (!!getIsoDepPlugin() || !!getCapacitorNfcPlugin());
 }
 
 function hasWebNfc() {
@@ -249,12 +257,18 @@ function parseCapacitorEvent(event) {
   };
 }
 
-async function scanCapacitorNfc(onResult, onError, onReading, mrzData) {
-  const plugin = getCapacitorNfcPlugin();
+async function scanCapacitorNfc(onResult, onError, onReading, mrzData, onProgress) {
+  // Prefer custom IsoDep plugin (supports APDU transceive for Civil ID)
+  const isoDepPlugin = getIsoDepPlugin();
+  const capgoPlugin = getCapacitorNfcPlugin();
+  const plugin = isoDepPlugin || capgoPlugin;
+
   if (!plugin) {
     onError?.(new Error('Native NFC plugin is not available.'));
     return null;
   }
+
+  const useIsoDep = !!isoDepPlugin;
 
   const cleanup = async (listenerHandle) => {
     try {
@@ -263,6 +277,9 @@ async function scanCapacitorNfc(onResult, onError, onReading, mrzData) {
     try {
       await plugin.stopScanning();
     } catch {}
+    if (useIsoDep) {
+      try { await isoDepPlugin.disconnect(); } catch {}
+    }
   };
 
   try {
@@ -283,20 +300,62 @@ async function scanCapacitorNfc(onResult, onError, onReading, mrzData) {
     }
 
     let closed = false;
-    const listener = await plugin.addListener('nfcEvent', async (event) => {
+
+    // Use the right event name for each plugin
+    const eventName = useIsoDep ? 'tagDiscovered' : 'nfcEvent';
+
+    const listener = await plugin.addListener(eventName, async (event) => {
       if (closed) return;
       closed = true;
       onReading?.();
 
-      // First try ICAO MRTD protocol read (reads chip data groups)
-      let icaoData = null;
-      try {
-        icaoData = await attemptICAORead(plugin, mrzData || null);
-      } catch {
-        // ICAO read failed — fall back to basic tag parsing
+      // Build tag info from IsoDep plugin event
+      let parsed;
+      if (useIsoDep) {
+        parsed = {
+          civilId: '',
+          fullName: '',
+          fullNameArabic: '',
+          age: null,
+          gender: '',
+          nationality: '',
+          serialNumber: event.id || '',
+          tagType: event.hasIsoDep ? 'IsoDep' : 'tag',
+          techTypes: [],
+          nfcBackend: 'isodep',
+          tagDetected: true,
+          likelyCivilId: event.hasIsoDep,
+          needsManualId: true,
+          raw: [],
+        };
+        // Extract tech types
+        try {
+          if (event.techTypes) {
+            for (let i = 0; i < event.techTypes.length; i++) {
+              const tech = typeof event.techTypes === 'string' ? event.techTypes : event.techTypes[i] || '';
+              if (tech) parsed.techTypes.push(tech.replace('android.nfc.tech.', ''));
+            }
+          }
+        } catch {}
+      } else {
+        parsed = parseCapacitorEvent(event);
       }
 
-      let parsed = parseCapacitorEvent(event);
+      // If IsoDep is connected, try ICAO MRTD protocol read
+      let icaoData = null;
+      if (useIsoDep && event.connected) {
+        try {
+          onProgress?.('Reading chip...');
+          icaoData = await attemptICAORead(isoDepPlugin, mrzData || null, onProgress, { readPhoto: true });
+        } catch {
+          // ICAO read failed — fall back to basic tag info
+        }
+      } else if (!useIsoDep) {
+        // Capgo plugin — try ICAO (will fail since no transceive, but harmless)
+        try {
+          icaoData = await attemptICAORead(capgoPlugin, mrzData || null, onProgress, { readPhoto: true });
+        } catch {}
+      }
 
       // If ICAO read succeeded and returned MRZ, parse it for richer data
       if (icaoData?.mrz) {
@@ -435,9 +494,9 @@ async function scanWebNfc(onResult, onError, onReading) {
   }
 }
 
-export async function scanNFC(onResult, onError, onReading, mrzData) {
+export async function scanNFC(onResult, onError, onReading, mrzData, onProgress) {
   const backend = getNfcBackend();
-  if (backend === 'capacitor') return scanCapacitorNfc(onResult, onError, onReading, mrzData);
+  if (backend === 'capacitor') return scanCapacitorNfc(onResult, onError, onReading, mrzData, onProgress);
   if (backend === 'webnfc') return scanWebNfc(onResult, onError, onReading);
 
   onError?.(new Error('NFC is not supported on this device. Use manual Civil ID entry.'));
