@@ -3,9 +3,11 @@ import { useApp } from '../../app.jsx';
 import { colors, fonts } from '../../design/tokens.js';
 import Modal from '../../shared/Modal.jsx';
 import { CheckIcon } from '../../design/icons.jsx';
-import { scanNFC, validateCivilId, getNfcPlatformInfo, findExistingPatient, getDisplayablePhotoUrl, parseCivilIdNumber } from './nfcReader.js';
+import { scanNFC, validateCivilId, getNfcPlatformInfo, findExistingPatient, findPatientByNfcUid, getDisplayablePhotoUrl, parseCivilIdNumber } from './nfcReader.js';
 import { BLOOD_TYPES, getNationalityLabel } from './mrzParser.js';
 import { logAction } from '../../data/audit.js';
+import CivilIdCameraScanner from './MRZCamera.jsx';
+import MRZScannerCamera from './MRZScannerCamera.jsx';
 
 const styles = {
   container: { display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', padding: '4px 0' },
@@ -144,6 +146,17 @@ export default function NFCScanner({ onClose }) {
   const [chipProgress, setChipProgress] = useState('');
   const abortRef = useRef(null);
 
+  // Camera scan states
+  const [showCamera, setShowCamera] = useState(false);
+  const [showMRZ, setShowMRZ] = useState(false);
+  const [cameraMrzData, setCameraMrzData] = useState(null);
+
+  // Known patient — found by NFC UID on re-tap
+  const [knownPatient, setKnownPatient] = useState(null);
+
+  // Store latest NFC serial in a ref so camera can access it immediately
+  const lastNfcSerialRef = useRef('');
+
   // Input states
   const [civilId, setCivilId] = useState('');
   const [civilIdError, setCivilIdError] = useState('');
@@ -209,12 +222,28 @@ export default function NFCScanner({ onClose }) {
           }
         }
 
+        // Save serial for camera flow
+        if (data.serialNumber) lastNfcSerialRef.current = data.serialNumber;
+
+        // Check if this card UID is already registered
+        if (data.serialNumber) {
+          const existingByUid = findPatientByNfcUid(patients, data.serialNumber);
+          if (existingByUid) {
+            setKnownPatient(existingByUid);
+            return; // Show known patient view
+          }
+        }
+
         if (data.civilId) {
           const existing = findExistingPatient(patients, data.civilId);
           if (existing) setDuplicatePatient(existing);
           setNfcData(data);
         } else if (data.tagDetected) {
           setCardDetected(true);
+          // If card detected but no data, auto-open camera to read Civil ID number
+          if (data.likelyCivilId && !data.civilId) {
+            setShowCamera(true);
+          }
           // If ICAO detected but needs BAC, show the form
           if (data.icaoDetected && data.icaoNeedsBAC) {
             setShowBacForm(true);
@@ -242,6 +271,35 @@ export default function NFCScanner({ onClose }) {
     if (nfcInfo.supported) startScan(null);
     return () => { abortRef.current?.(); };
   }, []);
+
+  // Camera MRZ callback — auto-start authenticated NFC scan
+  const handleCameraMRZ = useCallback((mrzParsed) => {
+    setShowCamera(false);
+    setCameraMrzData(mrzParsed);
+    // Auto-fill BAC fields
+    setBacDocNumber(mrzParsed.documentNumber || '');
+    if (mrzParsed.dateOfBirth) {
+      const d = mrzParsed.dateOfBirth;
+      setBacDob(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+    }
+    if (mrzParsed.dateOfExpiry) {
+      const d = mrzParsed.dateOfExpiry;
+      setBacExpiry(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+    }
+    // Auto-fill name/age/gender from MRZ
+    if (mrzParsed.age != null) {
+      setCivilId(''); // Will come from chip
+    }
+    // Show BAC form with pre-filled data, ready for NFC tap
+    setShowBacForm(true);
+    setCardDetected(true); // Skip initial scan phase
+    // Auto-start NFC scan with MRZ BAC key
+    const mrzKey = mrzParsed.bacKey;
+    if (mrzKey) {
+      abortRef.current?.();
+      startScan(mrzKey);
+    }
+  }, [startScan]);
 
   // Handle BAC-authenticated rescan
   const handleBacScan = useCallback(() => {
@@ -495,6 +553,143 @@ export default function NFCScanner({ onClose }) {
     );
   }
 
+  // ====== KNOWN PATIENT VIEW — card already registered ======
+  if (knownPatient) {
+    return (
+      <Modal title="Patient Found" onClose={onClose}>
+        <div style={styles.container}>
+          <div style={{ ...styles.resultCard, borderColor: colors.blue + '44', background: colors.blue + '11' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+              <CheckIcon size={18} color={colors.blue} />
+              <span style={{ fontSize: '14px', fontWeight: 700, color: colors.blue }}>
+                Known Patient
+              </span>
+            </div>
+            {knownPatient.fullName && (
+              <div style={styles.resultRow}>
+                <span style={styles.resultLabel}>Name</span>
+                <span style={{ ...styles.resultValue, fontFamily: fonts.sans }}>{knownPatient.fullName}</span>
+              </div>
+            )}
+            {knownPatient.fullNameArabic && knownPatient.fullNameArabic !== knownPatient.fullName && (
+              <div style={styles.resultRow}>
+                <span style={styles.resultLabel}>Arabic</span>
+                <span style={{ ...styles.resultValue, fontFamily: fonts.sans, direction: 'rtl' }}>{knownPatient.fullNameArabic}</span>
+              </div>
+            )}
+            {knownPatient.civilId && (
+              <div style={styles.resultRow}>
+                <span style={styles.resultLabel}>Civil ID</span>
+                <span style={styles.resultValue}>{knownPatient.civilId}</span>
+              </div>
+            )}
+            {knownPatient.age != null && (
+              <div style={styles.resultRow}>
+                <span style={styles.resultLabel}>Age</span>
+                <span style={styles.resultValue}>{knownPatient.age} years</span>
+              </div>
+            )}
+            {knownPatient.gender && (
+              <div style={styles.resultRow}>
+                <span style={styles.resultLabel}>Gender</span>
+                <span style={styles.resultValue}>{knownPatient.gender === 'F' ? 'Female' : 'Male'}</span>
+              </div>
+            )}
+            {knownPatient.bloodType && (
+              <div style={styles.resultRow}>
+                <span style={styles.resultLabel}>Blood Type</span>
+                <span style={{ ...styles.resultValue, color: colors.red }}>{knownPatient.bloodType}</span>
+              </div>
+            )}
+            <div style={styles.resultRow}>
+              <span style={styles.resultLabel}>Triage</span>
+              <span style={styles.resultValue}>{knownPatient.triage || 'GREEN'}</span>
+            </div>
+            <div style={styles.resultRow}>
+              <span style={styles.resultLabel}>Ward</span>
+              <span style={styles.resultValue}>{knownPatient.ward || '—'}</span>
+            </div>
+            <div style={styles.resultRow}>
+              <span style={styles.resultLabel}>Evac Status</span>
+              <span style={styles.resultValue}>{(knownPatient.evac || 'IN_WARD').replace('_', ' ')}</span>
+            </div>
+          </div>
+          <button style={{ ...styles.btn, background: colors.blue, color: '#fff' }}
+            onClick={onClose}>
+            OK
+          </button>
+          <button style={{ ...styles.btn, background: colors.bg2, color: colors.text0 }}
+            onClick={() => { setKnownPatient(null); if (nfcInfo.supported) startScan(null); }}>
+            Scan Another Card
+          </button>
+        </div>
+      </Modal>
+    );
+  }
+
+  // ====== MRZ CAMERA SCANNER (back of card) ======
+  if (showMRZ) {
+    return (
+      <Modal title="Scan MRZ (Back of Card)" onClose={() => setShowMRZ(false)}>
+        <MRZScannerCamera
+          onResult={(mrzParsed) => {
+            setShowMRZ(false);
+            handleCameraMRZ(mrzParsed);
+          }}
+          onCancel={() => setShowMRZ(false)}
+        />
+      </Modal>
+    );
+  }
+
+  // ====== CAMERA CIVIL ID SCANNER ======
+  if (showCamera) {
+    return (
+      <Modal title="Scan Civil ID" onClose={() => setShowCamera(false)}>
+        <CivilIdCameraScanner
+          onResult={(data) => {
+            if (!data.civilId) return;
+            // Add patient then close
+            const patient = {
+              civilId: data.civilId,
+              fullName: data.nameEn || scanMeta?.fullName || '',
+              fullNameArabic: data.nameAr || scanMeta?.fullNameArabic || '',
+              age: data.age,
+              gender: data.gender || scanMeta?.gender || 'M',
+              triage: 'GREEN',
+              mobility: 'AMBULATORY',
+              o2: 'NONE',
+              iso: 'NONE',
+              code: 'FULL',
+              allergies: 'NKDA',
+              dx: '',
+              meds: '',
+              notes: '',
+              nationality: scanMeta?.nationality || '',
+              bloodType: data.bloodType || '',
+              ward: auth?.ward?.name || '',
+              evac: 'IN_WARD',
+              nfcScanned: !!scanMeta?.tagDetected || !!lastNfcSerialRef.current,
+              nfcBackend: scanMeta?.nfcBackend || 'camera',
+              nfcSerial: lastNfcSerialRef.current || scanMeta?.serialNumber || '',
+              source: 'camera-ocr',
+            };
+            addPatient(patient).then((saved) => {
+              logAction('CAMERA_IMPORT', 'patient', saved.id, {
+                newValue: { civilId: data.civilId, source: 'camera-ocr' },
+              });
+              onClose();
+            }).catch(err => {
+              console.error('Failed to add patient:', err);
+            });
+          }}
+          onCancel={() => setShowCamera(false)}
+          autoStart
+        />
+      </Modal>
+    );
+  }
+
   // ====== SCAN + INPUT VIEW ======
   return (
     <Modal title="Civil ID Scanner" onClose={onClose}>
@@ -506,6 +701,29 @@ export default function NFCScanner({ onClose }) {
       `}</style>
 
       <div style={styles.container}>
+        {/* Camera scan buttons — always available */}
+        {!cardDetected && (
+          <>
+            <button
+              style={{ ...styles.btn, background: colors.blue, color: '#fff' }}
+              onClick={() => { abortRef.current?.(); setScanning(false); setShowCamera(true); }}>
+              Scan Civil ID with Camera
+            </button>
+            <button
+              style={{ ...styles.btn, background: colors.amber, color: '#000', marginBottom: '4px' }}
+              onClick={() => { abortRef.current?.(); setScanning(false); setShowMRZ(true); }}>
+              Scan MRZ (Back of Card)
+            </button>
+          </>
+        )}
+
+        {/* Show MRZ data if camera scanned */}
+        {cameraMrzData && (
+          <div style={styles.infoBox}>
+            MRZ scanned: {cameraMrzData.fullName} — now tap card on phone to read chip
+          </div>
+        )}
+
         {/* NFC scanning area */}
         {nfcInfo.supported && !cardDetected && (
           <div style={styles.nfcArea}>
@@ -551,6 +769,14 @@ export default function NFCScanner({ onClose }) {
               )}
               {scanMeta?.icaoDetected && (
                 <span style={{ ...styles.metaText, color: colors.green }}>ICAO MRTD applet detected</span>
+              )}
+              {scanMeta?.probeResults?.length > 0 && (
+                <span style={styles.metaText}>
+                  Chip apps: {scanMeta.probeResults.map(p => `${p.name}:${p.ok ? 'OK' : p.sw || p.error}`).join(', ')}
+                </span>
+              )}
+              {scanMeta?.selectedApp && (
+                <span style={{ ...styles.metaText, color: colors.green }}>Selected: {scanMeta.selectedApp}</span>
               )}
             </div>
           </>
@@ -655,11 +881,18 @@ export default function NFCScanner({ onClose }) {
 
           {/* Show BAC form toggle if chip was detected but no BAC form yet */}
           {nfcInfo.supported && cardDetected && !showBacForm && scanMeta?.icaoDetected && (
-            <button
-              style={{ ...styles.btnSmall, background: colors.blue + '22', color: colors.blue }}
-              onClick={() => setShowBacForm(true)}>
-              Unlock Chip Data (enter MRZ)
-            </button>
+            <>
+              <button
+                style={{ ...styles.btnSmall, background: colors.amber, color: '#000' }}
+                onClick={() => setShowMRZ(true)}>
+                Scan MRZ with Camera (unlock chip)
+              </button>
+              <button
+                style={{ ...styles.btnSmall, background: colors.blue + '22', color: colors.blue }}
+                onClick={() => setShowBacForm(true)}>
+                Type MRZ Manually
+              </button>
+            </>
           )}
 
           {nfcInfo.supported && (
