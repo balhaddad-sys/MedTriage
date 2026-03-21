@@ -391,4 +391,92 @@ assert.equal(headerlessJamal.assignedDoctor, 'zahra');
 assert.equal(headerlessJamal.sheetStatus, 'CHRONIC');
 assert.match(headerlessJamal.dx || '', /UTI/i);
 
+// Test 13: ALL CAPS names (PaddleOCR sometimes outputs in uppercase)
+const allCapsNames = analyzeOcrWords([
+  word('Bed', 10, 10, 98, 40),
+  word('Name', 120, 10, 98, 50),
+  word('Age', 310, 10, 98, 35),
+  word('Dx', 400, 10, 98, 30),
+  word('E-M-01', 10, 50),
+  word('AHMED', 120, 50),
+  word('ALI', 210, 50),
+  word('45/M', 310, 50),
+  word('NSTEMI', 400, 50),
+  word('E-M-02', 10, 90),
+  word('FATIMA', 120, 90),
+  word('HASSAN', 210, 90),
+  word('32/F', 310, 90),
+  word('CAP', 400, 90),
+  word('E-M-03', 10, 130),
+  word('OMAR', 120, 130),
+  word('67/M', 310, 130),
+  word('CHF', 400, 130),
+], 600, 240);
+
+assert.equal(allCapsNames.patients.length, 3, 'expected three patients with ALL CAPS names');
+assert.ok(allCapsNames.patients.some(p => /AHMED ALI|ahmed ali/i.test(p.fullName || '')), 'expected AHMED ALI to be detected as name');
+assert.ok(allCapsNames.patients.some(p => /FATIMA HASSAN|fatima hassan/i.test(p.fullName || '')), 'expected FATIMA HASSAN to be detected as name');
+assert.ok(allCapsNames.patients.some(p => /OMAR/i.test(p.fullName || '')), 'expected OMAR to be detected as name');
+
+// Test 14: Mixed case names without bed numbers (just name + diagnosis)
+const namesWithoutBeds = analyzeOcrWords([
+  word('Ahmed Al-Mutairi', 10, 20, 92, 160),
+  word('NSTEMI', 250, 20),
+  word('DM2', 340, 20),
+  word('Sara Alessa', 10, 60, 92, 120),
+  word('CAP', 250, 60),
+  word('Khalid', 10, 100, 92, 70),
+  word('DVT', 250, 100),
+], 500, 200);
+
+assert.equal(namesWithoutBeds.patients.length, 3, 'expected three patients even without bed numbers');
+assert.ok(namesWithoutBeds.patients.some(p => /Ahmed/i.test(p.fullName || '')), 'expected Ahmed to be detected');
+assert.ok(namesWithoutBeds.patients.some(p => /Sara/i.test(p.fullName || '')), 'expected Sara to be detected');
+assert.ok(namesWithoutBeds.patients.some(p => /Khalid/i.test(p.fullName || '')), 'expected Khalid to be detected');
+
+// Test 15: Short names that could be confused with medical terms
+const shortNamesSafe = analyzeOcrWords([
+  word('E-M-01', 10, 20),
+  word('Ali', 100, 20),
+  word('67/M', 200, 20),
+  word('AKI', 300, 20),
+  word('E-M-02', 10, 60),
+  word('Isa', 100, 60),
+  word('45/M', 200, 60),
+  word('CHF', 300, 60),
+  word('E-M-03', 10, 100),
+  word('Hind', 100, 100),
+  word('32/F', 200, 100),
+  word('UTI', 300, 100),
+], 500, 200);
+
+assert.equal(shortNamesSafe.patients.length, 3, 'expected three patients with short names');
+assert.ok(shortNamesSafe.patients.some(p => /Ali/i.test(p.fullName || '')), 'expected Ali to be a name not confused with medical term');
+assert.ok(shortNamesSafe.patients.some(p => /Isa/i.test(p.fullName || '')), 'expected Isa to be a name');
+assert.ok(shortNamesSafe.patients.some(p => /Hind/i.test(p.fullName || '')), 'expected Hind to be a name');
+// Make sure AKI is a diagnosis not swallowed as a name
+assert.ok(shortNamesSafe.patients.find(p => /Ali/i.test(p.fullName || ''))?.dx?.includes('AKI'), 'expected AKI to be diagnosis not name');
+
+// Test 16: Names with "Dr." prefix should detect doctor assignment
+const doctorNames = analyzeOcrWords([
+  word('Bed', 10, 10, 98, 40),
+  word('Name', 120, 10, 98, 50),
+  word('Dx', 300, 10, 98, 30),
+  word('Doctor', 450, 10, 98, 60),
+  word('E-M-05', 10, 50),
+  word('Nasser', 120, 50),
+  word('COPD', 300, 50),
+  word('Dr.', 450, 50),
+  word('Fahad', 500, 50),
+  word('E-M-06', 10, 90),
+  word('Reem', 120, 90),
+  word('UTI', 300, 90),
+  word('Dr.', 450, 90),
+  word('Salem', 500, 90),
+], 650, 180);
+
+assert.equal(doctorNames.patients.length, 2, 'expected two patients with doctor names');
+assert.ok(doctorNames.patients.some(p => /Nasser/i.test(p.fullName || '')), 'expected Nasser as patient name');
+assert.ok(doctorNames.patients.some(p => /Reem/i.test(p.fullName || '')), 'expected Reem as patient name');
+
 console.log('OCR verification passed');

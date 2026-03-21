@@ -1434,8 +1434,11 @@ const EntityRecognizer = {
     // Reject: has digits (except MRN-like which is handled by CIVIL_ID), or is a header
     if (/\d/.test(t) || isHeaderLike(t)) return { entity: 'NAME', confidence: 0 };
 
-    // Reject: all uppercase short tokens that look like medical abbreviations
-    if (/^[A-Z]{2,6}$/.test(t)) return { entity: 'NAME', confidence: 0 };
+    // Reject: all uppercase short tokens that are known medical terms (not names)
+    // Don't blanket-reject uppercase — PaddleOCR outputs "ALI", "OMAR", "DANA" in caps
+    if (/^[A-Z]{2,6}$/.test(t) && MedicalVocabulary.MEDICAL_TERMS[t.toUpperCase()]) {
+      return { entity: 'NAME', confidence: 0 };
+    }
 
     const hasArabic = /[\u0600-\u06FF]/.test(t);
     const arabicLen = (t.match(/[\u0600-\u06FF]/g) || []).length;
@@ -1454,14 +1457,20 @@ const EntityRecognizer = {
     // === Latin text — single word ===
     if (!hasArabic && words.length === 1) {
       const w = words[0];
-      // Database lookup first — most reliable signal
+      // Database lookup first — most reliable signal (case insensitive)
       const match = MedicalVocabulary.lookupName(w);
       if (match && match.confidence >= 0.7) {
         conf = Math.max(conf, match.confidence);
       }
-      // Capitalized word not in medical dictionary
-      else if (/^[A-Z][a-z]{2,20}$/.test(w)) {
+      // Capitalized word not in medical dictionary (Title Case)
+      if (/^[A-Z][a-z]{2,20}$/.test(w) && !match) {
         conf = Math.max(conf, 0.48);
+      }
+      // ALL CAPS word — PaddleOCR often outputs names in caps
+      // Only treat as name if DB match or if it's long enough to not be a medical abbrev
+      if (/^[A-Z]{3,}$/.test(w)) {
+        if (match && match.confidence >= 0.7) conf = Math.max(conf, match.confidence);
+        else if (w.length >= 5 && !MedicalVocabulary.MEDICAL_TERMS[w]) conf = Math.max(conf, 0.42);
       }
       // "Al-" prefix = almost certainly a family name
       if (/^Al[- ]?[A-Z]/i.test(w)) conf = Math.max(conf, 0.82);
@@ -1473,13 +1482,15 @@ const EntityRecognizer = {
 
     // === Latin text — multi-word ===
     if (!hasArabic && words.length >= 2) {
-      // Any two+ capitalized words
+      // Any two+ words starting with uppercase letter
       const capWords = words.filter(w => /^[A-Z]/.test(w)).length;
       if (capWords >= 2) conf = Math.max(conf, 0.82);
-      // "Firstname Al-Lastname" pattern
-      if (/Al[- ]?/i.test(t) && capWords >= 1) conf = Math.max(conf, 0.88);
+      // "Firstname Al-Lastname" pattern (any case)
+      if (/\bAl[- ]?/i.test(t)) conf = Math.max(conf, 0.88);
       // Three+ words with capitals
       if (words.length >= 3 && capWords >= 2) conf = Math.max(conf, 0.90);
+      // ALL CAPS multi-word — PaddleOCR outputs "AHMED AL-MUTAIRI" in caps
+      if (words.every(w => /^[A-Z]/.test(w))) conf = Math.max(conf, 0.80);
       // Database-backed: any word matches a known name
       const match = MedicalVocabulary.lookupName(t);
       if (match && match.confidence >= 0.7) conf = Math.max(conf, match.confidence);
@@ -1487,7 +1498,7 @@ const EntityRecognizer = {
       if (match && match.confidence >= 0.8 && words.every(w => /^[a-z]/.test(w))) {
         conf = Math.max(conf, 0.78);
       }
-      // Mixed case multi-word phrases (OCR sometimes lowercases)
+      // Mixed/any-case multi-word phrases with only letters — likely a name
       if (words.length >= 2 && words.every(w => /^[a-zA-Z]{2,}$/.test(w)) && !MedicalVocabulary.correctTerm(t, 0)) {
         conf = Math.max(conf, 0.65);
       }
