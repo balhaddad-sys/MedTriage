@@ -101,7 +101,10 @@ export default function MRZScannerCamera({ onResult, onCancel }) {
     };
   }, []);
 
-  // OCR scan loop for MRZ
+  // Warmup: don't start OCR until user has time to position card
+  const WARMUP_FRAMES = 5; // skip first ~3 seconds (5 frames × 600ms)
+
+  // OCR scan loop for MRZ — never auto-accepts, only tracks best result
   useEffect(() => {
     if (!scanning || found) return;
 
@@ -110,10 +113,22 @@ export default function MRZScannerCamera({ onResult, onCancel }) {
       const canvas = canvasRef.current;
       if (!video || !canvas || video.readyState < 2) return;
 
+      setFrameCount(c => {
+        const next = c + 1;
+        // During warmup, don't run OCR — just count
+        if (next <= WARMUP_FRAMES) {
+          setStatus(`Position card... starting scan in ${WARMUP_FRAMES - next + 1}`);
+        }
+        return next;
+      });
+
+      // Skip OCR during warmup
+      if (frameCount < WARMUP_FRAMES) return;
+
       const frame = captureFrame(video, canvas, 0.85);
       if (!frame) return;
 
-      setFrameCount(c => c + 1);
+      setStatus('Scanning MRZ...');
 
       const result = await recognizeMRZ(frame);
       if (result.fullText) setLastOcrText(result.fullText);
@@ -125,30 +140,16 @@ export default function MRZScannerCamera({ onResult, onCancel }) {
         const parsed = parseTD1(result.lines[0], result.lines[1], result.lines[2]);
         const totalScore = (result.scores || [0,0,0]).reduce((a,b) => a+b, 0);
 
-        // Track best result across frames
+        // Track best result across frames (never auto-accept)
         if (parsed && parsed.documentNumber && totalScore > bestRef.current.score) {
           bestRef.current = { lines: result.lines, score: totalScore, parsed };
-        }
-
-        // Accept if check digits pass or score is high enough
-        if (parsed && parsed.documentNumber) {
-          const isValid = parsed.errors.length === 0;
-          const isGoodEnough = totalScore >= 1.8 || isValid;
-          if (isGoodEnough) {
-            const best = bestRef.current.score > totalScore ? bestRef.current : { lines: result.lines, parsed };
-            setMrzLines(best.lines);
-            setFound(best.parsed);
-            setScanning(false);
-            streamRef.current?.getTracks().forEach(t => t.stop());
-            if (scanRef.current) clearInterval(scanRef.current);
-          }
         }
       }
     };
 
-    scanRef.current = setInterval(scan, 500);
+    scanRef.current = setInterval(scan, 600);
     return () => { if (scanRef.current) clearInterval(scanRef.current); };
-  }, [scanning, found]);
+  }, [scanning, found, frameCount]);
 
   // Handle manual MRZ entry
   const handleManualParse = useCallback(() => {
@@ -307,9 +308,9 @@ export default function MRZScannerCamera({ onResult, onCancel }) {
           MRZ not detected — try moving camera closer, ensure back of card is visible
         </span>
       )}
-      {frameCount > 8 && bestRef.current.parsed && (
+      {bestRef.current.parsed && (
         <button
-          style={{ ...styles.btn, background: colors.green + '22', color: colors.green, height: '38px', fontSize: '12px' }}
+          style={{ ...styles.btn, background: colors.green, color: '#fff', height: '52px', fontSize: '16px' }}
           onClick={() => {
             const best = bestRef.current;
             setMrzLines(best.lines);
@@ -318,7 +319,7 @@ export default function MRZScannerCamera({ onResult, onCancel }) {
             streamRef.current?.getTracks().forEach(t => t.stop());
             if (scanRef.current) clearInterval(scanRef.current);
           }}>
-          Use Best Reading (score: {Math.round(bestRef.current.score / 3 * 100)}%)
+          Accept MRZ Reading ({Math.round(bestRef.current.score / 3 * 100)}% confidence)
         </button>
       )}
       <button
