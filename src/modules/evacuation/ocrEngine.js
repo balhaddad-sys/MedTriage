@@ -173,7 +173,7 @@ const OCR_CONFUSION_CANONICAL = Object.fromEntries(
   OCR_CONFUSION_GROUPS.flatMap(group => group.map(char => [char, group[0]]))
 );
 const HEADER_PATTERNS = [
-  /^(name|patient|pt|bed|room|rm|age|sex|gender|diagnosis|diag|dx|meds?|medications?|allerg(?:y|ies)|code|status|ward|location|notes?|id|mrn)$/i,
+  /^(name|patient|pt|bed|room|rm|age|sex|gender|diagnosis|diag|dx|meds?|medications?|allerg(?:y|ies)|code|status|ward|location|notes?|id|mrn|mobil(?:ity)?|transport|blood\s*(?:type|group)|bt|bg|rh)$/i,
   /^(اسم|المريض|سرير|غرفة|العمر|الجنس|التشخيص|أدوية|ادوية|حساسية|الحالة|الرقم|ملاحظات)$/i,
 ];
 
@@ -182,7 +182,9 @@ const HEADER_ROLE_PATTERNS = [
     role: 'BED',
     patterns: [
       /^(?:bed|room|rm)(?:\s*(?:no|#))?$/i,
-      /^(?:bed|room)\s*\/\s*(?:bed|room)$/i,
+      /^(?:bed|room|ward)\s*\/\s*(?:bed|room|ward)$/i,
+      /^(?:room|bed)(?:\s*(?:no|#))?\s*\/\s*(?:ward|unit|location)$/i,
+      /^(?:ward|unit|location)\s*\/\s*(?:room|bed)(?:\s*(?:no|#))?$/i,
       /^(?:\u0633\u0631\u064A\u0631|\u063A\u0631\u0641\u0629)(?:\s*(?:\u0631\u0642\u0645|#))?$/i,
     ],
   },
@@ -226,8 +228,22 @@ const HEADER_ROLE_PATTERNS = [
   {
     role: 'STATUS',
     patterns: [
-      /^(?:code(?:\s*status)?|status)$/i,
+      /^(?:code(?:\s*status)?)$/i,
       /^(?:\u0627\u0644\u062D\u0627\u0644\u0629|\u062D\u0627\u0644\u0629\s*\u0627\u0644\u0625\u0646\u0639\u0627\u0634)$/i,
+    ],
+  },
+  {
+    role: 'ASSIGNED_DOCTOR',
+    patterns: [
+      /^(?:assigned\s*doctor|doctor|dr|consultant|team)$/i,
+      /^(?:\u0627\u0644\u0637\u0628\u064A\u0628|\u0627\u0644\u062F\u0643\u062A\u0648\u0631|\u0627\u0644\u0645\u0633\u0624\u0648\u0644)$/i,
+    ],
+  },
+  {
+    role: 'SHEET_STATUS',
+    patterns: [
+      /^(?:status|list\s*status|disposition|category)$/i,
+      /^(?:\u0627\u0644\u062D\u0627\u0644\u0629\s*\u0627\u0644\u0639\u0627\u0645\u0629|\u0627\u0644\u0641\u0626\u0629|\u0627\u0644\u062A\u0635\u0646\u064A\u0641)$/i,
     ],
   },
   {
@@ -258,11 +274,26 @@ const HEADER_ROLE_PATTERNS = [
       /^(?:\u0639\u0632\u0644|\u0627\u062D\u062A\u064A\u0627\u0637\u0627\u062A)$/i,
     ],
   },
+  {
+    role: 'MOBILITY',
+    patterns: [
+      /^(?:mobil(?:ity)?|transport|ambul(?:ation|atory)?|w\/?c)$/i,
+    ],
+  },
+  {
+    role: 'BLOOD_TYPE',
+    patterns: [
+      /^(?:blood\s*(?:type|group)|bt|bg|rh)$/i,
+      /^(?:\u0641\u0635\u064A\u0644\u0629\s*\u0627\u0644\u062F\u0645)$/i,
+    ],
+  },
 ];
 const GENERIC_SHEET_HEADER_PATTERNS = [
   /^(?:patient|ward|bed|room)\s+(?:list|sheet|board|census)$/i,
   /^(?:evac(?:uation)?|transfer|handover|admission|discharge)\s+(?:list|sheet)$/i,
   /^(?:daily|morning|evening)\s+(?:sheet|board|list)$/i,
+  /^(?:male|female)\s+list(?:\s+(?:active|inactive|chronic|new|pending))?$/i,
+  /^(?:male|female|active|chronic)\s+list(?:\s*\([^)]*\))?$/i,
   /^(?:\u0642\u0627\u0626\u0645\u0629|\u0646\u0645\u0648\u0630\u062C|\u0643\u0634\u0641)\s+(?:\u0627\u0644\u0645\u0631\u0636\u0649|\u0627\u0644\u0627\u062E\u0644\u0627\u0621|\u0627\u0644\u062C\u0646\u0627\u062D)$/i,
 ];
 
@@ -418,6 +449,8 @@ const FIELD_CONFIDENCE_KEYS = {
   meds: 'meds',
   allergies: 'allergies',
   code: 'code',
+  assignedDoctor: 'assignedDoctor',
+  sheetStatus: 'sheetStatus',
   ward: 'ward',
   o2: 'o2',
   iso: 'iso',
@@ -438,6 +471,7 @@ function canonicalizeConsensusValue(field, value) {
       return /^\d+$/.test(text) ? text : `${parseInt(text, 10) || ''}`;
     case 'gender':
     case 'code':
+    case 'sheetStatus':
     case 'o2':
     case 'iso':
     case 'suggestedTriage':
@@ -446,6 +480,7 @@ function canonicalizeConsensusValue(field, value) {
     case 'dx':
     case 'meds':
     case 'allergies':
+    case 'assignedDoctor':
     case 'ward':
       return stripForLexicon(text) || text.toUpperCase();
     default:
@@ -471,6 +506,7 @@ function normalizeConsensusOutput(field, value) {
     }
     case 'gender':
     case 'code':
+    case 'sheetStatus':
     case 'o2':
     case 'iso':
     case 'suggestedTriage':
@@ -595,7 +631,7 @@ function consolidatePatientGroup(patients) {
 
   const scalarFields = [
     'fullName', 'age', 'gender', 'bed', 'civilId',
-    'allergies', 'code', 'ward', 'o2', 'iso',
+    'allergies', 'code', 'assignedDoctor', 'sheetStatus', 'ward', 'o2', 'iso',
     'suggestedTriage', 'suggestedMobility',
   ];
   const listFields = ['dx', 'meds'];
@@ -619,6 +655,8 @@ function consolidatePatientGroup(patients) {
     meds: listConsensus.meds.value,
     allergies: scalarConsensus.allergies.value,
     code: scalarConsensus.code.value,
+    assignedDoctor: scalarConsensus.assignedDoctor.value,
+    sheetStatus: scalarConsensus.sheetStatus.value,
     ward: scalarConsensus.ward.value,
     o2: scalarConsensus.o2.value,
     iso: scalarConsensus.iso.value,
@@ -644,11 +682,13 @@ function consolidatePatientGroup(patients) {
     { value: fieldConfidence.gender, weight: merged.age != null ? 0.4 : 1.1 },
     { value: fieldConfidence.civilId, weight: 1.5 },
     { value: fieldConfidence.dx, weight: 1.7 },
-    { value: fieldConfidence.meds, weight: 1.1 },
-    { value: fieldConfidence.allergies, weight: 0.7 },
-    { value: fieldConfidence.code, weight: 0.6 },
-    { value: fieldConfidence.o2, weight: 0.5 },
-    { value: fieldConfidence.iso, weight: 0.5 },
+      { value: fieldConfidence.meds, weight: 1.1 },
+      { value: fieldConfidence.allergies, weight: 0.7 },
+      { value: fieldConfidence.code, weight: 0.6 },
+      { value: fieldConfidence.assignedDoctor, weight: 0.35 },
+      { value: fieldConfidence.sheetStatus, weight: 0.25 },
+      { value: fieldConfidence.o2, weight: 0.5 },
+      { value: fieldConfidence.iso, weight: 0.5 },
   ], baseConfidence) + ((Math.min(patients.length, 4) - 1) * 0.02));
 
   const reviewLevel = patients.reduce((current, patient) => (
@@ -1143,10 +1183,13 @@ const EntityRecognizer = {
       this.scoreWard(t),
       this.scoreO2(t),
       this.scoreIsolation(upper),
+      this.scoreMobility(t),
+      this.scoreBloodType(t),
       this.scoreName(t),
       this.scoreDiagnosis(t),
       this.scoreMedication(t),
       this.scoreStatus(upper),
+      this.scoreSheetStatus(t),
       this.scoreAllergy(upper),
     ].filter(c => c.confidence > 0.3);
 
@@ -1171,6 +1214,8 @@ const EntityRecognizer = {
       return { entity: 'BED', confidence: 0.99, corrected: canonical };
     if (/^(?:bed|rm|room|\u0633\u0631\u064A\u0631|\u063A\u0631\u0641\u0629)\s*#?\s*(\d{1,3})/i.test(t))
       return { entity: 'BED', confidence: 0.9, corrected: t };
+    if (/^\d{1,3}\s*-\s*\d{1,3}$/i.test(canonical))
+      return { entity: 'BED', confidence: 0.86, corrected: canonical.replace(/\s+/g, '') };
     if (/^[A-E]\d{1,2}$/i.test(canonical))
       return { entity: 'BED', confidence: 0.7, corrected: canonical };
     return { entity: 'BED', confidence: 0 };
@@ -1232,6 +1277,8 @@ const EntityRecognizer = {
     // ICU/CCU/NICU/PICU etc.
     if (/^(?:ICU|MICU|SICU|CCU|NICU|PICU|HDU|MAU|AMU|ACU|EDW|ED|ER|OT|OR|PACU|RECOVERY)$/i.test(upper))
       return { entity: 'WARD', confidence: 0.92, corrected: upper, meta: { ward: upper } };
+    if (/^(?:ER|ED)\s*\/\s*UNASSIGNED$/i.test(upper) || /^UNASSIGNED$/i.test(upper))
+      return { entity: 'WARD', confidence: 0.9, corrected: upper, meta: { ward: upper } };
     // Ward with number: "Ward 5", "W5"
     if (/^(?:ward|w)\s*#?\s*\d{1,2}$/i.test(t))
       return { entity: 'WARD', confidence: 0.88, corrected: t, meta: { ward: t } };
@@ -1270,6 +1317,30 @@ const EntityRecognizer = {
     if (/^(?:NEUTROPENIC|REVERSE\s*ISO)/i.test(upper))
       return { entity: 'ISOLATION', confidence: 0.88, corrected: 'AIRBORNE', meta: { iso: 'AIRBORNE' } };
     return { entity: 'ISOLATION', confidence: 0 };
+  },
+
+  scoreMobility(t) {
+    const upper = t.toUpperCase().trim();
+    if (/^AMBUL/i.test(upper)) return { entity: 'MOBILITY', confidence: 0.9, corrected: 'AMBULATORY', meta: { mobility: 'AMBULATORY' } };
+    if (/^W\/?C|WHEEL\s*CHAIR/i.test(upper)) return { entity: 'MOBILITY', confidence: 0.92, corrected: 'WHEELCHAIR', meta: { mobility: 'WHEELCHAIR' } };
+    if (/^STRETCH|LITTER/i.test(upper)) return { entity: 'MOBILITY', confidence: 0.9, corrected: 'STRETCHER', meta: { mobility: 'STRETCHER' } };
+    if (/^CRIT.*TRANSPORT|VENT.*TRANSPORT/i.test(upper)) return { entity: 'MOBILITY', confidence: 0.92, corrected: 'CRITICAL_TRANSPORT', meta: { mobility: 'CRITICAL_TRANSPORT' } };
+    if (/^(?:BED\s*BOUND|BEDRIDDEN|IMMOBILE)/i.test(upper)) return { entity: 'MOBILITY', confidence: 0.85, corrected: 'STRETCHER', meta: { mobility: 'STRETCHER' } };
+    return { entity: 'MOBILITY', confidence: 0 };
+  },
+
+  scoreBloodType(t) {
+    const clean = t.toUpperCase().replace(/\s+/g, '').trim();
+    const match = clean.match(/^(A|B|AB|O)[+-]?$/);
+    if (match) {
+      const hasRh = /[+-]$/.test(clean);
+      return { entity: 'BLOOD_TYPE', confidence: hasRh ? 0.92 : 0.6, corrected: clean, meta: { bloodType: clean } };
+    }
+    if (/^(?:A|B|AB|O)\s*(?:POS|NEG|POSITIVE|NEGATIVE)/i.test(clean)) {
+      const type = clean.replace(/POS.*/, '+').replace(/NEG.*/, '-');
+      return { entity: 'BLOOD_TYPE', confidence: 0.9, corrected: type, meta: { bloodType: type } };
+    }
+    return { entity: 'BLOOD_TYPE', confidence: 0 };
   },
 
   scoreName(t) {
@@ -1328,6 +1399,18 @@ const EntityRecognizer = {
     const statuses = { 'DNR': 1, 'DNAR': 1, 'FULL CODE': 1, 'COMFORT': 0.9, 'NFR': 0.9 };
     const conf = statuses[upper] || 0;
     return { entity: 'STATUS', confidence: conf, corrected: upper };
+  },
+
+  scoreSheetStatus(t) {
+    const normalized = `${t || ''}`.trim().replace(/\s+/g, ' ');
+    const upper = normalized.toUpperCase();
+    if (/^(?:NEW|ACTIVE|CHRONIC|PENDING|TRANSFER|FOLLOW[- ]?UP)$/i.test(upper)) {
+      return { entity: 'SHEET_STATUS', confidence: 0.76, corrected: normalized };
+    }
+    if (/^(?:ICU|ER|WARD)\s+DISCHARGE$/i.test(upper) || /DISCHARGE/i.test(upper)) {
+      return { entity: 'SHEET_STATUS', confidence: 0.82, corrected: normalized };
+    }
+    return { entity: 'SHEET_STATUS', confidence: 0 };
   },
 
   scoreAllergy(upper) {
@@ -1491,6 +1574,7 @@ const PatientAssembler = {
     const patient = {
       fullName: null, age: null, gender: null, bed: null,
       dx: null, meds: null, allergies: null, code: null,
+      assignedDoctor: null, sheetStatus: null,
       confidence: 0, warnings: [], flags: [],
       fieldConfidence: {}, rawEntityCount: cluster.length,
     };
@@ -1498,6 +1582,8 @@ const PatientAssembler = {
     const names = [];
     const diagnoses = [];
     const medications = [];
+    const assignedDoctors = [];
+    const sheetStatuses = [];
     const unknowns = [];
     let totalConf = 0, entityCount = 0;
 
@@ -1535,6 +1621,8 @@ const PatientAssembler = {
           break;
         case 'DIAGNOSIS': diagnoses.push(entity); break;
         case 'MEDICATION': medications.push(entity); break;
+        case 'ASSIGNED_DOCTOR': assignedDoctors.push(entity); break;
+        case 'SHEET_STATUS': sheetStatuses.push(entity); break;
         case 'ALLERGY':
           if (!patient.allergies || entity.confidence > (patient.fieldConfidence.allergies || 0)) {
             patient.allergies = entity.corrected;
@@ -1571,6 +1659,18 @@ const PatientAssembler = {
             patient.fieldConfidence.iso = entity.confidence;
           }
           break;
+        case 'MOBILITY':
+          if (!patient.mobility || patient.mobility === 'AMBULATORY' || entity.confidence > (patient.fieldConfidence.mobility || 0)) {
+            patient.mobility = entity.meta.mobility || entity.corrected;
+            patient.fieldConfidence.mobility = entity.confidence;
+          }
+          break;
+        case 'BLOOD_TYPE':
+          if (!patient.bloodType || entity.confidence > (patient.fieldConfidence.bloodType || 0)) {
+            patient.bloodType = entity.meta.bloodType || entity.corrected;
+            patient.fieldConfidence.bloodType = entity.confidence;
+          }
+          break;
         case 'UNKNOWN': unknowns.push(entity); break;
       }
     }
@@ -1605,6 +1705,16 @@ const PatientAssembler = {
       patient.meds = [...new Set(medications.map(e => e.corrected || e.text))].join(', ');
       patient.fieldConfidence.meds = average(medications.map(e => e.confidence), 0.5);
     }
+    if (assignedDoctors.length > 0) {
+      const sortedDoctors = [...assignedDoctors].sort((a, b) => a.box.cx - b.box.cx);
+      patient.assignedDoctor = [...new Set(sortedDoctors.map(e => (e.corrected || e.text).trim()).filter(Boolean))].join(' ');
+      patient.fieldConfidence.assignedDoctor = average(assignedDoctors.map(e => e.confidence), 0.45);
+    }
+    if (sheetStatuses.length > 0) {
+      const sortedStatuses = [...sheetStatuses].sort((a, b) => a.box.cx - b.box.cx);
+      patient.sheetStatus = [...new Set(sortedStatuses.map(e => (e.corrected || e.text).trim()).filter(Boolean))].join(' ');
+      patient.fieldConfidence.sheetStatus = average(sheetStatuses.map(e => e.confidence), 0.45);
+    }
 
     const baseConfidence = entityCount > 0 ? totalConf / entityCount : 0;
     patient.confidence = clamp(weightedAverage([
@@ -1617,6 +1727,8 @@ const PatientAssembler = {
       { value: patient.fieldConfidence.meds, weight: 1.1 },
       { value: patient.fieldConfidence.allergies, weight: 0.7 },
       { value: patient.fieldConfidence.code, weight: 0.6 },
+      { value: patient.fieldConfidence.assignedDoctor, weight: 0.35 },
+      { value: patient.fieldConfidence.sheetStatus, weight: 0.3 },
     ], baseConfidence) + (Math.min(cluster.length, 6) / 6 * 0.08));
 
     if (!patient.fullName && !patient.bed && diagnoses.length === 0) return null;
@@ -1737,6 +1849,16 @@ function normalizeBox(box) {
 function splitDetections(detections) {
   const result = [];
   for (const det of detections) {
+    const fullText = `${det.text || ''}`.trim();
+    if (
+      isHeaderLike(fullText) ||
+      EntityRecognizer.scoreWard(fullText).confidence >= 0.72 ||
+      EntityRecognizer.scoreSheetStatus(fullText).confidence >= 0.76
+    ) {
+      result.push(det);
+      continue;
+    }
+
     const parts = det.text
       .replace(/[;,|]+/g, ' ')
       .replace(/\u060C/g, ' ')
@@ -1951,6 +2073,7 @@ function applyRoleProjection(entity, role) {
   const scorerMap = {
     BED: EntityRecognizer.scoreBed.bind(EntityRecognizer),
     NAME: EntityRecognizer.scoreName.bind(EntityRecognizer),
+    ASSIGNED_DOCTOR: EntityRecognizer.scoreName.bind(EntityRecognizer),
     AGE_GENDER: text => {
       const combined = EntityRecognizer.scoreAgeGender(text);
       if (combined.confidence > 0) return combined;
@@ -1962,16 +2085,29 @@ function applyRoleProjection(entity, role) {
     MEDICATION: EntityRecognizer.scoreMedication.bind(EntityRecognizer),
     ALLERGY: EntityRecognizer.scoreAllergy.bind(EntityRecognizer),
     STATUS: EntityRecognizer.scoreStatus.bind(EntityRecognizer),
+    SHEET_STATUS: EntityRecognizer.scoreSheetStatus.bind(EntityRecognizer),
     WARD: EntityRecognizer.scoreWard.bind(EntityRecognizer),
     CIVIL_ID: EntityRecognizer.scoreCivilId.bind(EntityRecognizer),
   };
 
   const scorer = scorerMap[role];
-  if (!scorer) return entity;
+  if (!scorer) return { ...entity, meta: { ...(entity.meta || {}), columnRole: role } };
 
   const projected = role === 'STATUS' || role === 'ALLERGY'
     ? scorer(entity.text.toUpperCase())
     : scorer(entity.text);
+  if (role === 'BED' && (!projected || projected.confidence <= 0)) {
+    const normalizedBed = `${entity.text || ''}`.trim().toUpperCase().replace(/O/g, '0');
+    if (/^\d{1,3}(?:\s*-\s*\d{1,3})?$/.test(normalizedBed)) {
+      return {
+        ...entity,
+        entity: 'BED',
+        confidence: clamp(Math.max(entity.confidence, /^\d{1,3}$/.test(normalizedBed) ? 0.56 : 0.82)),
+        corrected: normalizedBed.replace(/\s+/g, ''),
+        meta: { ...(entity.meta || {}), columnRole: role },
+      };
+    }
+  }
   if (!projected || projected.confidence <= 0) {
     return { ...entity, meta: { ...(entity.meta || {}), columnRole: role } };
   }
@@ -2045,6 +2181,10 @@ function mapEntityToColumnRole(entityType) {
       return 'ALLERGY';
     case 'STATUS':
       return 'STATUS';
+    case 'ASSIGNED_DOCTOR':
+      return 'ASSIGNED_DOCTOR';
+    case 'SHEET_STATUS':
+      return 'SHEET_STATUS';
     case 'WARD':
       return 'WARD';
     case 'CIVIL_ID':
@@ -2053,6 +2193,10 @@ function mapEntityToColumnRole(entityType) {
       return 'O2';
     case 'ISOLATION':
       return 'ISOLATION';
+    case 'MOBILITY':
+      return 'MOBILITY';
+    case 'BLOOD_TYPE':
+      return 'BLOOD_TYPE';
     default:
       return null;
   }
@@ -2063,13 +2207,16 @@ function resolveAssemblyEntityType(entity) {
   if (!columnRole) return entity.entity;
 
   const projectedEntityType = mapColumnRoleToEntityType(columnRole);
-  if (!['NAME', 'DIAGNOSIS', 'MEDICATION', 'ALLERGY', 'STATUS', 'WARD', 'O2', 'ISOLATION'].includes(projectedEntityType)) {
+  if (!['NAME', 'DIAGNOSIS', 'MEDICATION', 'ALLERGY', 'STATUS', 'ASSIGNED_DOCTOR', 'SHEET_STATUS', 'WARD', 'O2', 'ISOLATION'].includes(projectedEntityType)) {
     return entity.entity;
   }
 
   const currentRole = mapEntityToColumnRole(entity.entity);
   if (!currentRole) return projectedEntityType;
   if (currentRole === columnRole) return entity.entity;
+  if (entity.entity === 'WARD' && entity.meta?.ward && (entity.confidence || 0) >= 0.72) {
+    return 'WARD';
+  }
 
   if (['UNKNOWN', 'NAME', 'DIAGNOSIS', 'MEDICATION', 'WARD'].includes(entity.entity)) {
     return projectedEntityType;
@@ -2090,6 +2237,10 @@ function mapColumnRoleToEntityType(role) {
       return 'ALLERGY';
     case 'STATUS':
       return 'STATUS';
+    case 'ASSIGNED_DOCTOR':
+      return 'ASSIGNED_DOCTOR';
+    case 'SHEET_STATUS':
+      return 'SHEET_STATUS';
     case 'WARD':
       return 'WARD';
     case 'O2':
@@ -2186,11 +2337,22 @@ function resolveEntityColumnRole(entity) {
   return entity.meta?.columnRole || mapEntityToColumnRole(entity.entity);
 }
 
+function buildRowText(row) {
+  return [...row]
+    .sort((a, b) => a.box.cx - b.box.cx)
+    .map(entity => entity.corrected || entity.text || '')
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function describeProjectedRow(row) {
   const roles = [];
   const seenRoles = new Set();
   let headerCellCount = 0;
   let leftmost = Infinity;
+  const wardContext = extractWardContext(row);
+  const rowText = buildRowText(row);
 
   for (const entity of row) {
     if (entity.entity === 'HEADER' || isHeaderLike(entity.text)) headerCellCount++;
@@ -2217,11 +2379,20 @@ function describeProjectedRow(row) {
   if (hasRole('O2')) identityScore += 0.2;
   if (hasRole('ISOLATION')) identityScore += 0.2;
   if (hasRole('WARD')) identityScore += 0.12;
+  const strongHeaderRow = headerCellCount >= Math.max(2, Math.ceil(row.length * 0.6));
+  const strongWardBanner = Boolean(
+    wardContext &&
+    row.length <= 3 &&
+    !row.some(entity => ['BED', 'CIVIL_ID', 'NAME', 'AGE_GENDER', 'AGE', 'GENDER'].includes(resolveAssemblyEntityType(entity)))
+  );
 
   return {
     roles,
     roleCount: roles.length,
     headerCellCount,
+    strongHeaderRow,
+    strongWardBanner,
+    wardContext,
     entityCount: row.length,
     leftmost: Number.isFinite(leftmost) ? leftmost : 0,
     centerY: average(row.map(entity => entity.box.cy), 0),
@@ -2229,10 +2400,12 @@ function describeProjectedRow(row) {
     hasSoftAnchor: hasRole('NAME') || hasRole('AGE_GENDER'),
     hasClinical: roles.some(role => ['DIAGNOSIS', 'MEDICATION', 'ALLERGY', 'STATUS', 'O2', 'ISOLATION'].includes(role)),
     identityScore,
+    rowText,
   };
 }
 
 function isProjectedSectionRow(profile) {
+  if (profile.strongHeaderRow || profile.strongWardBanner) return true;
   if (profile.hasHardAnchor || profile.hasSoftAnchor || profile.hasClinical) return false;
   if (profile.headerCellCount >= Math.max(1, Math.ceil(profile.entityCount / 2))) return true;
   return profile.roleCount > 0 && profile.roles.every(role => ['WARD', 'STATUS', 'O2', 'ISOLATION'].includes(role));
@@ -2246,7 +2419,7 @@ function shouldMergeProjectedContinuation(previousProfile, currentProfile, first
   if (yGap > Math.max(34, avgHeight * 1.75)) return false;
 
   const onlyContinuationRoles = currentProfile.roleCount > 0 && currentProfile.roles.every(role =>
-    ['DIAGNOSIS', 'MEDICATION', 'ALLERGY', 'STATUS', 'O2', 'ISOLATION', 'WARD'].includes(role)
+    ['DIAGNOSIS', 'MEDICATION', 'ALLERGY', 'STATUS', 'SHEET_STATUS', 'ASSIGNED_DOCTOR', 'O2', 'ISOLATION', 'WARD'].includes(role)
   );
   if (onlyContinuationRoles) return true;
 
@@ -2261,6 +2434,48 @@ function shouldMergeProjectedContinuation(previousProfile, currentProfile, first
   return currentProfile.identityScore < 0.65 && startsAfterIdentityColumns;
 }
 
+function extractWardContext(row) {
+  const rowText = buildRowText(row);
+  const joinedWard = EntityRecognizer.scoreWard(rowText);
+  if (joinedWard.confidence >= 0.72) {
+    return joinedWard.meta?.ward || joinedWard.corrected || rowText;
+  }
+
+  const wardCandidates = row
+    .map(entity => {
+      const rescored = EntityRecognizer.scoreWard(entity.corrected || entity.text);
+      if (rescored.confidence <= 0) return null;
+      return {
+        confidence: Math.max(entity.confidence || 0, rescored.confidence),
+        ward: rescored.meta?.ward || entity.meta?.ward || rescored.corrected || entity.corrected || entity.text,
+      };
+    })
+    .filter(Boolean);
+  if (wardCandidates.length === 0) return null;
+  const bestWard = wardCandidates.sort((a, b) => (b.confidence || 0) - (a.confidence || 0))[0];
+  return bestWard?.ward || null;
+}
+
+function createWardContextEntity(ward, row) {
+  const anchor = row[0]?.box || { x: 0, y: 0, w: 1, h: 1, cx: 0, cy: 0 };
+  return {
+    text: ward,
+    corrected: ward,
+    entity: 'WARD',
+    confidence: 0.88,
+    sourceConfidence: 0.88,
+    box: {
+      x: anchor.x,
+      y: anchor.y,
+      w: Math.max(anchor.w, 1),
+      h: Math.max(anchor.h, 1),
+      cx: anchor.cx,
+      cy: anchor.cy,
+    },
+    meta: { ward, sheetContext: true },
+  };
+}
+
 function mergeProjectedRows(rows) {
   if (rows.length === 0) return [];
 
@@ -2268,19 +2483,26 @@ function mergeProjectedRows(rows) {
   const firstColumnX = rows.flat().reduce((minX, entity) => Math.min(minX, entity.box.x), Infinity);
   const merged = [];
   let previousProfile = null;
+  let currentWardContext = null;
 
   for (const row of rows) {
-    const profile = describeProjectedRow(row);
+    const explicitWardContext = extractWardContext(row);
+    if (explicitWardContext) currentWardContext = explicitWardContext;
+
+    const contextualRow = currentWardContext && !explicitWardContext && !row.some(entity => resolveAssemblyEntityType(entity) === 'WARD')
+      ? [...row, createWardContextEntity(currentWardContext, row)]
+      : row;
+    const profile = describeProjectedRow(contextualRow);
     if (isProjectedSectionRow(profile)) continue;
 
     if (merged.length > 0 && shouldMergeProjectedContinuation(previousProfile, profile, firstColumnX, avgHeight)) {
-      merged[merged.length - 1].push(...row);
+      merged[merged.length - 1].push(...contextualRow);
       merged[merged.length - 1].sort((a, b) => a.box.cy - b.box.cy || a.box.cx - b.box.cx);
       previousProfile = describeProjectedRow(merged[merged.length - 1]);
       continue;
     }
 
-    merged.push([...row]);
+    merged.push([...contextualRow]);
     previousProfile = profile;
   }
 
@@ -2288,7 +2510,12 @@ function mergeProjectedRows(rows) {
 }
 
 function patientHasStrongIdentity(patient) {
-  return !!(patient?.bed && patient?.fullName && (patient?.age != null || patient?.gender));
+  return Boolean(
+    (patient?.bed && patient?.fullName) ||
+    (patient?.civilId && patient?.fullName) ||
+    (patient?.fullName && (patient?.age != null || patient?.gender)) ||
+    (patient?.fullName && patient?.ward && (patient?.assignedDoctor || patient?.sheetStatus || patient?.dx))
+  );
 }
 
 function patientAddsMissingDetail(existing, incoming) {
@@ -2300,6 +2527,8 @@ function patientAddsMissingDetail(existing, incoming) {
     (!existing?.civilId && incoming?.civilId) ||
     (!existing?.meds && incoming?.meds) ||
     (!existing?.allergies && incoming?.allergies) ||
+    (!existing?.assignedDoctor && incoming?.assignedDoctor) ||
+    (!existing?.sheetStatus && incoming?.sheetStatus) ||
     (!existing?.ward && incoming?.ward) ||
     ((!existing?.o2 || existing.o2 === 'NONE') && incoming?.o2 && incoming.o2 !== 'NONE') ||
     ((!existing?.iso || existing.iso === 'NONE') && incoming?.iso && incoming.iso !== 'NONE')
@@ -2484,11 +2713,17 @@ const LayoutHypothesisEngine = {
       for (const patient of hypothesis.patients) {
         const index = merged.findIndex(existing => shouldMerge(existing, patient));
         if (index === -1) {
+          if (bestIsStructuredSheet && lessStructuredHypothesis) {
+            if (!patientHasStrongIdentity(patient) || (patient.confidence || 0) < 0.92) continue;
+          }
           if ((patient.confidence || 0) >= 0.84) merged.push(patient);
           continue;
         }
 
         const existing = merged[index];
+        if (bestIsStructuredSheet && lessStructuredHypothesis && patientHasStrongIdentity(existing)) {
+          continue;
+        }
         if (
           bestIsStructuredSheet &&
           lessStructuredHypothesis &&

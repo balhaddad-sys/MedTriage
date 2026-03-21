@@ -115,6 +115,31 @@ export default function OCRScanner({ onClose, onImport }) {
     fileRef.current?.click();
   }, []);
 
+  // Demo mode — simulate OCR with realistic ward sheet data for testing
+  const handleDemo = useCallback(() => {
+    const demoPatients = [
+      { fullName: 'Ahmed Al-Mutairi', bed: 'E-M-03', age: 67, gender: 'M', dx: 'NSTEMI, DM2, HTN', meds: 'Aspirin, Ticagrelor, Enoxaparin, Metformin', triage: 'RED', mobility: 'STRETCHER', o2: 'NASAL_CANNULA', iso: 'NONE', code: 'FULL', allergies: 'NKDA', bloodType: 'A+', confidence: 0.95, reviewLevel: 'READY' },
+      { fullName: 'Fatima Al-Hajri', bed: 'E-F-07', age: 45, gender: 'F', dx: 'CAP, COPD', meds: 'Ceftriaxone, Azithromycin, Salbutamol', triage: 'YELLOW', mobility: 'WHEELCHAIR', o2: 'FACE_MASK', iso: 'DROPLET', code: 'FULL', allergies: 'Penicillin', bloodType: 'O+', confidence: 0.92, reviewLevel: 'READY' },
+      { fullName: 'Khaled Al-Enezi', bed: 'E-M-12', age: 78, gender: 'M', dx: 'CVA, AF, CKD3', meds: 'Apixaban, Amlodipine, Atorvastatin', triage: 'RED', mobility: 'STRETCHER', o2: 'NONE', iso: 'NONE', code: 'DNR', allergies: 'Sulfa', bloodType: 'B-', confidence: 0.88, reviewLevel: 'REVIEW', reviewReasons: ['Low name confidence'] },
+      { fullName: 'Sara Al-Dosari', bed: 'E-F-02', age: 32, gender: 'F', dx: 'DKA, T1DM', meds: 'Insulin Aspart, Insulin Glargine, KCl', triage: 'RED', mobility: 'AMBULATORY', o2: 'NONE', iso: 'NONE', code: 'FULL', allergies: 'NKDA', bloodType: 'AB+', confidence: 0.96, reviewLevel: 'READY' },
+      { fullName: 'Hamad Al-Shammari', bed: 'E-M-09', age: 55, gender: 'M', dx: 'UGIB, CLD', meds: 'Pantoprazole, Octreotide, Lactulose', triage: 'YELLOW', mobility: 'STRETCHER', o2: 'NONE', iso: 'NONE', code: 'FULL', allergies: 'NKDA', bloodType: 'O-', confidence: 0.91, reviewLevel: 'READY' },
+      { fullName: 'Noura Al-Kandari', bed: 'E-F-15', age: 63, gender: 'F', dx: 'ADHF, CKD4, DM2', meds: 'Furosemide, Carvedilol, Empagliflozin', triage: 'YELLOW', mobility: 'WHEELCHAIR', o2: 'BIPAP', iso: 'NONE', code: 'FULL', allergies: 'Codeine', bloodType: 'A-', confidence: 0.89, reviewLevel: 'REVIEW', reviewReasons: ['Medication confidence low'] },
+    ];
+    const demoResult = {
+      patients: demoPatients,
+      rawText: demoPatients.map(p => `${p.bed} ${p.fullName} ${p.age}/${p.gender} ${p.dx} ${p.meds}`).join('\n'),
+      processingTime: 0,
+      engine: 'demo-simulation',
+      qualityScore: 0.92,
+      qualityBand: 'GOOD',
+      wordConfidence: 0.91,
+      reviewCount: demoPatients.filter(p => p.reviewLevel !== 'READY').length,
+    };
+    setResult(demoResult);
+    setSelectedPatients(new Set(demoResult.patients.map((_, i) => i)));
+    setStage('review');
+  }, []);
+
   const handleFile = useCallback(async (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -183,12 +208,18 @@ export default function OCRScanner({ onClose, onImport }) {
     for (const p of toImport) {
       const patient = {
         ...p,
-        ward: auth?.ward?.name || '',
+        ward: (p.ward || auth?.ward?.name || '').trim(),
         fullName: (p.fullName || 'Unknown').trim(),
         bed: (p.bed || '').trim().toUpperCase(),
         dx: (p.dx || '').trim(),
         meds: (p.meds || '').trim(),
+        assignedDoctor: (p.assignedDoctor || '').trim(),
+        sheetStatus: (p.sheetStatus || '').trim(),
         allergies: (p.allergies || 'NKDA').trim(),
+        bloodType: (p.bloodType || '').trim(),
+        mobility: p.mobility || 'AMBULATORY',
+        o2: p.o2 || 'NONE',
+        iso: p.iso || 'NONE',
         ocrMeta: {
           ...(p.ocrMeta || {}),
           importedAt: new Date().toISOString(),
@@ -226,6 +257,13 @@ export default function OCRScanner({ onClose, onImport }) {
                 Supports printed tables, handwritten lists, whiteboards
               </span>
             </div>
+            <button style={{
+              background: colors.purple + '22', border: `1px solid ${colors.purple}44`,
+              borderRadius: '8px', padding: '10px 16px', color: colors.purple,
+              fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: fonts.mono,
+            }} onClick={handleDemo}>
+              DEMO: Load sample ward sheet
+            </button>
             {imageUrl && (
               <img src={imageUrl} style={styles.preview} alt="Captured" />
             )}
@@ -301,6 +339,22 @@ export default function OCRScanner({ onClose, onImport }) {
               </div>
             ) : (
               <>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '8px' }}>
+                  <button style={{
+                    background: colors.bg2, border: `1px solid ${colors.border}`, borderRadius: '6px',
+                    padding: '6px 12px', fontSize: '11px', fontWeight: 700, color: colors.text1,
+                    cursor: 'pointer', fontFamily: fonts.mono,
+                  }} onClick={() => setSelectedPatients(new Set(result.patients.map((_, i) => i)))}>
+                    Select All
+                  </button>
+                  <button style={{
+                    background: colors.bg2, border: `1px solid ${colors.border}`, borderRadius: '6px',
+                    padding: '6px 12px', fontSize: '11px', fontWeight: 700, color: colors.text1,
+                    cursor: 'pointer', fontFamily: fonts.mono,
+                  }} onClick={() => setSelectedPatients(new Set())}>
+                    Deselect All
+                  </button>
+                </div>
                 {result.patients.map((p, i) => (
                   <div key={i} style={{
                     ...styles.resultCard,
@@ -337,8 +391,13 @@ export default function OCRScanner({ onClose, onImport }) {
                       {p.age != null && <span style={styles.resultField}>Age: {p.age}</span>}
                       {p.gender && <span style={styles.resultField}>Gender: {p.gender}</span>}
                       {p.civilId && <span style={styles.resultField}>ID: {p.civilId}</span>}
+                      {p.ward && <span style={styles.resultField}>Ward: {p.ward}</span>}
                       {p.dx && <span style={styles.resultField}>Dx: {p.dx}</span>}
                       {p.meds && <span style={styles.resultField}>Meds: {p.meds}</span>}
+                      {p.assignedDoctor && <span style={styles.resultField}>Dr: {p.assignedDoctor}</span>}
+                      {p.sheetStatus && <span style={styles.resultField}>Status: {p.sheetStatus}</span>}
+                      {p.bloodType && <span style={{ ...styles.resultField, color: colors.red }}>Blood: {p.bloodType}</span>}
+                      {p.mobility && p.mobility !== 'AMBULATORY' && <span style={styles.resultField}>Mobility: {p.mobility}</span>}
                       {p.o2 && p.o2 !== 'NONE' && <span style={styles.resultField}>O2: {p.o2}</span>}
                       {p.iso && p.iso !== 'NONE' && <span style={{ ...styles.resultField, color: colors.amber }}>ISO: {p.iso}</span>}
                     </div>
@@ -394,12 +453,82 @@ export default function OCRScanner({ onClose, onImport }) {
                         />
                       </label>
                       <label style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>WARD</span>
+                        <input
+                          style={styles.input}
+                          value={p.ward || ''}
+                          onChange={e => updatePatientField(i, 'ward', e.target.value)}
+                        />
+                      </label>
+                      <label style={styles.fieldGroup}>
                         <span style={styles.fieldLabel}>MEDICATIONS</span>
                         <input
                           style={styles.input}
                           value={p.meds || ''}
                           onChange={e => updatePatientField(i, 'meds', e.target.value)}
                         />
+                      </label>
+                      <label style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>ASSIGNED DOCTOR</span>
+                        <input
+                          style={styles.input}
+                          value={p.assignedDoctor || ''}
+                          onChange={e => updatePatientField(i, 'assignedDoctor', e.target.value)}
+                        />
+                      </label>
+                      <label style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>SHEET STATUS</span>
+                        <input
+                          style={styles.input}
+                          value={p.sheetStatus || ''}
+                          onChange={e => updatePatientField(i, 'sheetStatus', e.target.value)}
+                        />
+                      </label>
+                      <label style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>BLOOD TYPE</span>
+                        <select style={styles.input}
+                          value={p.bloodType || ''}
+                          onChange={e => updatePatientField(i, 'bloodType', e.target.value)}>
+                          <option value="">-</option>
+                          {['A+','A-','B+','B-','AB+','AB-','O+','O-'].map(bt => (
+                            <option key={bt} value={bt}>{bt}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <label style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>MOBILITY</span>
+                        <select style={styles.input}
+                          value={p.mobility || 'AMBULATORY'}
+                          onChange={e => updatePatientField(i, 'mobility', e.target.value)}>
+                          <option value="AMBULATORY">AMBULATORY</option>
+                          <option value="WHEELCHAIR">WHEELCHAIR</option>
+                          <option value="STRETCHER">STRETCHER</option>
+                          <option value="CRITICAL_TRANSPORT">CRITICAL TRANSPORT</option>
+                        </select>
+                      </label>
+                      <label style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>O2</span>
+                        <select style={styles.input}
+                          value={p.o2 || 'NONE'}
+                          onChange={e => updatePatientField(i, 'o2', e.target.value)}>
+                          <option value="NONE">NONE</option>
+                          <option value="NASAL_CANNULA">NASAL CANNULA</option>
+                          <option value="FACE_MASK">FACE MASK</option>
+                          <option value="NON_REBREATHER">NON-REBREATHER</option>
+                          <option value="BIPAP">BIPAP</option>
+                          <option value="VENTILATOR">VENTILATOR</option>
+                        </select>
+                      </label>
+                      <label style={styles.fieldGroup}>
+                        <span style={styles.fieldLabel}>ISOLATION</span>
+                        <select style={styles.input}
+                          value={p.iso || 'NONE'}
+                          onChange={e => updatePatientField(i, 'iso', e.target.value)}>
+                          <option value="NONE">NONE</option>
+                          <option value="CONTACT">CONTACT</option>
+                          <option value="DROPLET">DROPLET</option>
+                          <option value="AIRBORNE">AIRBORNE</option>
+                        </select>
                       </label>
                       <label style={styles.fieldGroup}>
                         <span style={styles.fieldLabel}>ALLERGIES</span>
