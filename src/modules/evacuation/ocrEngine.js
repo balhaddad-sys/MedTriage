@@ -177,6 +177,119 @@ const HEADER_PATTERNS = [
   /^(اسم|المريض|سرير|غرفة|العمر|الجنس|التشخيص|أدوية|ادوية|حساسية|الحالة|الرقم|ملاحظات)$/i,
 ];
 
+const HEADER_ROLE_PATTERNS = [
+  {
+    role: 'BED',
+    patterns: [
+      /^(?:bed|room|rm)(?:\s*(?:no|#))?$/i,
+      /^(?:bed|room)\s*\/\s*(?:bed|room)$/i,
+      /^(?:\u0633\u0631\u064A\u0631|\u063A\u0631\u0641\u0629)(?:\s*(?:\u0631\u0642\u0645|#))?$/i,
+    ],
+  },
+  {
+    role: 'NAME',
+    patterns: [
+      /^(?:(?:patient|pt)\s*)?name(?:s)?$/i,
+      /^(?:full\s*name)$/i,
+      /^(?:\u0627\u0633\u0645|\u0627\u0633\u0645\s*\u0627\u0644\u0645\u0631\u064A\u0636|\u0627\u0644\u0645\u0631\u064A\u0636)$/i,
+    ],
+  },
+  {
+    role: 'AGE_GENDER',
+    patterns: [
+      /^(?:age|sex|gender)(?:\s*[/&-]\s*(?:age|sex|gender))*$/i,
+      /^(?:age\s*sex|sex\s*age)$/i,
+      /^(?:\u0627\u0644\u0639\u0645\u0631|\u0627\u0644\u062C\u0646\u0633)(?:\s*\/\s*(?:\u0627\u0644\u0639\u0645\u0631|\u0627\u0644\u062C\u0646\u0633))*$/i,
+    ],
+  },
+  {
+    role: 'DIAGNOSIS',
+    patterns: [
+      /^(?:diagnos(?:is|es)|diag|dx|impression|problem(?:s)?|condition)$/i,
+      /^(?:\u0627\u0644\u062A\u0634\u062E\u064A\u0635|\u0627\u0646\u0637\u0628\u0627\u0639|\u0645\u0634\u0643\u0644\u0629|\u0627\u0644\u062D\u0627\u0644\u0629)$/i,
+    ],
+  },
+  {
+    role: 'MEDICATION',
+    patterns: [
+      /^(?:med(?:ication)?s?|drugs?|rx|treatment)$/i,
+      /^(?:\u0627\u062F\u0648\u064A\u0629|\u0623\u062F\u0648\u064A\u0629|\u0639\u0644\u0627\u062C)$/i,
+    ],
+  },
+  {
+    role: 'ALLERGY',
+    patterns: [
+      /^(?:allerg(?:y|ies)|allergy\s*status)$/i,
+      /^(?:\u062D\u0633\u0627\u0633\u064A\u0629)$/i,
+    ],
+  },
+  {
+    role: 'STATUS',
+    patterns: [
+      /^(?:code(?:\s*status)?|status)$/i,
+      /^(?:\u0627\u0644\u062D\u0627\u0644\u0629|\u062D\u0627\u0644\u0629\s*\u0627\u0644\u0625\u0646\u0639\u0627\u0634)$/i,
+    ],
+  },
+  {
+    role: 'WARD',
+    patterns: [
+      /^(?:ward|unit|location|area)$/i,
+      /^(?:\u062C\u0646\u0627\u062D|\u0648\u062D\u062F\u0629|\u0645\u0648\u0642\u0639|\u0642\u0633\u0645)$/i,
+    ],
+  },
+  {
+    role: 'CIVIL_ID',
+    patterns: [
+      /^(?:id|mrn|civil\s*id|record\s*(?:id|no)|file\s*(?:id|no))$/i,
+      /^(?:\u0627\u0644\u0631\u0642\u0645|\u0631\u0642\u0645\s*\u0645\u0644\u0641|\u0631\u0642\u0645\s*\u0645\u062F\u0646\u064A)$/i,
+    ],
+  },
+  {
+    role: 'O2',
+    patterns: [
+      /^(?:o2|oxygen|resp(?:iratory)?\s*support|airway)$/i,
+      /^(?:\u0623\u0643\u0633\u062C\u064A\u0646|\u062A\u0646\u0641\u0633|\u062F\u0639\u0645\s*\u062A\u0646\u0641\u0633\u064A)$/i,
+    ],
+  },
+  {
+    role: 'ISOLATION',
+    patterns: [
+      /^(?:iso|isolation|precautions?)$/i,
+      /^(?:\u0639\u0632\u0644|\u0627\u062D\u062A\u064A\u0627\u0637\u0627\u062A)$/i,
+    ],
+  },
+];
+const GENERIC_SHEET_HEADER_PATTERNS = [
+  /^(?:patient|ward|bed|room)\s+(?:list|sheet|board|census)$/i,
+  /^(?:evac(?:uation)?|transfer|handover|admission|discharge)\s+(?:list|sheet)$/i,
+  /^(?:daily|morning|evening)\s+(?:sheet|board|list)$/i,
+  /^(?:\u0642\u0627\u0626\u0645\u0629|\u0646\u0645\u0648\u0630\u062C|\u0643\u0634\u0641)\s+(?:\u0627\u0644\u0645\u0631\u0636\u0649|\u0627\u0644\u0627\u062E\u0644\u0627\u0621|\u0627\u0644\u062C\u0646\u0627\u062D)$/i,
+];
+
+function normalizeSheetLabel(text) {
+  return `${text || ''}`
+    .trim()
+    .replace(/[_:]+/g, ' ')
+    .replace(/[|]+/g, '/')
+    .replace(/[()]+/g, ' ')
+    .replace(/\bnumber\b/gi, 'no')
+    .replace(/\s*[/\\]\s*/g, '/')
+    .replace(/\s+/g, ' ')
+    .replace(/[:\\-]+$/g, '')
+    .trim();
+}
+
+function detectHeaderRole(text) {
+  const cleaned = normalizeSheetLabel(text);
+  if (!cleaned) return null;
+
+  for (const entry of HEADER_ROLE_PATTERNS) {
+    if (entry.patterns.some(pattern => pattern.test(cleaned))) return entry.role;
+  }
+
+  return null;
+}
+
 function clamp(value, min = 0, max = 1) {
   return Math.min(max, Math.max(min, value));
 }
@@ -257,8 +370,9 @@ function ocrDistance(a, b, maxDist) {
 }
 
 function isHeaderLike(text) {
-  const cleaned = `${text || ''}`.trim().replace(/[:\-]+$/, '');
-  return HEADER_PATTERNS.some(pattern => pattern.test(cleaned));
+  const cleaned = normalizeSheetLabel(text);
+  if (!cleaned) return false;
+  return !!detectHeaderRole(cleaned) || GENERIC_SHEET_HEADER_PATTERNS.some(pattern => pattern.test(cleaned));
 }
 
 function dedupeWarnings(warnings) {
@@ -1390,8 +1504,9 @@ const PatientAssembler = {
     for (const entity of cluster) {
       totalConf += entity.confidence;
       entityCount++;
+      const assemblyEntity = resolveAssemblyEntityType(entity);
 
-      switch (entity.entity) {
+      switch (assemblyEntity) {
         case 'BED':
           if (!patient.bed || entity.confidence > (patient.fieldConfidence.bed || 0)) {
             patient.bed = entity.corrected;
@@ -1815,6 +1930,7 @@ function mergeWeakRows(rows) {
 }
 
 function inferColumnRole(text) {
+  return detectHeaderRole(text);
   const cleaned = `${text || ''}`.trim().replace(/[:\-]+$/, '');
   if (/^(?:bed|room|rm|#|سرير|غرفة)$/i.test(cleaned)) return 'BED';
   if (/^(?:name|patient|pt|اسم|المريض)$/i.test(cleaned)) return 'NAME';
@@ -1871,6 +1987,7 @@ function applyRoleProjection(entity, role) {
 }
 
 function resolveColumnRole(text) {
+  return detectHeaderRole(text);
   const existingRole = inferColumnRole(text);
   if (existingRole) return existingRole;
 
@@ -1941,6 +2058,49 @@ function mapEntityToColumnRole(entityType) {
   }
 }
 
+function resolveAssemblyEntityType(entity) {
+  const columnRole = entity.meta?.columnRole;
+  if (!columnRole) return entity.entity;
+
+  const projectedEntityType = mapColumnRoleToEntityType(columnRole);
+  if (!['NAME', 'DIAGNOSIS', 'MEDICATION', 'ALLERGY', 'STATUS', 'WARD', 'O2', 'ISOLATION'].includes(projectedEntityType)) {
+    return entity.entity;
+  }
+
+  const currentRole = mapEntityToColumnRole(entity.entity);
+  if (!currentRole) return projectedEntityType;
+  if (currentRole === columnRole) return entity.entity;
+
+  if (['UNKNOWN', 'NAME', 'DIAGNOSIS', 'MEDICATION', 'WARD'].includes(entity.entity)) {
+    return projectedEntityType;
+  }
+
+  return entity.entity;
+}
+
+function mapColumnRoleToEntityType(role) {
+  switch (role) {
+    case 'NAME':
+      return 'NAME';
+    case 'DIAGNOSIS':
+      return 'DIAGNOSIS';
+    case 'MEDICATION':
+      return 'MEDICATION';
+    case 'ALLERGY':
+      return 'ALLERGY';
+    case 'STATUS':
+      return 'STATUS';
+    case 'WARD':
+      return 'WARD';
+    case 'O2':
+      return 'O2';
+    case 'ISOLATION':
+      return 'ISOLATION';
+    default:
+      return role;
+  }
+}
+
 function inferColumnsFromRows(rows, imageWidth) {
   const entities = rows.flat();
   if (entities.length < 8) return [];
@@ -1993,12 +2153,150 @@ function inferColumnsFromRows(rows, imageWidth) {
     .sort((a, b) => a.centerX - b.centerX);
 }
 
+function normalizeStructuredColumns(columns) {
+  const sorted = [...columns].sort((a, b) => a.centerX - b.centerX);
+  const merged = [];
+
+  for (const column of sorted) {
+    const previous = merged[merged.length - 1];
+    if (previous && previous.role === column.role && Math.abs(previous.centerX - column.centerX) <= 72) {
+      previous.centerX = average([previous.centerX, column.centerX], previous.centerX);
+      previous.support += column.support || 1;
+      previous.confidence = Math.max(previous.confidence || 0, column.confidence || 0);
+      continue;
+    }
+    merged.push({ ...column, support: column.support || 1 });
+  }
+
+  return merged;
+}
+
+function projectRowsToColumns(rows, columns) {
+  const normalizedColumns = normalizeStructuredColumns(columns);
+  return rows.map(row => row.map(entity => {
+    const nearestColumn = normalizedColumns.reduce((best, column) => {
+      if (!best) return column;
+      return Math.abs(column.centerX - entity.box.cx) < Math.abs(best.centerX - entity.box.cx) ? column : best;
+    }, null);
+    return projectEntityByColumnRole(entity, nearestColumn?.role || null);
+  }));
+}
+
+function resolveEntityColumnRole(entity) {
+  return entity.meta?.columnRole || mapEntityToColumnRole(entity.entity);
+}
+
+function describeProjectedRow(row) {
+  const roles = [];
+  const seenRoles = new Set();
+  let headerCellCount = 0;
+  let leftmost = Infinity;
+
+  for (const entity of row) {
+    if (entity.entity === 'HEADER' || isHeaderLike(entity.text)) headerCellCount++;
+
+    const role = resolveEntityColumnRole(entity);
+    if (role && !seenRoles.has(role)) {
+      seenRoles.add(role);
+      roles.push(role);
+    }
+
+    leftmost = Math.min(leftmost, entity.box.x);
+  }
+
+  const hasRole = role => seenRoles.has(role);
+  let identityScore = 0;
+  if (hasRole('BED')) identityScore += 1.2;
+  if (hasRole('CIVIL_ID')) identityScore += 0.9;
+  if (hasRole('NAME')) identityScore += 1;
+  if (hasRole('AGE_GENDER')) identityScore += 0.85;
+  if (hasRole('DIAGNOSIS')) identityScore += 0.45;
+  if (hasRole('MEDICATION')) identityScore += 0.35;
+  if (hasRole('ALLERGY')) identityScore += 0.25;
+  if (hasRole('STATUS')) identityScore += 0.22;
+  if (hasRole('O2')) identityScore += 0.2;
+  if (hasRole('ISOLATION')) identityScore += 0.2;
+  if (hasRole('WARD')) identityScore += 0.12;
+
+  return {
+    roles,
+    roleCount: roles.length,
+    headerCellCount,
+    entityCount: row.length,
+    leftmost: Number.isFinite(leftmost) ? leftmost : 0,
+    centerY: average(row.map(entity => entity.box.cy), 0),
+    hasHardAnchor: hasRole('BED') || hasRole('CIVIL_ID'),
+    hasSoftAnchor: hasRole('NAME') || hasRole('AGE_GENDER'),
+    hasClinical: roles.some(role => ['DIAGNOSIS', 'MEDICATION', 'ALLERGY', 'STATUS', 'O2', 'ISOLATION'].includes(role)),
+    identityScore,
+  };
+}
+
+function isProjectedSectionRow(profile) {
+  if (profile.hasHardAnchor || profile.hasSoftAnchor || profile.hasClinical) return false;
+  if (profile.headerCellCount >= Math.max(1, Math.ceil(profile.entityCount / 2))) return true;
+  return profile.roleCount > 0 && profile.roles.every(role => ['WARD', 'STATUS', 'O2', 'ISOLATION'].includes(role));
+}
+
+function shouldMergeProjectedContinuation(previousProfile, currentProfile, firstColumnX, avgHeight) {
+  if (!previousProfile) return false;
+  if (currentProfile.hasHardAnchor) return false;
+
+  const yGap = Math.abs(currentProfile.centerY - previousProfile.centerY);
+  if (yGap > Math.max(34, avgHeight * 1.75)) return false;
+
+  const onlyContinuationRoles = currentProfile.roleCount > 0 && currentProfile.roles.every(role =>
+    ['DIAGNOSIS', 'MEDICATION', 'ALLERGY', 'STATUS', 'O2', 'ISOLATION', 'WARD'].includes(role)
+  );
+  if (onlyContinuationRoles) return true;
+
+  const startsAfterIdentityColumns = currentProfile.leftmost > (firstColumnX + Math.max(28, avgHeight * 1.35));
+  if (!currentProfile.hasSoftAnchor && currentProfile.roleCount <= 2 && (currentProfile.hasClinical || startsAfterIdentityColumns)) {
+    return true;
+  }
+  if (currentProfile.roleCount === 1 && currentProfile.roles[0] === 'NAME' && startsAfterIdentityColumns) {
+    return true;
+  }
+
+  return currentProfile.identityScore < 0.65 && startsAfterIdentityColumns;
+}
+
+function mergeProjectedRows(rows) {
+  if (rows.length === 0) return [];
+
+  const avgHeight = average(rows.flat().map(entity => entity.box.h), 20);
+  const firstColumnX = rows.flat().reduce((minX, entity) => Math.min(minX, entity.box.x), Infinity);
+  const merged = [];
+  let previousProfile = null;
+
+  for (const row of rows) {
+    const profile = describeProjectedRow(row);
+    if (isProjectedSectionRow(profile)) continue;
+
+    if (merged.length > 0 && shouldMergeProjectedContinuation(previousProfile, profile, firstColumnX, avgHeight)) {
+      merged[merged.length - 1].push(...row);
+      merged[merged.length - 1].sort((a, b) => a.box.cy - b.box.cy || a.box.cx - b.box.cx);
+      previousProfile = describeProjectedRow(merged[merged.length - 1]);
+      continue;
+    }
+
+    merged.push([...row]);
+    previousProfile = profile;
+  }
+
+  return merged;
+}
+
 function patientHasStrongIdentity(patient) {
   return !!(patient?.bed && patient?.fullName && (patient?.age != null || patient?.gender));
 }
 
 function patientAddsMissingDetail(existing, incoming) {
   return Boolean(
+    (!existing?.fullName && incoming?.fullName) ||
+    (!existing?.bed && incoming?.bed) ||
+    (existing?.age == null && incoming?.age != null) ||
+    (!existing?.gender && incoming?.gender) ||
     (!existing?.civilId && incoming?.civilId) ||
     (!existing?.meds && incoming?.meds) ||
     (!existing?.allergies && incoming?.allergies) ||
@@ -2011,36 +2309,36 @@ function patientAddsMissingDetail(existing, incoming) {
 const TableHypothesisBuilder = {
   build(entities) {
     const rows = groupEntitiesIntoRows(entities);
-    if (rows.length < 3) return null;
+    if (rows.length < 2) return null;
 
-    const headerIndex = rows.slice(0, 3).findIndex(row => row.filter(entity => isHeaderLike(entity.text)).length >= 2);
+    let headerIndex = -1;
+    let bestHeaderScore = 0;
+    for (let i = 0; i < Math.min(rows.length, 6); i++) {
+      const row = rows[i];
+      const roleCount = new Set(row.map(entity => resolveColumnRole(entity.text)).filter(Boolean)).size;
+      const headerLikeCount = row.filter(entity => isHeaderLike(entity.text)).length;
+      const score = (roleCount * 1.5) + (headerLikeCount * 0.35);
+      if (roleCount >= 2 && score > bestHeaderScore) {
+        bestHeaderScore = score;
+        headerIndex = i;
+      }
+    }
     if (headerIndex === -1) return null;
+    if (headerIndex >= rows.length - 1) return null;
 
     const headerRow = rows[headerIndex];
-    const columns = headerRow
+    const columns = normalizeStructuredColumns(headerRow
       .map(entity => ({
         role: resolveColumnRole(entity.text),
         centerX: entity.box.cx,
+        support: 1,
+        confidence: entity.confidence || 0.98,
       }))
-      .filter(column => column.role);
+      .filter(column => column.role));
     if (columns.length < 2) return null;
 
-    const clusters = [];
-    for (const row of rows.slice(headerIndex + 1)) {
-      const projected = row.map(entity => {
-        const nearestColumn = columns.reduce((best, column) => {
-          if (!best) return column;
-          return Math.abs(column.centerX - entity.box.cx) < Math.abs(best.centerX - entity.box.cx) ? column : best;
-        }, null);
-        return projectEntityByColumnRole(entity, nearestColumn?.role || null);
-      });
-
-      if (rowIdentityScore(projected) < 0.6 && clusters.length > 0) {
-        clusters[clusters.length - 1].push(...projected);
-      } else {
-        clusters.push(projected);
-      }
-    }
+    const projectedRows = projectRowsToColumns(rows.slice(headerIndex + 1), columns);
+    const clusters = mergeProjectedRows(projectedRows);
 
     if (clusters.length === 0) return null;
 
@@ -2048,7 +2346,7 @@ const TableHypothesisBuilder = {
     return {
       id: 'table-grid',
       clusters,
-      structuralScore: 0.94,
+      structuralScore: clamp(0.9 + (Math.min(columns.length, 6) * 0.01), 0, 0.96),
       coverage,
     };
   },
@@ -2067,13 +2365,7 @@ const InferredColumnHypothesisBuilder = {
     const distinctRoles = new Set(columns.map(column => column.role));
     if (columns.length < 2 || distinctRoles.size < 2) return null;
 
-    const projectedClusters = rows.map(row => row.map(entity => {
-      const nearestColumn = columns.reduce((best, column) => {
-        if (!best) return column;
-        return Math.abs(column.centerX - entity.box.cx) < Math.abs(best.centerX - entity.box.cx) ? column : best;
-      }, null);
-      return projectEntityByColumnRole(entity, nearestColumn?.role || null);
-    }));
+    const projectedClusters = mergeProjectedRows(projectRowsToColumns(rows, columns));
 
     const coverage = new Set(projectedClusters.flat().map(entityFingerprint)).size / Math.max(meaningful.length, 1);
     const columnConfidence = average(columns.map(column => column.confidence), 0.55);
@@ -2162,20 +2454,33 @@ const LayoutHypothesisEngine = {
   },
 
   pickBest(hypotheses) {
-    return [...hypotheses].sort((a, b) => {
+    const ranked = [...hypotheses].sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
       if (b.patients.length !== a.patients.length) return b.patients.length - a.patients.length;
       return average(b.patients.map(patient => patient.confidence), 0) - average(a.patients.map(patient => patient.confidence), 0);
-    })[0] || null;
+    });
+
+    const best = ranked[0] || null;
+    if (!best) return null;
+
+    const nearStructured = ranked.find(hypothesis =>
+      ['table-grid', 'schema-columns'].includes(hypothesis.id) &&
+      ((best.score || 0) - (hypothesis.score || 0)) <= 0.03 &&
+      hypothesis.patients.length >= Math.max(1, best.patients.length - 1)
+    );
+
+    return nearStructured || best;
   },
 
   fuse(best, hypotheses) {
     if (!best) return [];
     let merged = [...best.patients];
+    const bestIsStructuredSheet = ['table-grid', 'schema-columns'].includes(best.id);
 
     for (const hypothesis of hypotheses) {
       if (hypothesis.id === best.id) continue;
       const conservativeFusion = (best.score || 0) >= 0.88 && (hypothesis.score || 0) <= (best.score || 0);
+      const lessStructuredHypothesis = ['row-bands', 'lane-rows', 'spatial-cluster'].includes(hypothesis.id);
       for (const patient of hypothesis.patients) {
         const index = merged.findIndex(existing => shouldMerge(existing, patient));
         if (index === -1) {
@@ -2184,6 +2489,14 @@ const LayoutHypothesisEngine = {
         }
 
         const existing = merged[index];
+        if (
+          bestIsStructuredSheet &&
+          lessStructuredHypothesis &&
+          patientHasStrongIdentity(existing) &&
+          !patientAddsMissingDetail(existing, patient)
+        ) {
+          continue;
+        }
         if (conservativeFusion) {
           const incomingLooksBroader = (patient.rawEntityCount || 0) > ((existing.rawEntityCount || 0) + 2);
           if (patientHasStrongIdentity(existing) && incomingLooksBroader && !patientAddsMissingDetail(existing, patient)) {

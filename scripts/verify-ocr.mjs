@@ -159,4 +159,88 @@ assert.match(inferredColumns.patients[0].meds, /Azithromycin/i);
 assert.match(inferredColumns.patients[1].meds, /Furosemide/i);
 assert.match(inferredColumns.patients[2].meds, /Ceftriaxone/i);
 
+// Test 7: Sheet-style header synonyms should still trigger table parsing
+const sheetHeaderSynonyms = analyzeOcrWords([
+  word('Patient Name', 120, 10, 98, 90),
+  word('Room No', 10, 10, 98, 70),
+  word('Age/Sex', 270, 10, 98, 70),
+  word('Diagnosis', 380, 10, 98, 85),
+  word('Medication', 520, 10, 98, 95),
+  word('A-M-01', 10, 50),
+  word('Sara', 120, 50),
+  word('Yousef', 190, 50),
+  word('44/F', 280, 50),
+  word('CAP', 380, 50),
+  word('Azithromycin', 520, 50),
+], 760, 180);
+
+assert.equal(sheetHeaderSynonyms.strategy, 'table-grid', 'expected sheet-style headers to prefer table-grid');
+assert.equal(sheetHeaderSynonyms.patients.length, 1, 'expected one patient from a one-row sheet');
+assert.match(sheetHeaderSynonyms.patients[0].fullName || '', /Sara Yousef/i);
+assert.match(sheetHeaderSynonyms.patients[0].meds || '', /Azithromycin/i);
+
+// Test 8: Wrapped diagnosis/medication rows should stay attached to the same patient
+const wrappedTable = analyzeOcrWords([
+  word('Bed', 10, 10, 98, 40),
+  word('Name', 120, 10, 98, 50),
+  word('Age/Sex', 260, 10, 98, 70),
+  word('Diagnosis', 360, 10, 98, 85),
+  word('Meds', 560, 10, 98, 50),
+  word('E-M-21', 10, 52),
+  word('Nora', 120, 52),
+  word('Ali', 180, 52),
+  word('42/F', 270, 52),
+  word('Sepsis', 360, 52),
+  word('Piperacillin', 560, 52),
+  word('shock', 360, 82),
+  word('Tazobactam', 560, 82),
+  word('E-M-22', 10, 118),
+  word('Saif', 120, 118),
+  word('Jaber', 180, 118),
+  word('71/M', 270, 118),
+  word('CHF', 360, 118),
+  word('Furosemide', 560, 118),
+], 860, 260);
+
+assert.equal(wrappedTable.strategy, 'table-grid', 'expected wrapped table rows to stay in the table-grid path');
+assert.equal(wrappedTable.patients.length, 2, 'expected wrapped diagnosis/medication lines to merge into one patient');
+assert.match(wrappedTable.patients[0].fullName || '', /Nora Ali/i);
+assert.match(wrappedTable.patients[0].dx || '', /SEPSIS/i);
+assert.match(wrappedTable.patients[0].dx || '', /shock/i);
+assert.match(wrappedTable.patients[0].meds || '', /Piperacillin/i);
+assert.match(wrappedTable.patients[0].meds || '', /Tazobactam/i);
+
+// Test 9: Sheet titles above the header should be ignored while preserving columns
+const titledSheet = analyzeOcrWords([
+  word('Ward Transfer Sheet', 240, 8, 97, 170),
+  word('Morning Census', 280, 34, 97, 130),
+  word('Room No', 10, 68, 98, 70),
+  word('Patient Name', 120, 68, 98, 90),
+  word('Age/Sex', 260, 68, 98, 70),
+  word('Diagnosis', 360, 68, 98, 80),
+  word('Medication', 500, 68, 98, 90),
+  word('O2', 650, 68, 98, 25),
+  word('Isolation', 720, 68, 98, 70),
+  word('E-M-41', 10, 106),
+  word('Mona', 120, 106),
+  word('Ali', 180, 106),
+  word('63/F', 270, 106),
+  word('CAP', 360, 106),
+  word('Ceftriaxone', 500, 106),
+  word('NC', 650, 106),
+  word('Droplet', 720, 106),
+  word('E-M-42', 10, 142),
+  word('Hassan', 120, 142),
+  word('45/M', 270, 142),
+  word('NSTEMI', 360, 142),
+  word('Heparin', 500, 142),
+  word('RA', 650, 142),
+], 860, 260);
+
+assert.equal(titledSheet.strategy, 'table-grid', 'expected titled sheets to still resolve as table-grid');
+assert.equal(titledSheet.patients.length, 2, 'expected two patients from a titled ward sheet');
+assert.equal(titledSheet.patients[0].o2, 'NASAL_CANNULA');
+assert.equal(titledSheet.patients[0].iso, 'DROPLET');
+assert.equal(titledSheet.patients[1].o2, 'NONE');
+
 console.log('OCR verification passed');
