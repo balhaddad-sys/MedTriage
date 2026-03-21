@@ -181,17 +181,15 @@ export default function NFCScanner({ onClose, onResult }) {
           </span>
         </div>
 
-        {/* Mode tabs */}
+        {/* Mode tabs — always show both */}
         <div style={styles.tabRow}>
-          {nfcInfo.supported && (
-            <button style={{
-              ...styles.tab,
-              background: mode === 'nfc' ? colors.blue + '22' : colors.bg2,
-              color: mode === 'nfc' ? colors.blue : colors.text3,
-            }} onClick={() => { setMode('nfc'); setNfcData(null); setError(null); setCardDetected(false); setManualId(''); }}>
-              NFC Tap
-            </button>
-          )}
+          <button style={{
+            ...styles.tab,
+            background: mode === 'nfc' ? colors.blue + '22' : colors.bg2,
+            color: mode === 'nfc' ? colors.blue : colors.text3,
+          }} onClick={() => { setMode('nfc'); setNfcData(null); setError(null); setCardDetected(false); setManualId(''); }}>
+            NFC Tap
+          </button>
           <button style={{
             ...styles.tab,
             background: mode === 'manual' ? colors.blue + '22' : colors.bg2,
@@ -201,8 +199,43 @@ export default function NFCScanner({ onClose, onResult }) {
           </button>
         </div>
 
+        {/* ═══ NFC MODE: Not supported ═══ */}
+        {mode === 'nfc' && !nfcInfo.supported && !nfcData && (
+          <div style={styles.nfcArea}>
+            <div style={{ ...styles.nfcRing, borderColor: colors.amber }}>
+              <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={colors.amber} strokeWidth="1.5">
+                <path d="M6 8.32a7.43 7.43 0 010 7.36" />
+                <path d="M9.46 6.21a11.76 11.76 0 010 11.58" />
+                <path d="M12.91 4.1a16.1 16.1 0 010 15.8" />
+                <path d="M16.37 2a20.43 20.43 0 010 20" />
+              </svg>
+            </div>
+            <span style={styles.statusText}>NFC Not Available</span>
+            <span style={styles.subText}>
+              Web NFC requires Chrome 89+ on Android with NFC hardware
+            </span>
+            {nfcInfo.diagnostic && (
+              <div style={{
+                width: '100%', padding: '10px', borderRadius: '8px',
+                background: colors.bg2, border: `1px solid ${colors.border}`,
+                fontSize: '11px', color: colors.text3, fontFamily: fonts.mono,
+                wordBreak: 'break-all',
+              }}>
+                Reason: {nfcInfo.diagnostic}
+              </div>
+            )}
+            <span style={{ fontSize: '11px', color: colors.text3 }}>
+              Try: chrome://flags → search "Web NFC" → Enable → Relaunch
+            </span>
+            <button style={{ ...styles.btn, background: colors.blue, color: '#fff' }}
+              onClick={() => setMode('manual')}>
+              Use Manual Entry
+            </button>
+          </div>
+        )}
+
         {/* ═══ NFC MODE: Scanning ═══ */}
-        {mode === 'nfc' && !nfcData && !cardDetected && (
+        {mode === 'nfc' && nfcInfo.supported && !nfcData && !cardDetected && (
           <div style={styles.nfcArea}>
             <div style={{ ...styles.nfcRing, ...(scanning ? styles.nfcRingScanning : {}) }}>
               <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke={colors.blue} strokeWidth="1.5">

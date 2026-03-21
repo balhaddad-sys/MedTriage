@@ -42,11 +42,28 @@ export function getNfcPlatformInfo() {
   const backend = getNfcBackend();
   switch (backend) {
     case 'capacitor':
-      return { supported: true, backend, label: 'Native NFC', hint: 'Hold Civil ID card near device', canReadCard: true };
+      return { supported: true, backend, label: 'Native NFC', hint: 'Hold Civil ID card near device', canReadCard: true, diagnostic: '' };
     case 'webnfc':
-      return { supported: true, backend, label: 'NFC Detect', hint: 'Tap Civil ID card on back of phone', canReadCard: false };
-    default:
-      return { supported: false, backend, label: 'Manual Entry', hint: 'Enter 12-digit Civil ID number', canReadCard: false };
+      return { supported: true, backend, label: 'NFC Detect', hint: 'Tap Civil ID card on back of phone', canReadCard: false, diagnostic: '' };
+    default: {
+      // Build diagnostic info for troubleshooting
+      const diag = [];
+      if (typeof window === 'undefined') diag.push('No window object');
+      else {
+        if (!('NDEFReader' in window)) diag.push('NDEFReader API not found');
+        if (!window.isSecureContext) diag.push('Not HTTPS (secure context required)');
+        const ua = navigator.userAgent || '';
+        if (!/Android/i.test(ua)) diag.push('Not Android');
+        if (!/Chrome\/\d/i.test(ua)) diag.push('Not Chrome');
+        const chromeMatch = ua.match(/Chrome\/(\d+)/);
+        if (chromeMatch && parseInt(chromeMatch[1]) < 89) diag.push(`Chrome ${chromeMatch[1]} (need 89+)`);
+      }
+      return {
+        supported: false, backend, label: 'Manual Entry',
+        hint: 'Enter 12-digit Civil ID number', canReadCard: false,
+        diagnostic: diag.join(', ') || 'Unknown reason',
+      };
+    }
   }
 }
 
