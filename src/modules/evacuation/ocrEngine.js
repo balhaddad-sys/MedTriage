@@ -1362,6 +1362,7 @@ const EntityRecognizer = {
 
     // Multi-word with capitals
     if (/^[A-Z][a-z]+\s+(?:Al[- ])?[A-Z][a-z]+/.test(t)) conf = 0.85;
+    if (/^[A-Z][a-z]+(?:\s+[a-z]{2,})+$/.test(t)) conf = Math.max(conf, 0.72);
 
     // Penalize if it matches a medical term
     const medMatch = MedicalVocabulary.correctTerm(t, 0);
@@ -1850,10 +1851,18 @@ function splitDetections(detections) {
   const result = [];
   for (const det of detections) {
     const fullText = `${det.text || ''}`.trim();
+    const simpleTokens = fullText.split(/\s+/).filter(Boolean);
+    const preservePhraseCell = (
+      simpleTokens.length >= 2 &&
+      simpleTokens.length <= 4 &&
+      !/\d/.test(fullText) &&
+      !/[\\/|,;]+/.test(fullText)
+    );
     if (
       isHeaderLike(fullText) ||
       EntityRecognizer.scoreWard(fullText).confidence >= 0.72 ||
-      EntityRecognizer.scoreSheetStatus(fullText).confidence >= 0.76
+      EntityRecognizer.scoreSheetStatus(fullText).confidence >= 0.76 ||
+      preservePhraseCell
     ) {
       result.push(det);
       continue;
@@ -1940,12 +1949,19 @@ function shouldMerge(a, b) {
   if (a.age != null && b.age != null && Math.abs(a.age - b.age) > 8) return false;
 
   if (a.fullName && b.fullName) {
-    const dist = ocrDistance(normalizeNameForMerge(a.fullName), normalizeNameForMerge(b.fullName));
-    if (dist < 3) return true;
+    const normalizedA = normalizeNameForMerge(a.fullName);
+    const normalizedB = normalizeNameForMerge(b.fullName);
+    const dist = ocrDistance(normalizedA, normalizedB);
+    const minNameLength = Math.min(normalizedA.length, normalizedB.length);
+    const multiWordNames = /\s/.test(a.fullName) && /\s/.test(b.fullName);
+    const shortSingleTokenPair = !multiWordNames && minNameLength < 8;
+    const strictDistance = shortSingleTokenPair ? 1 : 2;
+    if (dist <= strictDistance) return true;
 
     const agesCompatible = a.age == null || b.age == null || Math.abs(a.age - b.age) <= 2;
     const gendersCompatible = !a.gender || !b.gender || a.gender === b.gender;
-    if (agesCompatible && gendersCompatible && dist <= 4) return true;
+    const relaxedDistance = shortSingleTokenPair ? 2 : 4;
+    if (agesCompatible && gendersCompatible && dist <= relaxedDistance && !shortSingleTokenPair) return true;
   }
   return false;
 }
@@ -2721,6 +2737,13 @@ const LayoutHypothesisEngine = {
         }
 
         const existing = merged[index];
+        if (
+          bestIsStructuredSheet &&
+          patientHasStrongIdentity(existing) &&
+          !patientAddsMissingDetail(existing, patient)
+        ) {
+          continue;
+        }
         if (bestIsStructuredSheet && lessStructuredHypothesis && patientHasStrongIdentity(existing)) {
           continue;
         }

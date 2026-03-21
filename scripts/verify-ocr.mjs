@@ -243,4 +243,78 @@ assert.equal(titledSheet.patients[0].o2, 'NASAL_CANNULA');
 assert.equal(titledSheet.patients[0].iso, 'DROPLET');
 assert.equal(titledSheet.patients[1].o2, 'NONE');
 
+// Test 10: Spreadsheet-style ward lists should preserve ward bands, repeated headers, doctors, and statuses
+const spreadsheetWardSheet = analyzeOcrWords([
+  word('Male list (active)', 40, 10, 98, 180),
+  word('Room / Ward', 20, 52, 98, 95),
+  word('Patient name', 170, 52, 98, 110),
+  word('Diagnosis', 410, 52, 98, 90),
+  word('Assigned Doctor', 650, 52, 98, 135),
+  word('Status', 860, 52, 98, 60),
+  word('Ward 20', 470, 84, 97, 80),
+  word('1-17', 50, 120),
+  word('Nawaf', 200, 120),
+  word('Chest infection', 420, 120, 92, 140),
+  word('Bader', 700, 120),
+  word('16-4', 50, 156),
+  word('Hassan', 200, 156),
+  word('Hypernatremia/AKI/DVT/CAP', 360, 156, 92, 220),
+  word('Noura', 700, 156),
+  word('Jamal', 210, 192),
+  word('Lvf exacerbation', 420, 192, 92, 160),
+  word('New', 870, 192, 92, 40),
+  word('Ward 19', 470, 228, 97, 80),
+  word('Bader', 200, 264),
+  word('Chest infection and UTI', 360, 264, 92, 200),
+  word('New', 870, 264, 92, 40),
+  word('Ali hussain', 180, 300, 92, 110),
+  word('?CVA', 430, 300, 92, 60),
+  word('New', 870, 300, 92, 40),
+  word('Ahmad alessa', 170, 336, 92, 130),
+  word('CVA left MCA occlusion', 380, 336, 92, 200),
+  word('ICU discharge', 840, 336, 92, 120),
+  word('(Chronic list)', 30, 400, 98, 160),
+  word('Patient name', 180, 438, 98, 110),
+  word('Diagnosis', 430, 438, 98, 90),
+  word('Assigned Doctor', 650, 438, 98, 135),
+  word('Status', 860, 438, 98, 60),
+  word('Ward 19', 35, 474, 98, 80),
+  word('1', 80, 510),
+  word('Abdullah', 190, 510),
+  word('Urosepsis, hyperNa', 390, 510, 92, 180),
+  word('Bader', 700, 510),
+  word('Chronic', 850, 510, 92, 70),
+], 1000, 620);
+
+assert.equal(spreadsheetWardSheet.strategy, 'table-grid', 'expected spreadsheet-style ward sheets to prefer table-grid');
+assert.equal(spreadsheetWardSheet.patients.length, 7, 'expected seven patients from the spreadsheet-style ward sheet');
+assert.ok(!spreadsheetWardSheet.patients.some(patient => /patient name|assigned doctor|male list|chronic list/i.test(patient.fullName || '')), 'expected titles and repeated headers to be ignored');
+
+const nawaf = spreadsheetWardSheet.patients.find(patient => /Nawaf/i.test(patient.fullName || ''));
+assert.ok(nawaf, 'expected Nawaf row to be parsed');
+assert.equal(nawaf.bed, '1-17');
+assert.equal(nawaf.ward, 'Ward 20');
+assert.equal(nawaf.assignedDoctor, 'Bader');
+assert.match(nawaf.dx || '', /Chest infection/i);
+
+const hassan = spreadsheetWardSheet.patients.find(patient => /Hassan/i.test(patient.fullName || ''));
+assert.ok(hassan, 'expected Hassan row to be parsed');
+assert.equal(hassan.bed, '16-4');
+assert.equal(hassan.ward, 'Ward 20');
+assert.equal(hassan.assignedDoctor, 'Noura');
+assert.match(hassan.dx || '', /Hypernatremia/i);
+
+const jamal = spreadsheetWardSheet.patients.find(patient => /Jamal/i.test(patient.fullName || ''));
+assert.ok(jamal, 'expected Jamal row to be parsed');
+assert.equal(jamal.ward, 'Ward 20');
+assert.equal(jamal.sheetStatus, 'NEW');
+assert.match(jamal.dx || '', /Lvf exacerbation/i);
+
+const chronicAbdullah = spreadsheetWardSheet.patients.find(patient => /Abdullah/i.test(patient.fullName || '') && patient.sheetStatus === 'CHRONIC');
+assert.ok(chronicAbdullah, 'expected chronic Abdullah row to be parsed');
+assert.equal(chronicAbdullah.bed, '1');
+assert.equal(chronicAbdullah.ward, 'Ward 19');
+assert.equal(chronicAbdullah.assignedDoctor, 'Bader');
+assert.match(chronicAbdullah.dx || '', /Urosepsis/i);
+
 console.log('OCR verification passed');
