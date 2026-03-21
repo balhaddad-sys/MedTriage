@@ -2358,70 +2358,86 @@ async function createScriptService(detBuffer, modelBuffer, dictionary, isSeconda
 
 let contextOcrRuntime = null;
 let contextOcrInitPromise = null;
+let arabicInitPromise = null;
+let detBufferCached = null;
 
+// Fast init — only loads Latin (det 2.4MB + rec 7.5MB). Arabic loads lazily.
 async function initContextOCR(onProgress) {
   if (contextOcrRuntime) return contextOcrRuntime;
   if (contextOcrInitPromise) return contextOcrInitPromise;
 
   contextOcrInitPromise = (async () => {
-    onProgress?.('Loading OCR models...');
+    onProgress?.('Loading OCR engine...');
 
-    // Use all available cores for faster OCR in emergencies
     ort.env.wasm.numThreads = Math.min(navigator.hardwareConcurrency || 1, 4);
     ort.env.wasm.simd = true;
     ort.env.wasm.wasmPaths = '/';
 
-    const [
-      detBuffer,
-      latinBuffer,
-      latinDictRaw,
-      arabicBuffer,
-      arabicDictRaw,
-    ] = await Promise.all([
+    // Only fetch detection + Latin — skips 9MB Arabic download on startup
+    const [detBuffer, latinBuffer, latinDictRaw] = await Promise.all([
       fetchModelWithCache(MODEL_URLS.detection, onProgress),
       fetchModelWithCache({
-        key: MODEL_URLS.latin.key,
-        url: MODEL_URLS.latin.url,
+        key: MODEL_URLS.latin.key, url: MODEL_URLS.latin.url,
         fallbackUrl: MODEL_URLS.latin.fallbackUrl,
       }, onProgress),
       fetchModelWithCache({
-        key: MODEL_URLS.latin.dictKey,
-        url: MODEL_URLS.latin.dictUrl,
+        key: MODEL_URLS.latin.dictKey, url: MODEL_URLS.latin.dictUrl,
         fallbackUrl: MODEL_URLS.latin.dictFallbackUrl,
-      }, onProgress),
-      fetchModelWithCache({
-        key: MODEL_URLS.arabic.key,
-        url: MODEL_URLS.arabic.url,
-        fallbackUrl: MODEL_URLS.arabic.fallbackUrl,
-      }, onProgress),
-      fetchModelWithCache({
-        key: MODEL_URLS.arabic.dictKey,
-        url: MODEL_URLS.arabic.dictUrl,
-        fallbackUrl: MODEL_URLS.arabic.dictFallbackUrl,
       }, onProgress),
     ]);
 
-    onProgress?.('Initializing OCR engine...');
+    detBufferCached = detBuffer;
+
+    onProgress?.('Starting OCR engine...');
     try {
       contextOcrRuntime = {
         latin: await createScriptService(detBuffer, latinBuffer, parseDictionary(latinDictRaw), false),
-        arabic: await createScriptService(detBuffer, arabicBuffer, parseDictionary(arabicDictRaw), true),
+        arabic: null, // loaded on demand
       };
     } catch (err) {
-      // Reset so next attempt can retry
       contextOcrRuntime = null;
       contextOcrInitPromise = null;
-      throw new Error(`OCR engine init failed: ${err.message}. Try clearing browser data and reloading.`);
+      throw new Error(`OCR engine init failed: ${err.message}. Clear browser data and reload.`);
     }
 
     return contextOcrRuntime;
   })().catch(err => {
-    // Reset promise so retries are possible
     contextOcrInitPromise = null;
     throw err;
   });
 
   return contextOcrInitPromise;
+}
+
+// Lazy Arabic init — only called when shouldRunArabicAugment() returns true
+async function ensureArabicOCR(onProgress) {
+  if (contextOcrRuntime?.arabic) return contextOcrRuntime.arabic;
+  if (arabicInitPromise) return arabicInitPromise;
+
+  arabicInitPromise = (async () => {
+    onProgress?.('Loading Arabic OCR...');
+    const [arabicBuffer, arabicDictRaw] = await Promise.all([
+      fetchModelWithCache({
+        key: MODEL_URLS.arabic.key, url: MODEL_URLS.arabic.url,
+        fallbackUrl: MODEL_URLS.arabic.fallbackUrl,
+      }, onProgress),
+      fetchModelWithCache({
+        key: MODEL_URLS.arabic.dictKey, url: MODEL_URLS.arabic.dictUrl,
+        fallbackUrl: MODEL_URLS.arabic.dictFallbackUrl,
+      }, onProgress),
+    ]);
+
+    const detBuffer = detBufferCached || await fetchModelWithCache(MODEL_URLS.detection, onProgress);
+    const arabic = await createScriptService(detBuffer, arabicBuffer, parseDictionary(arabicDictRaw), true);
+    if (contextOcrRuntime) contextOcrRuntime.arabic = arabic;
+    return arabic;
+  })().catch(err => {
+    arabicInitPromise = null;
+    console.warn('[OCR] Arabic init failed:', err.message);
+    return null;
+  });
+
+  return arabicInitPromise;
 }
 
 function recognitionDomainScore(result, script) {
@@ -2732,15 +2748,18 @@ export async function processPatientListImage(imageSource, onProgress) {
     });
 
     if (shouldRunArabicAugment(candidate)) {
-      onProgress?.(`Running Arabic rescue pass (${variant.label})...`);
-      const arabicResults = await runtime.arabic.recognize(input);
-      const fusedResults = fuseRecognitionResults(latinResults, arabicResults);
-      const fusedCandidate = buildPassCandidate(fusedResults, variant.canvas, variant.id, {
-        backend: 'paddle-dual',
-        scripts: ['latin', 'arabic'],
-      });
-      if (fusedCandidate.qualityScore >= candidate.qualityScore) {
-        candidate = fusedCandidate;
+      const arabic = await ensureArabicOCR(onProgress);
+      if (arabic) {
+        onProgress?.(`Running Arabic rescue pass (${variant.label})...`);
+        const arabicResults = await arabic.recognize(input);
+        const fusedResults = fuseRecognitionResults(latinResults, arabicResults);
+        const fusedCandidate = buildPassCandidate(fusedResults, variant.canvas, variant.id, {
+          backend: 'paddle-dual',
+          scripts: ['latin', 'arabic'],
+        });
+        if (fusedCandidate.qualityScore >= candidate.qualityScore) {
+          candidate = fusedCandidate;
+        }
       }
     }
     candidates.push(candidate);
@@ -2765,14 +2784,17 @@ export async function processPatientListImage(imageSource, onProgress) {
       });
 
       if (shouldRunArabicAugment(candidate)) {
-        const arabicResults = await runtime.arabic.recognize(input);
-        const fusedResults = fuseRecognitionResults(latinResults, arabicResults);
-        const fusedCandidate = buildPassCandidate(fusedResults, variant.canvas, variant.id, {
-          backend: 'paddle-dual',
-          scripts: ['latin', 'arabic'],
-        });
-        if (fusedCandidate.qualityScore >= candidate.qualityScore) {
-          candidate = fusedCandidate;
+        const arabic = await ensureArabicOCR(onProgress);
+        if (arabic) {
+          const arabicResults = await arabic.recognize(input);
+          const fusedResults = fuseRecognitionResults(latinResults, arabicResults);
+          const fusedCandidate = buildPassCandidate(fusedResults, variant.canvas, variant.id, {
+            backend: 'paddle-dual',
+            scripts: ['latin', 'arabic'],
+          });
+          if (fusedCandidate.qualityScore >= candidate.qualityScore) {
+            candidate = fusedCandidate;
+          }
         }
       }
 
