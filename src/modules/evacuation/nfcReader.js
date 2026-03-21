@@ -314,6 +314,10 @@ async function scanCapacitorNfc(onResult, onError, onReading, mrzData) {
             parsed.nationality = getNationalityLabel(mrzParsed.nationality) || parsed.nationality;
             parsed.nationalityCode = mrzParsed.nationality;
             parsed.documentNumber = mrzParsed.documentNumber;
+            // Kuwait Civil ID document number IS the Civil ID
+            if (mrzParsed.documentNumber && !parsed.civilId) {
+              parsed.civilId = mrzParsed.documentNumber;
+            }
             parsed.dateOfBirth = mrzParsed.dateOfBirth;
             parsed.dateOfExpiry = mrzParsed.dateOfExpiry;
             parsed.issuingState = mrzParsed.issuingState;
@@ -327,6 +331,7 @@ async function scanCapacitorNfc(onResult, onError, onReading, mrzData) {
       if (icaoData) {
         parsed.icaoDetected = true;
         parsed.icaoNeedsBAC = icaoData.needsBAC || false;
+        parsed.bacAuthenticated = icaoData.bacAuthenticated || false;
         parsed.icaoGroups = icaoData.availableGroups || [];
         if (icaoData.additionalDetails?.fullNameNative) {
           parsed.fullNameArabic = icaoData.additionalDetails.fullNameNative;
