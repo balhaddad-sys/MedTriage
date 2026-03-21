@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "generatedAt": "2026-03-21T00:00:00.000Z",
+  "materials": [
+    {
+      "id": "paddleocr-datasets",
+      "category": "official-docs",
+      "url": "https://www.paddleocr.ai/main/en/datasets/ocr_datasets.html",
+      "purpose": "dataset formats and PaddleOCR training conventions"
+    },
+    {
+      "id": "paddleocr-recognition-training",
+      "category": "official-docs",
+      "url": "https://www.paddleocr.ai/v2.10.0/en/ppocr/model_train/recognition.html",
+      "purpose": "recognition model training and fine-tuning"
+    },
+    {
+      "id": "ppocrlabel",
+      "category": "official-tool",
+      "url": "https://github.com/PFCCLab/PPOCRLabel",
+      "purpose": "annotation and export into Paddle-friendly training labels"
+    },
+    {
+      "id": "synthtiger",
+      "category": "official-tool",
+      "url": "https://github.com/clovaai/synthtiger",
+      "purpose": "synthetic OCR data generation for difficult text crops"
+    },
+    {
+      "id": "doctr-custom-training",
+      "category": "official-docs",
+      "url": "https://mindee.github.io/doctr/latest/using_doctr/custom_models_training.html",
+      "purpose": "alternative OCR training framework in PyTorch"
+    },
+    {
+      "id": "trocr",
+      "category": "official-paper",
+      "url": "https://www.microsoft.com/en-us/research/publication/trocr-transformer-based-optical-character-recognition-with-pre-trained-models/",
+      "purpose": "transformer recognizer baseline and fine-tuning reference"
+    },
+    {
+      "id": "parseq",
+      "category": "official-repo",
+      "url": "https://github.com/baudm/parseq",
+      "purpose": "strong recognizer baseline for comparison"
+    }
+  ]
+}

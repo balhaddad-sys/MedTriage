@@ -1,0 +1,15 @@
+# Generated OCR workspace artifacts
+/generated/*
+!/generated/.gitkeep
+/prepared/*
+!/prepared/.gitkeep
+/checkpoints/*
+!/checkpoints/.gitkeep
+/vendor/*
+!/vendor/.gitkeep
+
+# Local datasets
+/raw/medtriage_manual/*
+!/raw/medtriage_manual/.gitkeep
+/raw/medtriage_synthetic/*
+!/raw/medtriage_synthetic/.gitkeep

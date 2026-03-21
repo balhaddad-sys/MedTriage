@@ -1,0 +1,80 @@
+{
+  "version": 1,
+  "generatedAt": "2026-03-21T00:00:00.000Z",
+  "datasets": [
+    {
+      "id": "medtriage-manual",
+      "category": "first-party",
+      "status": "empty",
+      "path": "training/ocr/raw/medtriage_manual",
+      "tasks": ["recognition", "detection", "layout"],
+      "languages": ["english", "arabic", "mixed"],
+      "notes": "De-identified MedTriage captures and corrected OCR crops"
+    },
+    {
+      "id": "medtriage-synthetic",
+      "category": "synthetic",
+      "status": "generated-locally",
+      "path": "training/ocr/raw/medtriage_synthetic",
+      "tasks": ["recognition"],
+      "languages": ["english", "arabic", "mixed"],
+      "notes": "Synthetic crops created from MedTriage vocabulary and hospital row patterns"
+    },
+    {
+      "id": "funsd",
+      "category": "public",
+      "status": "manual-download",
+      "url": "https://guillaumejaume.github.io/FUNSD/",
+      "tasks": ["layout", "kie"],
+      "languages": ["english"]
+    },
+    {
+      "id": "xfund",
+      "category": "public",
+      "status": "manual-download",
+      "url": "https://www.microsoft.com/en-us/research/publication/xfund-a-benchmark-dataset-for-multilingual-visually-rich-form-understanding/",
+      "tasks": ["layout", "kie"],
+      "languages": ["multilingual"]
+    },
+    {
+      "id": "cord",
+      "category": "public",
+      "status": "manual-download",
+      "url": "https://github.com/clovaai/cord",
+      "tasks": ["layout", "kie", "recognition"],
+      "languages": ["english", "korean"]
+    },
+    {
+      "id": "sroie",
+      "category": "public",
+      "status": "manual-download",
+      "url": "https://github.com/zzzDavid/ICDAR-2019-SROIE",
+      "tasks": ["layout", "kie", "recognition"],
+      "languages": ["english"]
+    },
+    {
+      "id": "arabic-documents-ocr-dataset",
+      "category": "public",
+      "status": "manual-download",
+      "url": "https://humansintheloop.org/resources/datasets/arabic-documents-ocr-dataset/",
+      "tasks": ["recognition", "detection"],
+      "languages": ["arabic"]
+    },
+    {
+      "id": "hicma",
+      "category": "public",
+      "status": "manual-download",
+      "url": "https://hicma.net/dataset.html",
+      "tasks": ["recognition"],
+      "languages": ["arabic"]
+    },
+    {
+      "id": "iam-handwriting",
+      "category": "public",
+      "status": "manual-download",
+      "url": "https://fki.tic.heia-fr.ch/databases/download-the-iam-handwriting-database",
+      "tasks": ["recognition"],
+      "languages": ["english"]
+    }
+  ]
+}
