@@ -431,13 +431,57 @@ export async function attemptICAORead(nfcPlugin, mrzData, onProgress, options) {
   const reader = new ICAOReader(transceive);
 
   try {
-    // Step 1: Select MRTD applet — must be fast
+    // Step 1: Probe for known smart card applets
+    onProgress?.('Probing card applets...');
+
+    // Try multiple AIDs — Kuwait Civil ID may not use standard ICAO AID
+    const AIDS_TO_TRY = [
+      { name: 'ICAO MRTD', aid: [0xA0, 0x00, 0x00, 0x02, 0x47, 0x10, 0x01] },
+      { name: 'Kuwait PACI', aid: [0xA0, 0x00, 0x00, 0x00, 0x77, 0x01, 0x08, 0x00, 0x07, 0x00, 0x00, 0xFE, 0x00, 0x00, 0x01, 0x00] },
+      { name: 'PIV', aid: [0xA0, 0x00, 0x00, 0x03, 0x08, 0x00, 0x00, 0x10, 0x00, 0x01, 0x00] },
+      { name: 'GP ISD', aid: [0xA0, 0x00, 0x00, 0x01, 0x51, 0x00, 0x00] },
+      { name: 'PKI', aid: [0xA0, 0x00, 0x00, 0x00, 0x63, 0x50, 0x4B, 0x43, 0x53, 0x2D, 0x31, 0x35] },
+      { name: 'eID', aid: [0xE8, 0x28, 0xBD, 0x08, 0x0F] },
+      { name: 'Master File', aid: [0x3F, 0x00] },
+    ];
+
+    let selectedApp = null;
+    const probeResults = [];
+    for (const { name, aid } of AIDS_TO_TRY) {
+      try {
+        const cmd = [0x00, 0xA4, 0x04, 0x00, aid.length, ...aid];
+        const resp = await transceive(cmd);
+        const sw = resp.length >= 2 ? ((resp[resp.length - 2] << 8) | resp[resp.length - 1]) : 0;
+        const ok = sw === 0x9000 || (sw >> 8) === 0x61; // 9000=OK, 61xx=OK with data
+        console.log(`[ICAO] Probe ${name}: SW=${sw.toString(16)}, ok=${ok}, resp=${resp.length}bytes`);
+        probeResults.push({ name, sw: sw.toString(16), ok, dataLen: resp.length - 2 });
+        if (ok) { selectedApp = name; break; }
+      } catch (e) {
+        console.log(`[ICAO] Probe ${name}: error=${e.message}`);
+        probeResults.push({ name, error: e.message });
+      }
+    }
+
+    console.log('[ICAO] Probe results:', JSON.stringify(probeResults));
+
+    // Also try reading the ATR historical bytes by selecting MF
+    if (!selectedApp) {
+      try {
+        const mfCmd = [0x00, 0xA4, 0x00, 0x00, 0x02, 0x3F, 0x00];
+        const mfResp = await transceive(mfCmd);
+        const sw = mfResp.length >= 2 ? ((mfResp[mfResp.length - 2] << 8) | mfResp[mfResp.length - 1]) : 0;
+        console.log(`[ICAO] Select MF: SW=${sw.toString(16)}, data=${JSON.stringify(mfResp)}`);
+        if (sw === 0x9000 || (sw >> 8) === 0x61) selectedApp = 'Master File';
+      } catch {}
+    }
+
     onProgress?.('Selecting MRTD applet...');
     console.log('[ICAO] Selecting MRTD applet...');
     const selectResult = await reader.selectMRTD();
     console.log('[ICAO] Select result:', JSON.stringify({ ok: selectResult.ok, sw: selectResult.sw?.toString(16) }));
     if (!selectResult.ok) {
-      return null; // Not an ICAO-compliant document
+      // Return probe results so we know what's on the card
+      return { icaoDetected: false, needsBAC: false, bacAuthenticated: false, availableGroups: [], mrz: null, photo: null, additionalDetails: null, probeResults, selectedApp };
     }
 
     const result = {

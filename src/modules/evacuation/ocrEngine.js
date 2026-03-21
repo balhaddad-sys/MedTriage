@@ -2273,8 +2273,22 @@ async function setCachedModel(key, data) {
 
 async function fetchModelWithCache(asset, onProgress) {
   const { key, url, fallbackUrl } = asset;
+  const isDict = key.endsWith('dict');
+
+  // Check IndexedDB cache first
   const cached = await getCachedModel(key);
-  if (cached) return cached;
+  if (cached) {
+    // Validate cached data isn't corrupt (HTML error page, empty, etc.)
+    if (isDict && typeof cached === 'string' && cached.length > 10 && !cached.startsWith('<!')) return cached;
+    if (!isDict && cached instanceof ArrayBuffer && cached.byteLength > 1000) return cached;
+    // Corrupt cache entry — clear it and re-fetch
+    console.warn(`[OCR] Corrupt cache for ${key}, re-fetching...`);
+    try {
+      const db = await openModelCache();
+      const tx = db.transaction('models', 'readwrite');
+      tx.objectStore('models').delete(key);
+    } catch {}
+  }
 
   const sources = [
     { label: 'packaged', url },
@@ -2286,18 +2300,34 @@ async function fetchModelWithCache(asset, onProgress) {
     try {
       onProgress?.(`Loading ${key} (${source.label})...`);
       const response = await fetch(source.url);
-      if (!response.ok) throw new Error(`Failed to fetch ${key} from ${source.label}: ${response.status}`);
+      if (!response.ok) throw new Error(`HTTP ${response.status} from ${source.label}`);
 
-      const data = key.endsWith('dict') ? await response.text() : await response.arrayBuffer();
+      // Validate content-type isn't HTML (error page served instead of binary)
+      const ct = response.headers.get('content-type') || '';
+      if (!isDict && ct.includes('text/html')) {
+        throw new Error(`Got HTML instead of binary for ${key} from ${source.label}`);
+      }
+
+      const data = isDict ? await response.text() : await response.arrayBuffer();
+
+      // Validate the fetched data
+      if (isDict && (typeof data !== 'string' || data.length < 10 || data.startsWith('<!'))) {
+        throw new Error(`Invalid dict data for ${key} from ${source.label}`);
+      }
+      if (!isDict && (!(data instanceof ArrayBuffer) || data.byteLength < 1000)) {
+        throw new Error(`Invalid model data for ${key} from ${source.label} (${data?.byteLength || 0} bytes)`);
+      }
+
       await setCachedModel(key, data);
       return data;
     } catch (error) {
+      console.warn(`[OCR] Failed to load ${key} from ${source.label}:`, error.message);
       lastError = error;
     }
   }
 
   throw new Error(
-    `Unable to load OCR asset "${key}". ${lastError?.message || 'No asset source succeeded.'}`
+    `Unable to load OCR asset "${key}". ${lastError?.message || 'No source succeeded.'}`
   );
 }
 
@@ -2372,13 +2402,24 @@ async function initContextOCR(onProgress) {
     ]);
 
     onProgress?.('Initializing OCR engine...');
-    contextOcrRuntime = {
-      latin: await createScriptService(detBuffer, latinBuffer, parseDictionary(latinDictRaw), false),
-      arabic: await createScriptService(detBuffer, arabicBuffer, parseDictionary(arabicDictRaw), true),
-    };
+    try {
+      contextOcrRuntime = {
+        latin: await createScriptService(detBuffer, latinBuffer, parseDictionary(latinDictRaw), false),
+        arabic: await createScriptService(detBuffer, arabicBuffer, parseDictionary(arabicDictRaw), true),
+      };
+    } catch (err) {
+      // Reset so next attempt can retry
+      contextOcrRuntime = null;
+      contextOcrInitPromise = null;
+      throw new Error(`OCR engine init failed: ${err.message}. Try clearing browser data and reloading.`);
+    }
 
     return contextOcrRuntime;
-  })();
+  })().catch(err => {
+    // Reset promise so retries are possible
+    contextOcrInitPromise = null;
+    throw err;
+  });
 
   return contextOcrInitPromise;
 }
