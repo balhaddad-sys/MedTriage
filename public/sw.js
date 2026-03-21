@@ -1,12 +1,21 @@
-const CACHE_NAME = 'medevac-v3.8.0';
+const CACHE_NAME = 'medevac-v3.9.0';
 const BACKUP_CACHE = 'medevac-patient-backups';
 const OCR_MODEL_CACHE = 'medevac-ocr-models';
 
+// Core app shell — small files that MUST succeed for the app to load
 const PRECACHE_URLS = [
   '/',
   '/index.html',
   '/app.js',
   '/manifest.json',
+  '/icons/icon.svg',
+  '/icons/icon-192.png',
+  '/icons/icon-512.png',
+];
+
+// Large assets cached lazily in background — NOT in addAll() which is all-or-nothing
+// If any single file in addAll() fails, the entire SW install fails (error code 7)
+const LAZY_CACHE_URLS = [
   '/ort.mjs',
   '/ort-wasm-simd-threaded.mjs',
   '/ort-wasm-simd-threaded.wasm',
@@ -17,15 +26,19 @@ const PRECACHE_URLS = [
   '/models/ocr/latin-dict.txt',
   '/models/ocr/arabic-rec.onnx',
   '/models/ocr/arabic-dict.txt',
-  '/icons/icon.svg',
-  '/icons/icon-192.png',
-  '/icons/icon-512.png',
 ];
 
-// Install: precache core assets
+// Install: precache small app shell only — large files cache on first use or background
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS))
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(PRECACHE_URLS)).then(() => {
+      // Background-cache large assets — failures are non-fatal
+      caches.open(CACHE_NAME).then((cache) => {
+        for (const url of LAZY_CACHE_URLS) {
+          fetch(url).then((resp) => { if (resp.ok) cache.put(url, resp); }).catch(() => {});
+        }
+      });
+    })
   );
   self.skipWaiting();
 });
