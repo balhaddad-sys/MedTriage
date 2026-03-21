@@ -67,6 +67,9 @@ export default function MRZScannerCamera({ onResult, onCancel }) {
   const [mrzLines, setMrzLines] = useState(null);
   const [scanning, setScanning] = useState(false);
   const [frameCount, setFrameCount] = useState(0);
+  const [lastOcrText, setLastOcrText] = useState(''); // debug: raw OCR output
+  const [bestScores, setBestScores] = useState([0, 0, 0]);
+  const bestRef = useRef({ lines: null, score: 0, parsed: null }); // best across frames
   const [showManual, setShowManual] = useState(false);
   const [manualText, setManualText] = useState('');
   const [manualError, setManualError] = useState('');
@@ -113,19 +116,37 @@ export default function MRZScannerCamera({ onResult, onCancel }) {
       setFrameCount(c => c + 1);
 
       const result = await recognizeMRZ(frame);
+      if (result.fullText) setLastOcrText(result.fullText);
+      if (result.scores) setBestScores(prev =>
+        result.scores.map((s, i) => Math.max(s, prev[i] || 0))
+      );
+
       if (result.found && result.lines.length === 3) {
         const parsed = parseTD1(result.lines[0], result.lines[1], result.lines[2]);
+        const totalScore = (result.scores || [0,0,0]).reduce((a,b) => a+b, 0);
+
+        // Track best result across frames
+        if (parsed && parsed.documentNumber && totalScore > bestRef.current.score) {
+          bestRef.current = { lines: result.lines, score: totalScore, parsed };
+        }
+
+        // Accept if check digits pass or score is high enough
         if (parsed && parsed.documentNumber) {
-          setMrzLines(result.lines);
-          setFound(parsed);
-          setScanning(false);
-          streamRef.current?.getTracks().forEach(t => t.stop());
-          if (scanRef.current) clearInterval(scanRef.current);
+          const isValid = parsed.errors.length === 0;
+          const isGoodEnough = totalScore >= 1.8 || isValid;
+          if (isGoodEnough) {
+            const best = bestRef.current.score > totalScore ? bestRef.current : { lines: result.lines, parsed };
+            setMrzLines(best.lines);
+            setFound(best.parsed);
+            setScanning(false);
+            streamRef.current?.getTracks().forEach(t => t.stop());
+            if (scanRef.current) clearInterval(scanRef.current);
+          }
         }
       }
     };
 
-    scanRef.current = setInterval(scan, 600);
+    scanRef.current = setInterval(scan, 500);
     return () => { if (scanRef.current) clearInterval(scanRef.current); };
   }, [scanning, found]);
 
@@ -257,6 +278,49 @@ export default function MRZScannerCamera({ onResult, onCancel }) {
       <span style={styles.statusText}>
         {error || `${status}${frameCount > 0 ? ` (scanning... ${frameCount})` : ''}`}
       </span>
+      {frameCount > 0 && (
+        <div style={{ width: '100%', display: 'flex', gap: '4px', justifyContent: 'center' }}>
+          {['Line 1', 'Line 2', 'Line 3'].map((label, i) => (
+            <span key={i} style={{
+              fontSize: '10px', fontWeight: 700, fontFamily: fonts.mono,
+              padding: '2px 6px', borderRadius: '4px',
+              background: bestScores[i] >= 0.6 ? colors.green + '22' : colors.bg2,
+              color: bestScores[i] >= 0.6 ? colors.green : colors.text3,
+            }}>
+              {label}: {Math.round(bestScores[i] * 100)}%
+            </span>
+          ))}
+        </div>
+      )}
+      {lastOcrText && frameCount > 3 && (
+        <div style={{
+          width: '100%', padding: '6px 8px', borderRadius: '6px',
+          background: colors.bg2, border: `1px solid ${colors.border}`,
+          fontSize: '9px', fontFamily: fonts.mono, color: colors.text3,
+          maxHeight: '60px', overflow: 'auto', whiteSpace: 'pre-wrap', wordBreak: 'break-all',
+        }}>
+          {lastOcrText.substring(0, 200)}
+        </div>
+      )}
+      {frameCount > 10 && bestScores[0] < 0.3 && (
+        <span style={{ fontSize: '11px', color: colors.amber, fontWeight: 600, textAlign: 'center' }}>
+          MRZ not detected — try moving camera closer, ensure back of card is visible
+        </span>
+      )}
+      {frameCount > 8 && bestRef.current.parsed && (
+        <button
+          style={{ ...styles.btn, background: colors.green + '22', color: colors.green, height: '38px', fontSize: '12px' }}
+          onClick={() => {
+            const best = bestRef.current;
+            setMrzLines(best.lines);
+            setFound(best.parsed);
+            setScanning(false);
+            streamRef.current?.getTracks().forEach(t => t.stop());
+            if (scanRef.current) clearInterval(scanRef.current);
+          }}>
+          Use Best Reading (score: {Math.round(bestRef.current.score / 3 * 100)}%)
+        </button>
+      )}
       <button
         style={{ ...styles.btn, background: colors.amber + '22', color: colors.amber }}
         onClick={() => { setScanning(false); streamRef.current?.getTracks().forEach(t => t.stop()); setShowManual(true); }}>
