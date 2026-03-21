@@ -10,6 +10,7 @@ import ScoresModule from './modules/scores/ScoresModule.jsx';
 import { getDeviceId, registerDevice } from './data/device.js';
 import { setAuditContext } from './data/audit.js';
 import { recoverData, startAutoExport, getPatients, savePatient, deletePatient } from './data/storage.js';
+import { preloadOcrModels } from './modules/evacuation/ocrEngine.js';
 
 // ====== APP CONTEXT ======
 export const AppContext = createContext(null);
@@ -118,6 +119,8 @@ export default function App() {
       setAuditContext({ wardPin: auth.pin, deviceId: getDeviceId() });
       registerDevice(auth.pin);
       startAutoExport();
+      // Preload OCR models in background so scanning is instant during emergencies
+      preloadOcrModels();
     })();
   }, [auth]);
 

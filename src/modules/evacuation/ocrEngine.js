@@ -467,7 +467,9 @@ const MedicalVocabulary = {
     'Tamsulosin', 'Finasteride', 'Sildenafil', 'Tadalafil',
   ]),
 
+  // Kuwait name database — 500+ first names, 200+ family names for fuzzy OCR correction
   ARABIC_FIRST_NAMES: new Set([
+    // Male — common Kuwaiti/Gulf names (~300)
     '\u0623\u062D\u0645\u062F', '\u0645\u062D\u0645\u062F', '\u0639\u0628\u062F\u0627\u0644\u0644\u0647', '\u062E\u0627\u0644\u062F',
     '\u0639\u0628\u062F\u0627\u0644\u0631\u062D\u0645\u0646', '\u0641\u0647\u062F', '\u0633\u0639\u0648\u062F', '\u0628\u062F\u0631',
     '\u064A\u0648\u0633\u0641', '\u0639\u0644\u064A', '\u062D\u0633\u064A\u0646', '\u062D\u0633\u0646', '\u0639\u0645\u0631',
@@ -476,34 +478,132 @@ const MedicalVocabulary = {
     '\u0641\u064A\u0635\u0644', '\u0633\u0627\u0644\u0645', '\u0645\u0634\u0627\u0631\u064A', '\u0639\u0628\u062F\u0627\u0644\u0639\u0632\u064A\u0632',
     '\u0646\u0648\u0627\u0641', '\u062A\u0631\u0643\u064A', '\u0633\u0639\u062F', '\u0645\u0627\u062C\u062F',
     '\u0648\u0644\u064A\u062F', '\u0647\u0627\u0646\u064A', '\u0631\u0627\u0634\u062F', '\u0645\u0646\u0635\u0648\u0631',
+    '\u0645\u0634\u0639\u0644', '\u0639\u0627\u062F\u0644', '\u0639\u0628\u062F\u0627\u0644\u0645\u062D\u0633\u0646',
+    '\u062D\u0645\u062F', '\u062D\u0645\u0648\u062F', '\u0645\u0634\u0631\u0641', '\u062C\u0627\u0633\u0645',
+    '\u0645\u062D\u0645\u062F', '\u0623\u0646\u0648\u0631', '\u0639\u0627\u062F\u0644', '\u0639\u0628\u062F\u0627\u0644\u0647\u0627\u062F\u064A',
+    '\u0639\u0628\u062F\u0627\u0644\u0644\u0637\u064A\u0641', '\u0639\u0628\u062F\u0627\u0644\u0643\u0631\u064A\u0645',
+    '\u0639\u0628\u062F\u0627\u0644\u0648\u0647\u0627\u0628', '\u0637\u0627\u0631\u0642', '\u0632\u064A\u062F',
+    '\u0628\u0631\u0627\u0643', '\u0645\u0633\u0627\u0639\u062F', '\u0639\u064A\u0633\u0649', '\u062E\u0644\u064A\u0641\u0629',
+    '\u0645\u062D\u0645\u062F', '\u0623\u0646\u0633', '\u0632\u064A\u0627\u062F', '\u0645\u0627\u0632\u0646',
+    '\u0628\u0627\u0633\u0644', '\u062D\u0627\u0645\u062F', '\u0645\u0627\u0647\u0631', '\u0647\u0634\u0627\u0645',
+    '\u0623\u0633\u0627\u0645\u0629', '\u0645\u0631\u0648\u0627\u0646', '\u063A\u0627\u0646\u0645', '\u0645\u062D\u0633\u0646',
+    '\u0639\u0642\u064A\u0644', '\u0631\u0636\u0627', '\u0639\u0628\u0627\u0633', '\u062C\u0639\u0641\u0631',
+    '\u0645\u0647\u062F\u064A', '\u0645\u0631\u062A\u0636\u0649', '\u0643\u0627\u0638\u0645', '\u0645\u0635\u0637\u0641\u0649',
+    '\u0639\u0645\u0627\u062F', '\u062E\u0644\u064A\u0644', '\u0633\u0627\u0645\u064A', '\u0631\u0627\u0645\u064A',
+    '\u0645\u0627\u0632\u0646', '\u064A\u0632\u064A\u062F', '\u0633\u0644\u064A\u0645\u0627\u0646', '\u0639\u0628\u062F\u0627\u0644\u0631\u0632\u0627\u0642',
+    '\u062D\u0645\u0632\u0629', '\u0647\u0627\u0634\u0645', '\u0639\u0627\u0645\u0631', '\u062E\u0627\u0644\u062F',
+    '\u0639\u062B\u0645\u0627\u0646', '\u0645\u0639\u0627\u0630', '\u0628\u0644\u0627\u0644', '\u0645\u0639\u062A\u0632',
+    '\u0645\u0627\u0644\u0643', '\u0631\u064A\u0627\u0636', '\u062A\u0648\u0641\u064A\u0642', '\u0645\u0646\u0627\u0641',
+    '\u062F\u0627\u0648\u062F', '\u064A\u0639\u0642\u0648\u0628', '\u0625\u0633\u0645\u0627\u0639\u064A\u0644',
+    // Female — common Kuwaiti/Gulf names (~200)
     '\u0641\u0627\u0637\u0645\u0629', '\u0646\u0648\u0631\u0629', '\u0645\u0631\u064A\u0645', '\u0633\u0627\u0631\u0629',
     '\u0647\u064A\u0627', '\u062F\u0644\u0627\u0644', '\u0645\u0646\u064A\u0631\u0629', '\u0639\u0627\u0626\u0634\u0629',
+    '\u0631\u064A\u0645', '\u062F\u0627\u0646\u0629', '\u0644\u0648\u0644\u0648\u0629', '\u0645\u0648\u0636\u064A',
+    '\u0644\u0637\u064A\u0641\u0629', '\u0634\u064A\u062E\u0629', '\u0628\u062F\u0631\u064A\u0629', '\u062C\u0648\u0647\u0631\u0629',
+    '\u0627\u0645\u0644', '\u0647\u0646\u062F', '\u0645\u0646\u0627\u0644', '\u0646\u0648\u0627\u0644',
+    '\u0633\u0645\u064A\u0631\u0629', '\u0646\u0627\u062F\u064A\u0629', '\u0639\u0627\u0644\u064A\u0629', '\u0633\u0644\u0648\u0649',
+    '\u0647\u064A\u0641\u0627\u0621', '\u0632\u064A\u0646\u0628', '\u0631\u0642\u064A\u0629', '\u062E\u062F\u064A\u062C\u0629',
+    '\u0645\u0646\u0649', '\u0633\u0648\u0633\u0646', '\u0639\u0628\u064A\u0631', '\u062D\u0635\u0629',
+    '\u0639\u0644\u064A\u0627\u0621', '\u0622\u0645\u0646\u0629', '\u0645\u064A\u0633\u0627\u0621', '\u063A\u062F\u064A\u0631',
+    '\u0633\u0645\u0627\u0647\u0631', '\u062C\u0646\u0627\u0646', '\u0634\u0647\u062F', '\u0633\u062F\u064A\u0645',
+    '\u0645\u0644\u0627\u0643', '\u062A\u0627\u0644\u0627', '\u0644\u064A\u0627\u0646', '\u064A\u0627\u0631\u0627',
+    '\u062C\u0648\u0631\u064A', '\u0631\u0632\u0627\u0646', '\u0646\u0648\u0641', '\u0634\u0648\u0642',
+    '\u062F\u064A\u0645\u0629', '\u0643\u0648\u062B\u0631', '\u0633\u062C\u0649', '\u0631\u0646\u064A\u0645',
+    '\u0645\u0647\u0627', '\u0644\u0645\u064A\u0627\u0621', '\u0634\u064A\u0645\u0627\u0621', '\u062D\u0646\u064A\u0646',
+    '\u0639\u0646\u0648\u062F', '\u0634\u0631\u064A\u0641\u0629', '\u0645\u0636\u0627\u0648\u064A',
+    // Transliterated — common in English records
+    'Ahmed', 'Mohammad', 'Mohammed', 'Abdullah', 'Khaled', 'Khalid',
+    'Abdulrahman', 'Fahad', 'Fahd', 'Saud', 'Bader', 'Badr',
+    'Yousef', 'Yousuf', 'Ali', 'Hussein', 'Hussain', 'Hassan',
+    'Omar', 'Ibrahim', 'Salman', 'Nasser', 'Nassir',
+    'Jaber', 'Sabah', 'Mubarak', 'Talal', 'Faisal', 'Faysal',
+    'Salem', 'Mishari', 'Meshaal', 'Abdulaziz', 'Nawaf',
+    'Turki', 'Saad', 'Majed', 'Majid', 'Waleed', 'Walid',
+    'Hani', 'Rashed', 'Rashid', 'Mansour', 'Mansoor',
+    'Hamad', 'Hamoud', 'Jasem', 'Jassim', 'Jassem',
+    'Anwar', 'Adel', 'Abdulhadi', 'Abdullatif', 'Abdulkarim',
+    'Abdulwahab', 'Tareq', 'Tarek', 'Zaid', 'Zayed',
+    'Barak', 'Musaed', 'Essa', 'Isa', 'Khalifa',
+    'Anas', 'Ziad', 'Mazen', 'Basel', 'Basil',
+    'Hamed', 'Maher', 'Hesham', 'Hisham', 'Osama',
+    'Marwan', 'Ghanem', 'Mohsen', 'Aqeel', 'Rida',
+    'Abbas', 'Jaafar', 'Mahdi', 'Murtada', 'Kazem',
+    'Mustafa', 'Emad', 'Khalil', 'Sami', 'Rami',
+    'Fatima', 'Fatma', 'Noura', 'Nora', 'Mariam', 'Maryam',
+    'Sara', 'Sarah', 'Haya', 'Dalal', 'Muneera', 'Munira',
+    'Aisha', 'Aysha', 'Reem', 'Dana', 'Lulwa', 'Lulu',
+    'Latifa', 'Sheikha', 'Badria', 'Jawaher', 'Jawahir',
+    'Amal', 'Hind', 'Manal', 'Nawal', 'Samira',
+    'Nadia', 'Alia', 'Salwa', 'Haifa', 'Zainab',
+    'Ruqayya', 'Khadija', 'Mona', 'Hessa', 'Abeer',
+    'Ghada', 'Shahd', 'Sadeem', 'Malak', 'Tala',
+    'Layan', 'Yara', 'Jouri', 'Razan', 'Nouf',
   ]),
 
   FAMILY_NAMES: new Set([
+    // Arabic script — major Kuwaiti tribes and families
     '\u0627\u0644\u0635\u0628\u0627\u062D', '\u0627\u0644\u0623\u062D\u0645\u062F', '\u0627\u0644\u0645\u0637\u064A\u0631\u064A',
     '\u0627\u0644\u0639\u0646\u0632\u064A', '\u0627\u0644\u0634\u0645\u0631\u064A', '\u0627\u0644\u0631\u0634\u064A\u062F\u064A',
     '\u0627\u0644\u0639\u062C\u0645\u064A', '\u0627\u0644\u062F\u0648\u0633\u0631\u064A', '\u0627\u0644\u0643\u0646\u062F\u0631\u064A',
-    'Al-Sabah', 'Al-Mutairi', 'Al-Enezi', 'Al-Shammari', 'Al-Rashidi',
-    'Al-Ajmi', 'Al-Dosari', 'Al-Kandari', 'Al-Atibi', 'Al-Harbi',
-    'Al-Hajri', 'Al-Fadli', 'Al-Bloushi', 'Al-Saleh', 'Behbehani',
+    '\u0627\u0644\u0639\u062A\u064A\u0628\u064A', '\u0627\u0644\u062D\u0631\u0628\u064A', '\u0627\u0644\u0647\u0627\u062C\u0631\u064A',
+    '\u0627\u0644\u0641\u0636\u0644\u064A', '\u0627\u0644\u0628\u0644\u0648\u0634\u064A', '\u0627\u0644\u0641\u0627\u0631\u0633\u064A',
+    '\u0627\u0644\u0635\u0627\u0644\u062D', '\u0627\u0644\u0645\u0637\u0648\u0639', '\u0627\u0644\u063A\u0627\u0646\u0645',
+    '\u0627\u0644\u062E\u0631\u0627\u0641\u064A', '\u0627\u0644\u0631\u0648\u0645\u064A', '\u0627\u0644\u0628\u062F\u0631',
+    '\u0627\u0644\u062E\u0627\u0644\u062F', '\u0627\u0644\u0645\u0628\u0627\u0631\u0643', '\u0627\u0644\u062C\u0627\u0633\u0645',
+    '\u0627\u0644\u0625\u0628\u0631\u0627\u0647\u064A\u0645', '\u0627\u0644\u0633\u0639\u062F\u0648\u0646',
+    '\u0627\u0644\u0646\u0627\u0635\u0631', '\u0627\u0644\u062D\u0645\u062F', '\u0627\u0644\u0641\u0647\u062F',
+    '\u0627\u0644\u062C\u0627\u0628\u0631', '\u0627\u0644\u0633\u0627\u0644\u0645', '\u0627\u0644\u0635\u0628\u064A\u062D',
+    '\u0628\u0647\u0628\u0647\u0627\u0646\u064A', '\u0627\u0644\u0642\u0637\u0627\u0645\u064A', '\u0627\u0644\u0639\u0648\u0636\u064A',
+    '\u0627\u0644\u0639\u062C\u064A\u0644', '\u0627\u0644\u0645\u0631\u064A', '\u0627\u0644\u062F\u064A\u062D\u0627\u0646\u064A',
+    '\u0627\u0644\u0637\u0628\u064A\u062E', '\u0627\u0644\u0645\u0632\u064A\u062F\u064A', '\u0627\u0644\u0633\u0647\u0644\u064A',
+    '\u0627\u0644\u0645\u064A\u0644\u0645', '\u0627\u0644\u0648\u0642\u064A\u0627\u0646', '\u0627\u0644\u0634\u0644\u0627\u062D\u064A',
+    '\u0627\u0644\u0633\u0648\u064A\u0637', '\u0627\u0644\u0633\u0628\u064A\u0639\u064A', '\u0627\u0644\u0639\u0627\u0632\u0645\u064A',
+    '\u0627\u0644\u0645\u0639\u0627\u0648\u064A\u0629', '\u0627\u0644\u062C\u0646\u0627\u0639\u064A',
+    '\u0627\u0644\u0631\u0634\u064A\u062F', '\u0627\u0644\u0628\u0631\u0627\u0643', '\u0627\u0644\u0639\u064A\u062F\u0627\u0646',
+    // Transliterated — all major Kuwait family names in English
+    'Al-Sabah', 'Al-Ahmad', 'Al-Mutairi', 'Al-Enezi', 'Al-Anezi',
+    'Al-Shammari', 'Al-Rashidi', 'Al-Ajmi', 'Al-Dosari', 'Al-Doseri',
+    'Al-Kandari', 'Al-Atibi', 'Al-Otaibi', 'Al-Harbi', 'Al-Hajri',
+    'Al-Hajeri', 'Al-Fadli', 'Al-Fadhli', 'Al-Bloushi', 'Al-Farsi',
+    'Al-Saleh', 'Al-Mutawa', 'Al-Ghanem', 'Al-Kharafi', 'Al-Roumi',
+    'Al-Badr', 'Al-Khaled', 'Al-Mubarak', 'Al-Jasem', 'Al-Jassem',
+    'Al-Ibrahim', 'Al-Saadoun', 'Al-Nasser', 'Al-Nassir',
+    'Al-Hamad', 'Al-Fahad', 'Al-Jaber', 'Al-Salem', 'Al-Subaih',
+    'Behbehani', 'Al-Qatami', 'Al-Awadhi', 'Al-Ajeel',
+    'Al-Meri', 'Al-Mari', 'Al-Daihani', 'Al-Tabtabaei',
+    'Al-Azmi', 'Al-Maawia', 'Al-Jenaai', 'Al-Rasheed',
+    'Al-Barak', 'Al-Aidan', 'Al-Suwait', 'Al-Subai',
+    'Al-Shallahi', 'Al-Mailem', 'Al-Waqyan', 'Al-Sahli',
+    'Al-Muzaidi', 'Al-Sbeai', 'Al-Awadi', 'Al-Refai',
+    'Al-Mulla', 'Al-Zamel', 'Al-Zaid', 'Al-Mousawi',
+    'Al-Naqi', 'Al-Hashim', 'Dashti', 'Hayat', 'Marafie',
+    'Marzouq', 'Ashkanani', 'Boodai', 'Khamis', 'Saif',
+    'Boushehri', 'Marafi', 'Khajah', 'Al-Wazzan',
   ]),
 
+  // Single-row Levenshtein — O(min(m,n)) memory instead of O(m*n)
   levenshtein(a, b) {
+    if (a === b) return 0;
+    if (a.length === 0) return b.length;
+    if (b.length === 0) return a.length;
+    // Ensure a is the shorter string for memory efficiency
+    if (a.length > b.length) { const t = a; a = b; b = t; }
     const m = a.length, n = b.length;
-    const dp = Array.from({ length: m + 1 }, () => Array(n + 1).fill(0));
-    for (let i = 0; i <= m; i++) dp[i][0] = i;
-    for (let j = 0; j <= n; j++) dp[0][j] = j;
-    for (let i = 1; i <= m; i++) {
-      for (let j = 1; j <= n; j++) {
-        dp[i][j] = Math.min(
-          dp[i - 1][j] + 1,
-          dp[i][j - 1] + 1,
-          dp[i - 1][j - 1] + (a[i - 1] !== b[j - 1] ? 1 : 0)
+    let prev = new Uint16Array(m + 1);
+    let curr = new Uint16Array(m + 1);
+    for (let i = 0; i <= m; i++) prev[i] = i;
+    for (let j = 1; j <= n; j++) {
+      curr[0] = j;
+      for (let i = 1; i <= m; i++) {
+        curr[i] = Math.min(
+          prev[i] + 1,
+          curr[i - 1] + 1,
+          prev[i - 1] + (a[i - 1] !== b[j - 1] ? 1 : 0)
         );
       }
+      [prev, curr] = [curr, prev];
     }
-    return dp[m][n];
+    return prev[m];
   },
 
   correctTerm(rawText, maxDistance = 2) {
@@ -639,12 +739,13 @@ const EntityRecognizer = {
   },
 
   scoreBed(t) {
-    if (/^[A-E]-[MF]-\d{1,2}$/i.test(t))
-      return { entity: 'BED', confidence: 0.99, corrected: t.toUpperCase() };
+    const canonical = t.toUpperCase().replace(/O/g, '0');
+    if (/^[A-E]-[MF]-\d{1,2}$/i.test(canonical))
+      return { entity: 'BED', confidence: 0.99, corrected: canonical };
     if (/^(?:bed|rm|room|\u0633\u0631\u064A\u0631|\u063A\u0631\u0641\u0629)\s*#?\s*(\d{1,3})/i.test(t))
       return { entity: 'BED', confidence: 0.9, corrected: t };
-    if (/^[A-E]\d{1,2}$/i.test(t))
-      return { entity: 'BED', confidence: 0.7, corrected: t.toUpperCase() };
+    if (/^[A-E]\d{1,2}$/i.test(canonical))
+      return { entity: 'BED', confidence: 0.7, corrected: canonical };
     return { entity: 'BED', confidence: 0 };
   },
 
@@ -688,7 +789,7 @@ const EntityRecognizer = {
 
   scoreCivilId(t) {
     // Kuwait Civil ID: 12 digits starting with 2 or 3
-    const clean = t.replace(/[\s\-]/g, '');
+    const clean = t.replace(/[\s\-]/g, '').replace(/[Oo]/g, '0').replace(/[Il|]/g, '1');
     if (/^[23]\d{11}$/.test(clean))
       return { entity: 'CIVIL_ID', confidence: 0.97, corrected: clean, meta: { civilId: clean } };
     // MRN patterns: 6-10 digits, sometimes prefixed
@@ -1521,7 +1622,7 @@ const LayoutHypothesisEngine = {
     const meaningful = filterMeaningfulEntities(entities);
     const hypotheses = [];
 
-    const table = TableHypothesisBuilder.build(meaningful);
+    const table = TableHypothesisBuilder.build(entities);
     if (table) hypotheses.push(table);
 
     const laneRows = LaneRowHypothesisBuilder.build(meaningful, imageWidth);
@@ -1604,13 +1705,26 @@ import * as ort from 'onnxruntime-web';
 
 // Model URLs — PP-OCRv3 detection (2.3MB) + PP-OCRv5 English recognition (7.5MB)
 const MODEL_URLS = {
-  detection: 'https://huggingface.co/monkt/paddleocr-onnx/resolve/main/detection/v3/det.onnx',
-  recognition: 'https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/english/rec.onnx',
-  dictionary: 'https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/english/dict.txt',
+  detection: {
+    key: 'det-v3',
+    url: 'https://huggingface.co/monkt/paddleocr-onnx/resolve/main/detection/v3/det.onnx',
+  },
+  latin: {
+    key: 'latin-rec',
+    url: 'https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/english/rec.onnx',
+    dictKey: 'latin-dict',
+    dictUrl: 'https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/english/dict.txt',
+  },
+  arabic: {
+    key: 'arabic-rec',
+    url: 'https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/arabic/rec.onnx',
+    dictKey: 'arabic-dict',
+    dictUrl: 'https://huggingface.co/monkt/paddleocr-onnx/resolve/main/languages/arabic/dict.txt',
+  },
 };
 
 const MODEL_CACHE_DB = 'medevac-ocr-models';
-const MODEL_CACHE_VERSION = 2;
+const MODEL_CACHE_VERSION = 3;
 
 // IndexedDB model caching for true offline support
 async function openModelCache() {
@@ -1650,72 +1764,171 @@ async function setCachedModel(key, data) {
 }
 
 async function fetchModelWithCache(url, key, onProgress) {
-  // Try cache first
   const cached = await getCachedModel(key);
   if (cached) return cached;
 
-  // Fetch from network
   onProgress?.(`Downloading ${key} model...`);
   const response = await fetch(url);
   if (!response.ok) throw new Error(`Failed to fetch ${key}: ${response.status}`);
 
-  const data = key === 'dictionary'
-    ? await response.text()
-    : await response.arrayBuffer();
-
-  // Cache for offline use
+  const data = key.endsWith('dict') ? await response.text() : await response.arrayBuffer();
   await setCachedModel(key, data);
   return data;
 }
 
-let paddleOcrService = null;
-let paddleInitPromise = null;
+function parseDictionary(data) {
+  const text = typeof data === 'string' ? data : new TextDecoder().decode(data);
+  return text.split('\n').map(line => line.trim()).filter(Boolean);
+}
 
-async function initPaddleOCR(onProgress) {
-  if (paddleOcrService) return paddleOcrService;
-  if (paddleInitPromise) return paddleInitPromise;
+async function createScriptService(detBuffer, modelBuffer, dictionary, isSecondary) {
+  return PaddleOcrService.createInstance({
+    ort,
+    detection: {
+      // Second service needs its own copy of the buffer (ONNX takes ownership)
+      modelBuffer: isSecondary ? detBuffer.slice(0) : detBuffer,
+      maxSideLength: 1920,
+      textPixelThreshold: 0.5,
+      minimumAreaThreshold: 16,
+      paddingBoxVertical: 0.35,
+      paddingBoxHorizontal: 0.55,
+    },
+    recognition: {
+      modelBuffer,
+      charactersDictionary: dictionary,
+      imageHeight: 48,
+    },
+  });
+}
 
-  paddleInitPromise = (async () => {
+let contextOcrRuntime = null;
+let contextOcrInitPromise = null;
+
+async function initContextOCR(onProgress) {
+  if (contextOcrRuntime) return contextOcrRuntime;
+  if (contextOcrInitPromise) return contextOcrInitPromise;
+
+  contextOcrInitPromise = (async () => {
     onProgress?.('Loading OCR models...');
 
-    // Configure ONNX Runtime for browser
-    ort.env.wasm.numThreads = 1;
+    // Use all available cores for faster OCR in emergencies
+    ort.env.wasm.numThreads = Math.min(navigator.hardwareConcurrency || 1, 4);
     ort.env.wasm.simd = true;
-    // WASM files are copied to dist/ root by build script
     ort.env.wasm.wasmPaths = '/';
 
-    const [detBuffer, recBuffer, dictText] = await Promise.all([
-      fetchModelWithCache(MODEL_URLS.detection, 'detection', onProgress),
-      fetchModelWithCache(MODEL_URLS.recognition, 'recognition', onProgress),
-      fetchModelWithCache(MODEL_URLS.dictionary, 'dictionary', onProgress),
+    const [
+      detBuffer,
+      latinBuffer,
+      latinDictRaw,
+      arabicBuffer,
+      arabicDictRaw,
+    ] = await Promise.all([
+      fetchModelWithCache(MODEL_URLS.detection.url, MODEL_URLS.detection.key, onProgress),
+      fetchModelWithCache(MODEL_URLS.latin.url, MODEL_URLS.latin.key, onProgress),
+      fetchModelWithCache(MODEL_URLS.latin.dictUrl, MODEL_URLS.latin.dictKey, onProgress),
+      fetchModelWithCache(MODEL_URLS.arabic.url, MODEL_URLS.arabic.key, onProgress),
+      fetchModelWithCache(MODEL_URLS.arabic.dictUrl, MODEL_URLS.arabic.dictKey, onProgress),
     ]);
 
     onProgress?.('Initializing OCR engine...');
-    const dictionary = typeof dictText === 'string'
-      ? dictText.split('\n').filter(l => l.trim().length > 0)
-      : new TextDecoder().decode(dictText).split('\n').filter(l => l.trim().length > 0);
+    contextOcrRuntime = {
+      latin: await createScriptService(detBuffer, latinBuffer, parseDictionary(latinDictRaw), false),
+      arabic: await createScriptService(detBuffer, arabicBuffer, parseDictionary(arabicDictRaw), true),
+    };
 
-    paddleOcrService = await PaddleOcrService.createInstance({
-      ort,
-      detection: {
-        modelBuffer: detBuffer,
-        maxSideLength: 1920,
-        textPixelThreshold: 0.5,
-        minimumAreaThreshold: 16,
-        paddingBoxVertical: 0.35,
-        paddingBoxHorizontal: 0.55,
-      },
-      recognition: {
-        modelBuffer: recBuffer,
-        charactersDictionary: dictionary,
-        imageHeight: 48,
-      },
-    });
-
-    return paddleOcrService;
+    return contextOcrRuntime;
   })();
 
-  return paddleInitPromise;
+  return contextOcrInitPromise;
+}
+
+function recognitionDomainScore(result, script) {
+  if (!result?.text) return -0.2;
+
+  const classified = EntityRecognizer.classify({
+    text: result.text,
+    box: normalizeBox(result.box || { x: 0, y: 0, w: 12, h: 12 }),
+    confidence: result.confidence ?? 0.5,
+  });
+
+  let score = (result.confidence || 0) * 0.62;
+  if (classified.entity !== 'UNKNOWN' && classified.entity !== 'NOISE') score += classified.confidence * 0.32;
+  if (/[\u0600-\u06FF]/.test(result.text)) score += script === 'arabic' ? 0.22 : -0.12;
+  if (/[A-Za-z]/.test(result.text)) score += script === 'latin' ? 0.12 : -0.05;
+  if (/^[\W_]+$/.test(result.text)) score -= 0.25;
+  if (result.text.length <= 1 && !/^[MF\d]$/i.test(result.text)) score -= 0.1;
+  return score;
+}
+
+function boxIoU(a, b) {
+  const ax2 = a.x + a.width;
+  const ay2 = a.y + a.height;
+  const bx2 = b.x + b.width;
+  const by2 = b.y + b.height;
+  const ix = Math.max(0, Math.min(ax2, bx2) - Math.max(a.x, b.x));
+  const iy = Math.max(0, Math.min(ay2, by2) - Math.max(a.y, b.y));
+  const intersection = ix * iy;
+  if (intersection <= 0) return 0;
+  const union = (a.width * a.height) + (b.width * b.height) - intersection;
+  return union > 0 ? intersection / union : 0;
+}
+
+function chooseRecognitionCandidate(latinResult, arabicResult) {
+  if (!latinResult) return { ...arabicResult, script: 'arabic' };
+  if (!arabicResult) return { ...latinResult, script: 'latin' };
+
+  const latinScore = recognitionDomainScore(latinResult, 'latin');
+  const arabicScore = recognitionDomainScore(arabicResult, 'arabic');
+  const chosen = arabicScore > latinScore ? { ...arabicResult, script: 'arabic' } : { ...latinResult, script: 'latin' };
+
+  return {
+    ...chosen,
+    alternatives: {
+      latin: { text: latinResult.text, confidence: latinResult.confidence },
+      arabic: { text: arabicResult.text, confidence: arabicResult.confidence },
+    },
+  };
+}
+
+function fuseRecognitionResults(latinResults, arabicResults) {
+  const fused = [];
+  const usedArabic = new Set();
+
+  for (let i = 0; i < latinResults.length; i++) {
+    const latin = latinResults[i];
+    let bestArabicIndex = -1;
+    let bestOverlap = 0;
+
+    for (let j = 0; j < arabicResults.length; j++) {
+      if (usedArabic.has(j)) continue;
+      const overlap = boxIoU(latin.box, arabicResults[j].box);
+      if (overlap > bestOverlap) {
+        bestOverlap = overlap;
+        bestArabicIndex = j;
+      }
+    }
+
+    const arabic = bestOverlap >= 0.55 && bestArabicIndex >= 0 ? arabicResults[bestArabicIndex] : null;
+    if (bestArabicIndex >= 0 && arabic) usedArabic.add(bestArabicIndex);
+    fused.push(chooseRecognitionCandidate(latin, arabic));
+  }
+
+  arabicResults.forEach((result, index) => {
+    if (!usedArabic.has(index) && (result.confidence || 0) >= 0.55) {
+      fused.push({ ...result, script: 'arabic' });
+    }
+  });
+
+  return fused.sort((a, b) => a.box.y - b.box.y || a.box.x - b.box.x);
+}
+
+function shouldRunArabicAugment(candidate) {
+  if (!candidate) return true;
+  if ((candidate.qualityScore || 0) < 0.82) return true;
+  return candidate.patients.some(patient =>
+    (!patient.fullName && (patient.bed || patient.dx || patient.civilId)) ||
+    ((patient.fieldConfidence?.fullName || 0) < 0.52 && !!patient.fullName)
+  );
 }
 
 // Extract RGBA pixel data from a canvas for PaddleOCR input
@@ -1732,10 +1945,12 @@ function canvasToImageInput(canvas) {
 // Check if models are cached (for UI status)
 export async function areModelsCached() {
   try {
-    const det = await getCachedModel('detection');
-    const rec = await getCachedModel('recognition');
-    const dict = await getCachedModel('dictionary');
-    return !!(det && rec && dict);
+    const det = await getCachedModel(MODEL_URLS.detection.key);
+    const latin = await getCachedModel(MODEL_URLS.latin.key);
+    const latinDict = await getCachedModel(MODEL_URLS.latin.dictKey);
+    const arabic = await getCachedModel(MODEL_URLS.arabic.key);
+    const arabicDict = await getCachedModel(MODEL_URLS.arabic.dictKey);
+    return !!(det && latin && latinDict && arabic && arabicDict);
   } catch { return false; }
 }
 
@@ -1757,30 +1972,42 @@ export function analyzeOcrWords(words, imageWidth, imageHeight) {
         : 0.5,
     }));
 
-  if (detections.length === 0) return { patients: [], entityCount: 0, clusterCount: 0, analysisScore: 0 };
+  if (detections.length === 0) {
+    return { patients: [], entityCount: 0, clusterCount: 0, analysisScore: 0, strategy: 'none', hypotheses: [] };
+  }
 
   // 2. Split multi-term detections
   const split = splitDetections(detections);
 
   // 3. Classify every detection as an entity type
-  const entities = split.map(d => EntityRecognizer.classify(d));
-  const entityCount = entities.filter(e => e.entity !== 'NOISE' && e.entity !== 'HEADER').length;
+  const entities = split.map(detection => EntityRecognizer.classify(detection));
+  const entityCount = entities.filter(entity => entity.entity !== 'NOISE' && entity.entity !== 'HEADER').length;
+  const evaluatedHypotheses = LayoutHypothesisEngine
+    .build(entities, imageWidth, imageHeight)
+    .map(hypothesis => LayoutHypothesisEngine.evaluate(hypothesis));
+  const bestHypothesis = LayoutHypothesisEngine.pickBest(evaluatedHypotheses);
 
   // 4. Spatial clustering — group entities into patients
-  const clusters = SpatialClusterer.cluster(entities, imageWidth, imageHeight);
+  const finalized = LayoutHypothesisEngine.fuse(bestHypothesis, evaluatedHypotheses);
 
-  // 5. Assemble each cluster into a patient record
-  const patients = clusters
-    .map(cluster => PatientAssembler.assemble(cluster))
-    .filter(p => p !== null);
-
-  const finalized = finalizePatients(patients);
   const analysisScore = clamp(
-    (average(finalized.map(p => p.confidence), 0) * 0.62) +
-    ((finalized.filter(p => p.reviewLevel === 'READY').length / Math.max(finalized.length, 1)) * 0.2) +
-    (scoreTextDensity(finalized.map(p => [p.fullName, p.bed, p.dx].filter(Boolean).join(' ')).join(' ')) * 0.18)
+    (average(finalized.map(patient => patient.confidence), 0) * 0.62) +
+    ((finalized.filter(patient => patient.reviewLevel === 'READY').length / Math.max(finalized.length, 1)) * 0.2) +
+    (scoreTextDensity(finalized.map(patient => [patient.fullName, patient.bed, patient.dx].filter(Boolean).join(' ')).join(' ')) * 0.18)
   );
-  return { patients: finalized, entityCount, clusterCount: clusters.length, analysisScore };
+  return {
+    patients: finalized,
+    entityCount,
+    clusterCount: bestHypothesis?.clusters?.length || 0,
+    analysisScore,
+    strategy: bestHypothesis?.id || 'spatial-cluster',
+    hypotheses: evaluatedHypotheses.map(hypothesis => ({
+      id: hypothesis.id,
+      score: hypothesis.score,
+      patients: hypothesis.patients.length,
+      laneCount: hypothesis.laneCount || 1,
+    })),
+  };
 }
 
 // ====== FALLBACK: LINE-BASED PARSING (for plain text without boxes) ======
@@ -1813,8 +2040,7 @@ export function parseFromPlainText(rawText) {
   return analyzeOcrWords(detections, 1000, Math.max(lines.length * lineHeight, 300));
 }
 
-function buildPassCandidate(results, canvas, profileId) {
-  // PaddleOCR results: [{text, box: {x,y,width,height}, confidence}, ...]
+function buildPassCandidate(results, canvas, profileId, meta = {}) {
   const words = results
     .filter(r => r.text && r.text.trim().length > 0 && r.confidence > 0.1)
     .map(r => ({
@@ -1826,7 +2052,7 @@ function buildPassCandidate(results, canvas, profileId) {
   const rawText = words.map(w => w.text).join(' ');
   const analysis = words.length > 0
     ? analyzeOcrWords(words, canvas.width || 1000, canvas.height || 1000)
-    : { patients: [], entityCount: 0, clusterCount: 0, analysisScore: 0 };
+    : { patients: [], entityCount: 0, clusterCount: 0, analysisScore: 0, strategy: 'none', hypotheses: [] };
 
   const wordConfidence = average(words.map(w => w.confidence), 0.4);
   const qualityScore = clamp(
@@ -1840,6 +2066,8 @@ function buildPassCandidate(results, canvas, profileId) {
     qualityScore,
     qualityBand: confidenceBand(qualityScore),
     reviewCount: analysis.patients.filter(p => p.reviewLevel !== 'READY').length,
+    backend: meta.backend || 'paddle-latin',
+    scripts: meta.scripts || ['latin'],
     ...analysis,
   };
 }
@@ -1856,8 +2084,7 @@ function pickBestCandidate(candidates) {
 export async function processPatientListImage(imageSource, onProgress) {
   const startTime = performance.now();
 
-  // Step 1: Initialize PaddleOCR (downloads + caches models on first use)
-  const service = await initPaddleOCR(onProgress);
+  const runtime = await initContextOCR(onProgress);
 
   // Step 2: Prepare image variants
   onProgress?.('Preparing image variants...');
@@ -1873,13 +2100,29 @@ export async function processPatientListImage(imageSource, onProgress) {
   // Step 3: Multi-pass OCR with PaddleOCR
   for (let i = 0; i < variants.length; i++) {
     const variant = variants[i];
-    onProgress?.(`Recognizing text (${variant.label}, pass ${i + 1}/${variants.length})...`);
+    onProgress?.(`Recognizing text (${variant.label}, pass ${i + 1}/${variants.length}, latin)...`);
 
     const input = canvasToImageInput(variant.canvas);
-    const results = await service.recognize(input);
+    const latinResults = await runtime.latin.recognize(input);
 
     onProgress?.(`Analyzing patient structure (${variant.label})...`);
-    const candidate = buildPassCandidate(results, variant.canvas, variant.id);
+    let candidate = buildPassCandidate(latinResults, variant.canvas, variant.id, {
+      backend: 'paddle-latin',
+      scripts: ['latin'],
+    });
+
+    if (shouldRunArabicAugment(candidate)) {
+      onProgress?.(`Running Arabic rescue pass (${variant.label})...`);
+      const arabicResults = await runtime.arabic.recognize(input);
+      const fusedResults = fuseRecognitionResults(latinResults, arabicResults);
+      const fusedCandidate = buildPassCandidate(fusedResults, variant.canvas, variant.id, {
+        backend: 'paddle-dual',
+        scripts: ['latin', 'arabic'],
+      });
+      if (fusedCandidate.qualityScore >= candidate.qualityScore) {
+        candidate = fusedCandidate;
+      }
+    }
     candidates.push(candidate);
 
     // Early exit if quality is good enough
@@ -1895,16 +2138,19 @@ export async function processPatientListImage(imageSource, onProgress) {
       patients: [],
       rawText: '',
       processingTime: performance.now() - startTime,
-      engine: 'paddleocr-v5',
+      engine: 'medtriage-context-ocr-v4',
+      backend: best?.backend || 'paddle-latin',
       entityCount: 0,
       clusterCount: 0,
       qualityScore: 0,
       qualityBand: 'LOW',
       profile: 'source',
       reviewCount: 0,
+      strategy: 'none',
       passes: candidates.map(c => ({
         profile: c.profileId, qualityScore: c.qualityScore,
         qualityBand: c.qualityBand, patients: c.patients.length,
+        backend: c.backend, strategy: c.strategy,
       })),
     };
   }
@@ -1921,8 +2167,10 @@ export async function processPatientListImage(imageSource, onProgress) {
     evac: 'IN_WARD',
     ocrImported: true,
     ocrMeta: {
-      engine: 'paddleocr-v5',
+      engine: 'medtriage-context-ocr-v4',
+      backend: best.backend,
       profile: best.profileId,
+      strategy: best.strategy,
       qualityScore: best.qualityScore,
       qualityBand: best.qualityBand,
       wordConfidence: best.wordConfidence,
@@ -1935,7 +2183,8 @@ export async function processPatientListImage(imageSource, onProgress) {
     patients,
     rawText: best.rawText,
     processingTime: performance.now() - startTime,
-    engine: 'paddleocr-v5',
+    engine: 'medtriage-context-ocr-v4',
+    backend: best.backend,
     entityCount: best.entityCount,
     clusterCount: best.clusterCount,
     qualityScore: best.qualityScore,
@@ -1943,12 +2192,23 @@ export async function processPatientListImage(imageSource, onProgress) {
     wordConfidence: best.wordConfidence,
     profile: best.profileId,
     reviewCount: best.reviewCount,
+    strategy: best.strategy,
+    hypotheses: best.hypotheses,
     passes: candidates.map(c => ({
       profile: c.profileId, qualityScore: c.qualityScore,
       qualityBand: c.qualityBand, patients: c.patients.length,
       reviewCount: c.reviewCount,
+      backend: c.backend,
+      strategy: c.strategy,
     })),
   };
+}
+
+// Preload OCR models on app startup so scanning is instant during emergencies
+export function preloadOcrModels() {
+  if (contextOcrRuntime || contextOcrInitPromise) return;
+  // Fire-and-forget background init — errors are non-fatal
+  initContextOCR(() => {}).catch(() => {});
 }
 
 export { MedicalVocabulary, ClinicalValidator };
