@@ -115,28 +115,78 @@ export default function OCRScanner({ onClose, onImport }) {
     fileRef.current?.click();
   }, []);
 
-  // Demo mode — simulate OCR with realistic ward sheet data for testing
-  const handleDemo = useCallback(() => {
-    const demoPatients = [
-      { fullName: 'Ahmed Al-Mutairi', bed: 'E-M-03', age: 67, gender: 'M', dx: 'NSTEMI, DM2, HTN', meds: 'Aspirin, Ticagrelor, Enoxaparin, Metformin', triage: 'RED', mobility: 'STRETCHER', o2: 'NASAL_CANNULA', iso: 'NONE', code: 'FULL', allergies: 'NKDA', bloodType: 'A+', confidence: 0.95, reviewLevel: 'READY' },
-      { fullName: 'Fatima Al-Hajri', bed: 'E-F-07', age: 45, gender: 'F', dx: 'CAP, COPD', meds: 'Ceftriaxone, Azithromycin, Salbutamol', triage: 'YELLOW', mobility: 'WHEELCHAIR', o2: 'FACE_MASK', iso: 'DROPLET', code: 'FULL', allergies: 'Penicillin', bloodType: 'O+', confidence: 0.92, reviewLevel: 'READY' },
-      { fullName: 'Khaled Al-Enezi', bed: 'E-M-12', age: 78, gender: 'M', dx: 'CVA, AF, CKD3', meds: 'Apixaban, Amlodipine, Atorvastatin', triage: 'RED', mobility: 'STRETCHER', o2: 'NONE', iso: 'NONE', code: 'DNR', allergies: 'Sulfa', bloodType: 'B-', confidence: 0.88, reviewLevel: 'REVIEW', reviewReasons: ['Low name confidence'] },
-      { fullName: 'Sara Al-Dosari', bed: 'E-F-02', age: 32, gender: 'F', dx: 'DKA, T1DM', meds: 'Insulin Aspart, Insulin Glargine, KCl', triage: 'RED', mobility: 'AMBULATORY', o2: 'NONE', iso: 'NONE', code: 'FULL', allergies: 'NKDA', bloodType: 'AB+', confidence: 0.96, reviewLevel: 'READY' },
-      { fullName: 'Hamad Al-Shammari', bed: 'E-M-09', age: 55, gender: 'M', dx: 'UGIB, CLD', meds: 'Pantoprazole, Octreotide, Lactulose', triage: 'YELLOW', mobility: 'STRETCHER', o2: 'NONE', iso: 'NONE', code: 'FULL', allergies: 'NKDA', bloodType: 'O-', confidence: 0.91, reviewLevel: 'READY' },
-      { fullName: 'Noura Al-Kandari', bed: 'E-F-15', age: 63, gender: 'F', dx: 'ADHF, CKD4, DM2', meds: 'Furosemide, Carvedilol, Empagliflozin', triage: 'YELLOW', mobility: 'WHEELCHAIR', o2: 'BIPAP', iso: 'NONE', code: 'FULL', allergies: 'Codeine', bloodType: 'A-', confidence: 0.89, reviewLevel: 'REVIEW', reviewReasons: ['Medication confidence low'] },
-    ];
+  // Demo scenarios — simulate realistic ward sheet OCR for testing
+  const DEMO_SCENARIOS = [
+    {
+      name: 'Internal Medicine Ward (Mubarak Al-Kabeer)',
+      strategy: 'table-grid',
+      patients: [
+        { fullName: 'Ahmed Al-Mutairi', bed: 'E-M-03', age: 67, gender: 'M', dx: 'NSTEMI, DM2, HTN', meds: 'Aspirin, Ticagrelor, Enoxaparin, Metformin, Atorvastatin', triage: 'RED', mobility: 'STRETCHER', o2: 'NASAL_CANNULA', iso: 'NONE', code: 'FULL', allergies: 'NKDA', bloodType: 'A+', ward: 'Med-3', assignedDoctor: 'Dr. Nasser', confidence: 0.95, reviewLevel: 'READY' },
+        { fullName: 'Fatima Al-Hajri', bed: 'E-F-07', age: 45, gender: 'F', dx: 'CAP, AECOPD', meds: 'Ceftriaxone, Azithromycin, Salbutamol, Ipratropium, Prednisolone', triage: 'YELLOW', mobility: 'WHEELCHAIR', o2: 'FACE_MASK', iso: 'DROPLET', code: 'FULL', allergies: 'Penicillin', bloodType: 'O+', ward: 'Med-3', assignedDoctor: 'Dr. Hani', confidence: 0.92, reviewLevel: 'READY' },
+        { fullName: 'Khaled Al-Enezi', bed: 'E-M-12', age: 78, gender: 'M', dx: 'CVA (MCA), AF, CKD3B, HTN', meds: 'Apixaban, Amlodipine, Atorvastatin, Ramipril', triage: 'RED', mobility: 'STRETCHER', o2: 'NONE', iso: 'NONE', code: 'DNR', allergies: 'Sulfa', bloodType: 'B-', ward: 'Med-3', assignedDoctor: 'Dr. Nasser', confidence: 0.88, reviewLevel: 'REVIEW', reviewReasons: ['Low name confidence — verify Arabic spelling'] },
+        { fullName: 'Sara Al-Dosari', bed: 'E-F-02', age: 32, gender: 'F', dx: 'DKA, T1DM', meds: 'Insulin Aspart, Insulin Glargine, KCl, NS 0.9%', triage: 'RED', mobility: 'AMBULATORY', o2: 'NONE', iso: 'NONE', code: 'FULL', allergies: 'NKDA', bloodType: 'AB+', ward: 'Med-3', assignedDoctor: 'Dr. Hani', confidence: 0.96, reviewLevel: 'READY' },
+        { fullName: 'Hamad Al-Shammari', bed: 'E-M-09', age: 55, gender: 'M', dx: 'UGIB, CLD, Portal HTN', meds: 'Pantoprazole 80mg IV, Octreotide, Lactulose, Spironolactone', triage: 'YELLOW', mobility: 'STRETCHER', o2: 'NONE', iso: 'NONE', code: 'FULL', allergies: 'NKDA', bloodType: 'O-', ward: 'Med-3', confidence: 0.91, reviewLevel: 'READY' },
+        { fullName: 'Noura Al-Kandari', bed: 'E-F-15', age: 63, gender: 'F', dx: 'ADHF, CKD4, DM2, HTN', meds: 'Furosemide 40mg IV, Carvedilol, Empagliflozin, Spironolactone', triage: 'YELLOW', mobility: 'WHEELCHAIR', o2: 'BIPAP', iso: 'NONE', code: 'FULL', allergies: 'Codeine, NSAID', bloodType: 'A-', ward: 'Med-3', assignedDoctor: 'Dr. Nasser', confidence: 0.89, reviewLevel: 'REVIEW', reviewReasons: ['Medication OCR confidence low'] },
+        { fullName: 'Jaber Al-Ajmi', bed: 'E-M-18', age: 42, gender: 'M', dx: 'Acute Pancreatitis, DM2', meds: 'NS 0.9%, Paracetamol, Ondansetron, Pantoprazole, Insulin Glargine', triage: 'YELLOW', mobility: 'AMBULATORY', o2: 'NONE', iso: 'NONE', code: 'FULL', allergies: 'NKDA', bloodType: 'B+', ward: 'Med-3', confidence: 0.94, reviewLevel: 'READY' },
+        { fullName: 'Maryam Al-Rashidi', bed: 'E-F-11', age: 71, gender: 'F', dx: 'Sepsis (UTI source), AKI on CKD3, DM2', meds: 'Meropenem, NS 0.9%, Paracetamol, Insulin Aspart', triage: 'RED', mobility: 'STRETCHER', o2: 'NASAL_CANNULA', iso: 'CONTACT', code: 'FULL', allergies: 'Vancomycin', bloodType: 'O+', ward: 'Med-3', assignedDoctor: 'Dr. Hani', confidence: 0.93, reviewLevel: 'READY' },
+      ],
+    },
+    {
+      name: 'ICU Handover (SBAR format)',
+      strategy: 'row-bands',
+      patients: [
+        { fullName: 'Abdulrahman Al-Sabah', bed: 'ICU-1', age: 58, gender: 'M', dx: 'STEMI (LAD), cardiogenic shock, DM2', meds: 'Noradrenaline, Dobutamine, Heparin, Aspirin, Ticagrelor, Insulin', triage: 'RED', mobility: 'CRITICAL_TRANSPORT', o2: 'VENTILATOR', iso: 'NONE', code: 'FULL', allergies: 'NKDA', bloodType: 'A+', ward: 'ICU', assignedDoctor: 'Dr. Fahad', sheetStatus: 'Day 3 — pending cath lab', confidence: 0.97, reviewLevel: 'READY' },
+        { fullName: 'Hessa Al-Ghanim', bed: 'ICU-3', age: 44, gender: 'F', dx: 'ARDS (COVID pneumonia), AKI', meds: 'Dexamethasone, Remdesivir, CRRT, Propofol, Fentanyl, Noradrenaline', triage: 'RED', mobility: 'CRITICAL_TRANSPORT', o2: 'VENTILATOR', iso: 'AIRBORNE', code: 'FULL', allergies: 'Penicillin', bloodType: 'AB-', ward: 'ICU', assignedDoctor: 'Dr. Fahad', sheetStatus: 'Day 7 — weaning trial today', confidence: 0.94, reviewLevel: 'READY' },
+        { fullName: 'Turki Al-Otaibi', bed: 'ICU-5', age: 29, gender: 'M', dx: 'Polytrauma (RTA), TBI, bilateral pneumothorax', meds: 'Fentanyl, Midazolam, Meropenem, Enoxaparin, TPN', triage: 'RED', mobility: 'CRITICAL_TRANSPORT', o2: 'VENTILATOR', iso: 'NONE', code: 'FULL', allergies: 'NKDA', bloodType: 'O-', ward: 'ICU', assignedDoctor: 'Dr. Salem', sheetStatus: 'Day 2 — neurosurg consult pending', confidence: 0.91, reviewLevel: 'READY' },
+        { fullName: 'Munira Al-Fadli', bed: 'ICU-7', age: 66, gender: 'F', dx: 'Status epilepticus, CKD5 on HD, HTN', meds: 'Levetiracetam, Midazolam, Lacosamide, Amlodipine', triage: 'RED', mobility: 'CRITICAL_TRANSPORT', o2: 'NON_REBREATHER', iso: 'NONE', code: 'DNR', allergies: 'Phenytoin', bloodType: 'B+', ward: 'ICU', assignedDoctor: 'Dr. Salem', sheetStatus: 'Day 1 — EEG pending', confidence: 0.90, reviewLevel: 'REVIEW', reviewReasons: ['Verify code status with family'] },
+      ],
+    },
+    {
+      name: 'Emergency MCI Triage (mass casualty)',
+      strategy: 'spatial-cluster',
+      patients: [
+        { fullName: 'Unknown M-001', bed: 'RED-1', age: null, gender: 'M', dx: 'Blast injury, bilateral LE amputation, hemorrhagic shock', meds: 'TXA, O-neg PRBC x4, Fentanyl', triage: 'RED', mobility: 'CRITICAL_TRANSPORT', o2: 'NON_REBREATHER', iso: 'NONE', code: 'FULL', allergies: 'Unknown', bloodType: 'O-', confidence: 0.70, reviewLevel: 'VERIFY', reviewReasons: ['No ID — MCI tag only', 'Age unknown'] },
+        { fullName: 'Unknown F-002', bed: 'RED-2', age: null, gender: 'F', dx: 'Penetrating chest trauma, tension PTX', meds: 'Chest tube, NS bolus, Morphine', triage: 'RED', mobility: 'CRITICAL_TRANSPORT', o2: 'FACE_MASK', iso: 'NONE', code: 'FULL', allergies: 'Unknown', confidence: 0.65, reviewLevel: 'VERIFY', reviewReasons: ['No ID', 'Age unknown', 'Blood type unknown'] },
+        { fullName: 'Yousef Al-Harbi', bed: 'YEL-1', age: 34, gender: 'M', dx: 'Open fracture R tibia, burns 15% BSA', meds: 'Cefazolin, Morphine, Tetanus, NS', triage: 'YELLOW', mobility: 'STRETCHER', o2: 'NONE', iso: 'NONE', code: 'FULL', allergies: 'NKDA', bloodType: 'A+', confidence: 0.85, reviewLevel: 'REVIEW', reviewReasons: ['Handwritten — verify name'] },
+        { fullName: 'Dalal Al-Awadhi', bed: 'YEL-3', age: 52, gender: 'F', dx: 'Smoke inhalation, 2nd degree burns face/arms', meds: 'Salbutamol neb, Paracetamol, Silver sulfadiazine', triage: 'YELLOW', mobility: 'WHEELCHAIR', o2: 'NASAL_CANNULA', iso: 'NONE', code: 'FULL', allergies: 'Sulfa', confidence: 0.88, reviewLevel: 'READY' },
+        { fullName: 'Mansour Al-Dosari', bed: 'GRN-1', age: 27, gender: 'M', dx: 'Laceration R forearm, contusions', meds: 'Sutures, Tetanus, Paracetamol', triage: 'GREEN', mobility: 'AMBULATORY', o2: 'NONE', iso: 'NONE', code: 'FULL', allergies: 'NKDA', bloodType: 'B+', confidence: 0.92, reviewLevel: 'READY' },
+        { fullName: 'Haya Al-Bloushi', bed: 'GRN-4', age: 19, gender: 'F', dx: 'Anxiety, minor abrasions', meds: 'Diazepam 2mg, Wound care', triage: 'GREEN', mobility: 'AMBULATORY', o2: 'NONE', iso: 'NONE', code: 'FULL', allergies: 'NKDA', confidence: 0.94, reviewLevel: 'READY' },
+      ],
+    },
+    {
+      name: 'Nursing Handover Sheet (night shift)',
+      strategy: 'schema-columns',
+      patients: [
+        { fullName: 'Salem Al-Mutawa', bed: 'A-12', age: 81, gender: 'M', dx: 'HAP, COPD, CKD4, AF', meds: 'Tazocin, Salbutamol neb q4h, Furosemide, Digoxin, Apixaban', triage: 'YELLOW', mobility: 'STRETCHER', o2: 'NASAL_CANNULA', iso: 'CONTACT', code: 'COMFORT', allergies: 'Ciprofloxacin', bloodType: 'O+', ward: 'Med-1', assignedDoctor: 'Dr. Ibrahim', sheetStatus: 'Sputum culture pending, watch for desaturation', confidence: 0.93, reviewLevel: 'READY' },
+        { fullName: 'Zainab Behbehani', bed: 'A-08', age: 55, gender: 'F', dx: 'Acute cholangitis, choledocholithiasis, DM2', meds: 'Meropenem, Paracetamol, Insulin Aspart, Ondansetron', triage: 'YELLOW', mobility: 'AMBULATORY', o2: 'NONE', iso: 'NONE', code: 'FULL', allergies: 'Metformin (lactic acidosis)', bloodType: 'A-', ward: 'Med-1', assignedDoctor: 'Dr. Ibrahim', sheetStatus: 'ERCP booked tomorrow AM', confidence: 0.95, reviewLevel: 'READY' },
+        { fullName: 'Faisal Al-Jassem', bed: 'A-03', age: 47, gender: 'M', dx: 'DVT (L leg), PE (subsegmental)', meds: 'Enoxaparin, Warfarin (loading), Paracetamol, TED stockings', triage: 'YELLOW', mobility: 'WHEELCHAIR', o2: 'NONE', iso: 'NONE', code: 'FULL', allergies: 'NKDA', bloodType: 'AB+', ward: 'Med-1', sheetStatus: 'INR due AM, target 2-3', confidence: 0.91, reviewLevel: 'READY' },
+        { fullName: 'Aisha Al-Roumi', bed: 'A-17', age: 38, gender: 'F', dx: 'SLE flare, lupus nephritis class IV', meds: 'Methylprednisolone pulse, Hydroxychloroquine, Cyclophosphamide pending', triage: 'YELLOW', mobility: 'AMBULATORY', o2: 'NONE', iso: 'NONE', code: 'FULL', allergies: 'Sulfa, Trimethoprim', bloodType: 'B+', ward: 'Med-1', assignedDoctor: 'Dr. Rashed', sheetStatus: 'Renal biopsy results pending, rheum following', confidence: 0.90, reviewLevel: 'REVIEW', reviewReasons: ['Diagnosis OCR uncertain — verify lupus class'] },
+        { fullName: 'Nasser Al-Ibrahim', bed: 'A-22', age: 69, gender: 'M', dx: 'Decompensated CLD, HE grade 2, SBP', meds: 'Ceftriaxone, Lactulose q2h, Rifaximin, Albumin, Spironolactone', triage: 'YELLOW', mobility: 'STRETCHER', o2: 'NONE', iso: 'NONE', code: 'FULL', allergies: 'NKDA', bloodType: 'O-', ward: 'Med-1', assignedDoctor: 'Dr. Ibrahim', sheetStatus: 'Paracentesis done — 2.3L, PMN 480', confidence: 0.92, reviewLevel: 'READY' },
+      ],
+    },
+  ];
+
+  const [demoMenuOpen, setDemoMenuOpen] = useState(false);
+
+  const handleDemo = useCallback((scenarioIdx) => {
+    const scenario = DEMO_SCENARIOS[scenarioIdx];
     const demoResult = {
-      patients: demoPatients,
-      rawText: demoPatients.map(p => `${p.bed} ${p.fullName} ${p.age}/${p.gender} ${p.dx} ${p.meds}`).join('\n'),
+      patients: scenario.patients,
+      rawText: scenario.patients.map(p =>
+        `${p.bed}\t${p.fullName}\t${p.age ?? '?'}/${p.gender}\t${p.dx}\t${p.meds}`
+      ).join('\n'),
       processingTime: 0,
       engine: 'demo-simulation',
+      backend: 'simulated',
+      strategy: scenario.strategy,
       qualityScore: 0.92,
       qualityBand: 'GOOD',
       wordConfidence: 0.91,
-      reviewCount: demoPatients.filter(p => p.reviewLevel !== 'READY').length,
+      reviewCount: scenario.patients.filter(p => p.reviewLevel !== 'READY').length,
     };
     setResult(demoResult);
     setSelectedPatients(new Set(demoResult.patients.map((_, i) => i)));
+    setDemoMenuOpen(false);
     setStage('review');
   }, []);
 
@@ -257,13 +307,28 @@ export default function OCRScanner({ onClose, onImport }) {
                 Supports printed tables, handwritten lists, whiteboards
               </span>
             </div>
-            <button style={{
-              background: colors.purple + '22', border: `1px solid ${colors.purple}44`,
-              borderRadius: '8px', padding: '10px 16px', color: colors.purple,
-              fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: fonts.mono,
-            }} onClick={handleDemo}>
-              DEMO: Load sample ward sheet
-            </button>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+              <button style={{
+                background: colors.purple + '22', border: `1px solid ${colors.purple}44`,
+                borderRadius: '8px', padding: '10px 16px', color: colors.purple,
+                fontSize: '12px', fontWeight: 700, cursor: 'pointer', fontFamily: fonts.mono,
+              }} onClick={() => setDemoMenuOpen(!demoMenuOpen)}>
+                {demoMenuOpen ? 'Hide Simulations' : 'SIMULATE: Load demo ward data'}
+              </button>
+              {demoMenuOpen && DEMO_SCENARIOS.map((s, i) => (
+                <button key={i} style={{
+                  background: colors.bg2, border: `1px solid ${colors.border}`,
+                  borderRadius: '8px', padding: '10px 14px', color: colors.text1,
+                  fontSize: '12px', fontWeight: 600, cursor: 'pointer', fontFamily: fonts.sans,
+                  textAlign: 'left',
+                }} onClick={() => handleDemo(i)}>
+                  <div style={{ fontWeight: 700 }}>{s.name}</div>
+                  <div style={{ fontSize: '10px', color: colors.text3, fontFamily: fonts.mono, marginTop: '2px' }}>
+                    {s.patients.length} patients | strategy: {s.strategy}
+                  </div>
+                </button>
+              ))}
+            </div>
             {imageUrl && (
               <img src={imageUrl} style={styles.preview} alt="Captured" />
             )}
