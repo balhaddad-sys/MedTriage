@@ -14,10 +14,11 @@
 // The OCR engine queries the learner for boosted confidence scores and corrections.
 
 import { loadSeedData } from './ocrSeedData.js';
+import { loadProgressNoteSeedData } from './ocrSeedProgressNotes.js';
 
 const MODELS_KEY = 'ocr_learned_models';
 const TRAINING_KEY = 'ocr_training_data';
-const SEED_VERSION = 1; // bump to re-seed
+const SEED_VERSION = 2; // bump to re-seed (v2: added progress notes)
 
 // ═══════════════════════════════════════════════════════════════════
 // LEARNED MODEL — the output of the learning cycle
@@ -30,9 +31,10 @@ function loadModels() {
     if (!models.seeded || (models.seedVersion || 0) < SEED_VERSION) {
       console.log('[LEARNER] Loading seed data...');
       models = loadSeedData(models);
+      models = loadProgressNoteSeedData(models);
       models.seedVersion = SEED_VERSION;
       saveModels(models);
-      console.log(`[LEARNER] Seeded: ${Object.keys(models.names).length} names, ${Object.keys(models.diagnoses).length} dx, ${Object.keys(models.medications).length} meds`);
+      console.log(`[LEARNER] Seeded: ${Object.keys(models.names).length} names, ${Object.keys(models.diagnoses).length} dx, ${Object.keys(models.medications).length} meds, ${Object.keys(models.abbreviations || {}).length} abbreviations, ${Object.keys(models.labTests || {}).length} lab tests`);
     }
     return models;
   } catch {
@@ -484,6 +486,43 @@ export function getCharConfusion(expectedChar) {
     .map(([char, count]) => ({ char, count }));
 }
 
+// Expand a clinical abbreviation
+export function expandAbbreviation(text) {
+  const models = getModels();
+  if (!text || !models.abbreviations) return null;
+  const key = text.trim().toLowerCase();
+  const entry = models.abbreviations[key];
+  if (entry) return { expansion: entry.expansion, confidence: entry.confidence };
+  return null;
+}
+
+// Check if text is a known lab test
+export function isKnownLabTest(text) {
+  const models = getModels();
+  if (!text || !models.labTests) return null;
+  const key = text.trim().toLowerCase();
+  const entry = models.labTests[key];
+  if (entry) return { confidence: entry.confidence, entity: 'LAB_TEST' };
+  return null;
+}
+
+// Check if text is a known section header (SOAP, etc.)
+export function isStructureMarker(text) {
+  const models = getModels();
+  if (!text || !models.structureMarkers) return null;
+  const key = text.trim().toLowerCase().replace(/:$/, '');
+  const entry = models.structureMarkers[key];
+  if (entry) return { type: entry.type, confidence: entry.confidence };
+  return null;
+}
+
+// Check if text is a known unit of measurement
+export function isKnownUnit(text) {
+  const models = getModels();
+  if (!text || !models.units) return false;
+  return !!models.units[text.trim().toLowerCase()];
+}
+
 // Get overall learning stats
 export function getLearningStats() {
   const models = getModels();
@@ -497,6 +536,10 @@ export function getLearningStats() {
     doctors: Object.keys(models.doctors || {}).length,
     charConfusions: Object.keys(models.charConfusion || {}).length,
     layouts: Object.keys(models.layouts || {}).length,
+    abbreviations: Object.keys(models.abbreviations || {}).length,
+    labTests: Object.keys(models.labTests || {}).length,
+    structureMarkers: Object.keys(models.structureMarkers || {}).length,
+    units: Object.keys(models.units || {}).length,
     trainingSamples: models.trainingSamplesUsed || 0,
     updatedAt: models.updatedAt,
   };
