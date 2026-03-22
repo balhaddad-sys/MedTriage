@@ -13,8 +13,11 @@
 // The learner runs periodically and stores its models in localStorage.
 // The OCR engine queries the learner for boosted confidence scores and corrections.
 
+import { loadSeedData } from './ocrSeedData.js';
+
 const MODELS_KEY = 'ocr_learned_models';
 const TRAINING_KEY = 'ocr_training_data';
+const SEED_VERSION = 1; // bump to re-seed
 
 // ═══════════════════════════════════════════════════════════════════
 // LEARNED MODEL — the output of the learning cycle
@@ -22,9 +25,19 @@ const TRAINING_KEY = 'ocr_training_data';
 
 function loadModels() {
   try {
-    return JSON.parse(localStorage.getItem(MODELS_KEY) || 'null') || createEmptyModels();
+    let models = JSON.parse(localStorage.getItem(MODELS_KEY) || 'null') || createEmptyModels();
+    // Auto-seed on first load or when seed version bumps
+    if (!models.seeded || (models.seedVersion || 0) < SEED_VERSION) {
+      console.log('[LEARNER] Loading seed data...');
+      models = loadSeedData(models);
+      models.seedVersion = SEED_VERSION;
+      saveModels(models);
+      console.log(`[LEARNER] Seeded: ${Object.keys(models.names).length} names, ${Object.keys(models.diagnoses).length} dx, ${Object.keys(models.medications).length} meds`);
+    }
+    return models;
   } catch {
-    return createEmptyModels();
+    const models = loadSeedData(createEmptyModels());
+    return models;
   }
 }
 
