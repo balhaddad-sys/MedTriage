@@ -479,4 +479,52 @@ assert.equal(doctorNames.patients.length, 2, 'expected two patients with doctor 
 assert.ok(doctorNames.patients.some(p => /Nasser/i.test(p.fullName || '')), 'expected Nasser as patient name');
 assert.ok(doctorNames.patients.some(p => /Reem/i.test(p.fullName || '')), 'expected Reem as patient name');
 
+// Test 17: Whole-line pipe-delimited roster rows should preserve spreadsheet structure
+const pipeDelimitedRows = analyzeOcrWords([
+  word('Room / Ward | Patient name | Diagnosis | Assigned Doctor | Status', 20, 10, 98, 720),
+  word('10 | ali hussain | CVA left MCA occlusion | Consultant saleh | New', 20, 50, 92, 690),
+  word('11 | ahmad alessa | Chest infection | Team noura | Chronic', 20, 88, 92, 650),
+], 980, 180);
+
+assert.ok(['table-grid', 'schema-columns', 'row-bands'].includes(pipeDelimitedRows.strategy), 'expected pipe-delimited rows to resolve structurally');
+assert.equal(pipeDelimitedRows.patients.length, 2, 'expected two patients from pipe-delimited roster rows');
+
+const pipeAli = pipeDelimitedRows.patients.find(patient => /ali hussain/i.test(patient.fullName || ''));
+assert.ok(pipeAli, 'expected ali hussain in pipe-delimited rows');
+assert.equal(pipeAli.bed, '10');
+assert.match(pipeAli.dx || '', /CVA left MCA occlusion/i);
+assert.equal(pipeAli.assignedDoctor, 'saleh');
+assert.equal(pipeAli.sheetStatus, 'NEW');
+
+const pipeAhmad = pipeDelimitedRows.patients.find(patient => /ahmad alessa/i.test(patient.fullName || ''));
+assert.ok(pipeAhmad, 'expected ahmad alessa in pipe-delimited rows');
+assert.equal(pipeAhmad.bed, '11');
+assert.match(pipeAhmad.dx || '', /Chest infection/i);
+assert.equal(pipeAhmad.assignedDoctor, 'noura');
+assert.equal(pipeAhmad.sheetStatus, 'CHRONIC');
+
+// Test 18: Titled doctor cells should normalize down to the doctor name
+const titledDoctorCells = analyzeOcrWords([
+  word('Patient name', 180, 10, 98, 110),
+  word('Diagnosis', 420, 10, 98, 90),
+  word('Doctor', 650, 10, 98, 70),
+  word('Status', 860, 10, 98, 60),
+  word('ali hussain', 180, 52, 92, 120),
+  word('CVA left MCA occlusion', 390, 52, 92, 220),
+  word('Doctor saleh', 650, 52, 92, 130),
+  word('New', 870, 52, 92, 40),
+  word('jamal', 180, 90, 92, 80),
+  word('UTI', 420, 90, 92, 40),
+  word('Consultant noura', 650, 90, 92, 150),
+  word('Chronic', 850, 90, 92, 70),
+], 980, 170);
+
+assert.equal(titledDoctorCells.patients.length, 2, 'expected titled doctor cells to stay attached to each patient');
+const titledAli = titledDoctorCells.patients.find(patient => /ali hussain/i.test(patient.fullName || ''));
+assert.ok(titledAli, 'expected ali hussain with titled doctor cell');
+assert.equal(titledAli.assignedDoctor, 'saleh');
+const titledJamal = titledDoctorCells.patients.find(patient => /^jamal$/i.test(patient.fullName || ''));
+assert.ok(titledJamal, 'expected jamal with titled doctor cell');
+assert.equal(titledJamal.assignedDoctor, 'noura');
+
 console.log('OCR verification passed');

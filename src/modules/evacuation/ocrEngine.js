@@ -698,7 +698,7 @@ function consolidatePatientGroup(patients) {
   ), 'READY');
   merged.reviewLevel = reviewLevel;
 
-  if (!merged.fullName && !merged.bed && !merged.dx && !merged.civilId) return null;
+  if (!merged.fullName && !merged.bed && !merged.dx && !merged.civilId && merged.age == null) return null;
   return merged;
 }
 
@@ -914,6 +914,66 @@ const MedicalVocabulary = {
     'FAILURE TO THRIVE': { category: 'status', severity: 'GREEN' },
     'FTT': { category: 'status', severity: 'GREEN' },
     'SOCIAL ADMISSION': { category: 'status', severity: 'GREEN' },
+    // Missing common diagnoses found by audit
+    'FEVER': { category: 'infect', severity: 'YELLOW' },
+    'PYREXIA': { category: 'infect', severity: 'YELLOW' },
+    'PUO': { category: 'infect', severity: 'YELLOW' },
+    'FUO': { category: 'infect', severity: 'YELLOW' },
+    'MYALGIA': { category: 'ortho', severity: 'GREEN' },
+    'ARTHRALGIA': { category: 'ortho', severity: 'GREEN' },
+    'FRACTURE': { category: 'ortho', severity: 'YELLOW' },
+    'DISLOCATION': { category: 'ortho', severity: 'YELLOW' },
+    'CRUSH INJURY': { category: 'ortho', severity: 'RED' },
+    'SPRAIN': { category: 'ortho', severity: 'GREEN' },
+    'CONCUSSION': { category: 'neuro', severity: 'YELLOW' },
+    'HEAD INJURY': { category: 'neuro', severity: 'YELLOW' },
+    'SPINAL CORD INJURY': { category: 'neuro', severity: 'RED' },
+    'BRONCHITIS': { category: 'resp', severity: 'GREEN' },
+    'ACUTE BRONCHITIS': { category: 'resp', severity: 'GREEN' },
+    'PNEUMONIA': { category: 'resp', severity: 'YELLOW' },
+    'PLEURAL EFFUSION': { category: 'resp', severity: 'YELLOW' },
+    'DYSPNEA': { category: 'resp', severity: 'YELLOW' },
+    'HEMATEMESIS': { category: 'gi', severity: 'RED' },
+    'MELENA': { category: 'gi', severity: 'RED' },
+    'HEMATOCHEZIA': { category: 'gi', severity: 'YELLOW' },
+    'JAUNDICE': { category: 'gi', severity: 'YELLOW' },
+    'HEPATITIS': { category: 'gi', severity: 'YELLOW' },
+    'GASTROENTERITIS': { category: 'gi', severity: 'GREEN' },
+    'DIARRHEA': { category: 'gi', severity: 'GREEN' },
+    'CONSTIPATION': { category: 'gi', severity: 'GREEN' },
+    'NAUSEA': { category: 'gi', severity: 'GREEN' },
+    'VOMITING': { category: 'gi', severity: 'GREEN' },
+    'ABDOMINAL PAIN': { category: 'gi', severity: 'YELLOW' },
+    'CHEST PAIN': { category: 'cardio', severity: 'YELLOW' },
+    'SYNCOPE': { category: 'neuro', severity: 'YELLOW' },
+    'VERTIGO': { category: 'neuro', severity: 'GREEN' },
+    'HEADACHE': { category: 'neuro', severity: 'GREEN' },
+    'MIGRAINE': { category: 'neuro', severity: 'GREEN' },
+    'ALTERED MENTAL STATUS': { category: 'neuro', severity: 'RED' },
+    'AMS': { category: 'neuro', severity: 'RED' },
+    'LOC': { category: 'neuro', severity: 'RED' },
+    'HEMATURIA': { category: 'renal', severity: 'YELLOW' },
+    'URINARY RETENTION': { category: 'renal', severity: 'YELLOW' },
+    'RENAL COLIC': { category: 'renal', severity: 'YELLOW' },
+    'NEPHROLITHIASIS': { category: 'renal', severity: 'YELLOW' },
+    'PYELONEPHRITIS': { category: 'infect', severity: 'YELLOW' },
+    'PERITONITIS': { category: 'gi', severity: 'RED' },
+    'APPENDICITIS': { category: 'surg', severity: 'YELLOW' },
+    'CHOLECYSTITIS': { category: 'gi', severity: 'YELLOW' },
+    'ANAPHYLAXIS': { category: 'infect', severity: 'RED' },
+    'ANGIOEDEMA': { category: 'infect', severity: 'RED' },
+    'BURNS': { category: 'surg', severity: 'YELLOW' },
+    'SMOKE INHALATION': { category: 'resp', severity: 'RED' },
+    'HYPOTHERMIA': { category: 'status', severity: 'YELLOW' },
+    'HYPERTHERMIA': { category: 'status', severity: 'YELLOW' },
+    'DEHYDRATION': { category: 'renal', severity: 'YELLOW' },
+    'MALNUTRITION': { category: 'status', severity: 'GREEN' },
+    'OBESITY': { category: 'endo', severity: 'GREEN' },
+    'GOUT': { category: 'ortho', severity: 'GREEN' },
+    'RHABDOMYOLYSIS': { category: 'renal', severity: 'RED' },
+    'POLYTRAUMA': { category: 'surg', severity: 'RED' },
+    'RTA': { category: 'surg', severity: 'YELLOW' },
+    'BLAST INJURY': { category: 'surg', severity: 'RED' },
     // Status
     'NKDA': { category: 'status' }, 'DNR': { category: 'status' }, 'DNAR': { category: 'status' },
     'FULL': { category: 'status' }, 'NFR': { category: 'status' }, 'COMFORT': { category: 'status' },
@@ -980,6 +1040,26 @@ const MedicalVocabulary = {
     'Prochlorperazine', 'Domperidone', 'Granisetron', 'Aprepitant',
     'Cetirizine', 'Loratadine', 'Fexofenadine', 'Chlorpheniramine', 'Promethazine',
     'Tamsulosin', 'Finasteride', 'Sildenafil', 'Tadalafil',
+    // Trade names common in Kuwait/Gulf hospitals
+    'Brufen', 'Voltaren', 'Tylenol', 'Perfalgan', 'Clexane', 'Fragmin',
+    'Xarelto', 'Eliquis', 'Pradaxa', 'Plavix', 'Brilinta', 'Lipitor',
+    'Crestor', 'Zocor', 'Nexium', 'Losec', 'Zantac', 'Motilium',
+    'Zofran', 'Maxolon', 'Flagyl', 'Ciprobay', 'Tavanic', 'Zithromax',
+    'Klacid', 'Rocephin', 'Zinacef', 'Fortum', 'Meronem', 'Invanz',
+    'Tienam', 'Targocid', 'Zyvox', 'Diflucan', 'Cancidas',
+    'Glucophage', 'Amaryl', 'Januvia', 'Jardiance', 'Forxiga',
+    'Lantus', 'Novorapid', 'Humalog', 'Novomix', 'Mixtard',
+    'Concor', 'Tenormin', 'Betaloc', 'Diovan', 'Cozaar', 'Atacand',
+    'Tritace', 'Norvasc', 'Plendil', 'Lasix', 'Aldactone',
+    'Cordarone', 'Lanoxin', 'Isoptin', 'Cardizem', 'Adalat',
+    'Ventolin', 'Atrovent', 'Spiriva', 'Pulmicort', 'Seretide', 'Symbicort',
+    'Xanax', 'Valium', 'Dormicum', 'Rivotril', 'Keppra', 'Tegretol', 'Depakine',
+    'Seroquel', 'Risperdal', 'Zyprexa', 'Haldol', 'Lexapro', 'Zoloft',
+    'Prozac', 'Effexor', 'Cymbalta', 'Remeron',
+    'Adrenalin', 'Levophed', 'Precedex', 'Diprivan', 'Nimbex',
+    'Hartmann', 'Gelofusine', 'Voluven', 'Plasmalyte',
+    'TPN', 'PPN', 'KCl', 'NaCl', 'MgSO4', 'CaCl2',
+    'Neulasta', 'Aranesp', 'Venofer', 'Ferinject',
   ]),
 
   // Kuwait name database — 500+ first names, 200+ family names for fuzzy OCR correction
@@ -1088,6 +1168,7 @@ const MedicalVocabulary = {
     'Sadeem', 'Malak', 'Malek', 'Tala', 'Talah',
     'Layan', 'Layane', 'Yara', 'Yarah',
     'Jouri', 'Jory', 'Razan', 'Razaan', 'Nouf', 'Noaf',
+    'Noor', 'Nour', 'Nura', 'Nurah',
     'Maha', 'Mahah', 'Hala', 'Halah',
     'Yasmin', 'Yasmeen', 'Jasmine',
     'Asma', 'Asmaa', 'Eman', 'Iman', 'Amani', 'Amna', 'Amina',
@@ -1334,6 +1415,7 @@ const EntityRecognizer = {
       this.scoreIsolation(upper),
       this.scoreMobility(t),
       this.scoreBloodType(t),
+      this.scoreAssignedDoctor(t),
       this.scoreName(t),
       this.scoreDiagnosis(t),
       this.scoreMedication(t),
@@ -1492,12 +1574,40 @@ const EntityRecognizer = {
     return { entity: 'BLOOD_TYPE', confidence: 0 };
   },
 
+  scoreAssignedDoctor(t) {
+    const normalized = `${t || ''}`.trim().replace(/\s+/g, ' ');
+    const match = normalized.match(/^(dr\.?|doctor|consultant|team)\s*(?:[:\-]\s*)?(.+)$/i);
+    if (!match || !match[2]) return { entity: 'ASSIGNED_DOCTOR', confidence: 0 };
+
+    const doctorText = match[2]
+      .replace(/^[`"'~.,:;!?()[\]{}<>]+|[`"'~.,:;!?()[\]{}<>]+$/g, '')
+      .trim();
+    if (!doctorText || /\d/.test(doctorText) || isHeaderLike(doctorText)) {
+      return { entity: 'ASSIGNED_DOCTOR', confidence: 0 };
+    }
+
+    const nameScore = this.scoreName(doctorText).confidence || 0;
+    const lexiconScore = MedicalVocabulary.lookupName(doctorText)?.confidence || 0;
+    const supportsDoctorName = Math.max(nameScore, lexiconScore);
+    if (supportsDoctorName < 0.45 && !/^[A-Za-z\u0600-\u06FF][A-Za-z\u0600-\u06FF' -]{1,40}$/i.test(doctorText)) {
+      return { entity: 'ASSIGNED_DOCTOR', confidence: 0 };
+    }
+
+    return {
+      entity: 'ASSIGNED_DOCTOR',
+      confidence: clamp(0.76 + (supportsDoctorName * 0.18)),
+      corrected: doctorText,
+      meta: { doctor: doctorText, doctorTitle: match[1] },
+    };
+  },
+
   scoreName(t) {
     let conf = 0;
     if (!t || t.length < 2) return { entity: 'NAME', confidence: 0 };
 
     // Reject: has digits (except MRN-like which is handled by CIVIL_ID), or is a header
     if (/\d/.test(t) || isHeaderLike(t)) return { entity: 'NAME', confidence: 0 };
+    if (/^(?:dr\.?|doctor|consultant|team)\b/i.test(t.trim())) return { entity: 'NAME', confidence: 0 };
 
     // Reject: all uppercase short tokens that are known medical terms (not names)
     // Don't blanket-reject uppercase — PaddleOCR outputs "ALI", "OMAR", "DANA" in caps
@@ -1621,9 +1731,15 @@ const EntityRecognizer = {
   scoreMedication(t) {
     const match = MedicalVocabulary.correctMedication(t, 2);
     if (!match) return { entity: 'MEDICATION', confidence: 0 };
+    let conf = 0.55 + match.confidence * 0.45;
+    // Penalize fuzzy matches on short words — too many false positives with names
+    if (match.distance > 0 && t.length <= 5) conf *= 0.5;
+    // Penalize if the word is also a known name — names should win
+    const nameMatch = MedicalVocabulary.lookupName(t);
+    if (nameMatch && nameMatch.confidence >= 0.7) conf *= 0.3;
     return {
       entity: 'MEDICATION',
-      confidence: 0.55 + match.confidence * 0.45,
+      confidence: conf,
       corrected: match.term,
     };
   },
@@ -1951,6 +2067,18 @@ const PatientAssembler = {
     const likelyDoctorBoundary = clusterMinX + (clusterSpan * 0.62);
 
     for (const unk of unknowns) {
+      const unknownText = `${unk.corrected || unk.text || ''}`.trim();
+      if (
+        !patient.bed &&
+        /^\d{1,3}(?:\s*-\s*\d{1,3})?$/.test(unknownText) &&
+        unk.box.cx <= likelyNameBoundary &&
+        (names.length > 0 || diagnoses.length > 0 || assignedDoctors.length > 0 || sheetStatuses.length > 0)
+      ) {
+        patient.bed = unknownText.replace(/\s+/g, '');
+        patient.fieldConfidence.bed = Math.max(patient.fieldConfidence.bed || 0, 0.58);
+        continue;
+      }
+
       const likelyNameScore = scoreLikelyNameText(unk.corrected || unk.text);
       if (likelyNameScore >= 0.72 && unk.box.cx <= likelyNameBoundary) {
         names.push({ ...unk, entity: 'NAME', confidence: Math.max(unk.confidence, likelyNameScore) });
@@ -2015,7 +2143,8 @@ const PatientAssembler = {
       { value: patient.fieldConfidence.sheetStatus, weight: 0.3 },
     ], baseConfidence) + (Math.min(cluster.length, 6) / 6 * 0.08));
 
-    if (!patient.fullName && !patient.bed && diagnoses.length === 0) return null;
+    // Only drop if truly empty — keep patients with civilId, age, or gender
+    if (!patient.fullName && !patient.bed && diagnoses.length === 0 && !patient.civilId && patient.age == null) return null;
     return patient;
   },
 
@@ -2134,6 +2263,40 @@ function splitDetections(detections) {
   const result = [];
   for (const det of detections) {
     const fullText = `${det.text || ''}`.trim();
+    const pipeCells = fullText.includes('|')
+      ? fullText
+        .split('|')
+        .map(cell => `${cell || ''}`.replace(/\s+/g, ' ').trim())
+        .filter(Boolean)
+      : [];
+    if (pipeCells.length > 1) {
+      const totalChars = Math.max(pipeCells.reduce((sum, cell) => sum + Math.max(cell.length, 1), 0), 1);
+      let currentX = det.box.x;
+
+      pipeCells.forEach((cell, index) => {
+        const remainingWidth = Math.max((det.box.x + det.box.w) - currentX, det.box.w * 0.12);
+        const proportionalWidth = Math.max(det.box.w * (Math.max(cell.length, 1) / totalChars), det.box.w * 0.1, 36);
+        const cellWidth = index === pipeCells.length - 1
+          ? remainingWidth
+          : Math.min(remainingWidth, proportionalWidth);
+
+        result.push({
+          text: cell,
+          box: {
+            x: currentX,
+            y: det.box.y,
+            w: cellWidth,
+            h: det.box.h,
+            cx: currentX + (cellWidth / 2),
+            cy: det.box.cy,
+          },
+          confidence: det.confidence,
+        });
+        currentX += cellWidth;
+      });
+      continue;
+    }
+
     const simpleTokens = fullText.split(/\s+/).filter(Boolean);
     const preservePhraseCell = (
       simpleTokens.length >= 2 &&
@@ -2480,13 +2643,15 @@ function applyRoleProjection(entity, role) {
 }
 
 function resolveColumnRole(text) {
-  return detectHeaderRole(text);
-  const existingRole = inferColumnRole(text);
-  if (existingRole) return existingRole;
+  const headerRole = detectHeaderRole(text);
+  if (headerRole) return headerRole;
 
+  // Fallback: infer role from content patterns (was unreachable dead code before)
   const cleaned = `${text || ''}`.trim().replace(/[:\-]+$/, '');
   if (/^(?:o2|oxygen|airway|resp|fio2)$/i.test(cleaned)) return 'O2';
   if (/^(?:iso|isolation|precautions?)$/i.test(cleaned)) return 'ISOLATION';
+  if (/^(?:mob|mobility|transport)$/i.test(cleaned)) return 'MOBILITY';
+  if (/^(?:blood|bt|bg|rh)$/i.test(cleaned)) return 'BLOOD_TYPE';
   return null;
 }
 
@@ -3107,7 +3272,7 @@ const LayoutHypothesisEngine = {
           if (bestIsStructuredSheet && lessStructuredHypothesis) {
             if (!patientHasStrongIdentity(patient) || (patient.confidence || 0) < 0.92) continue;
           }
-          if ((patient.confidence || 0) >= 0.84) merged.push(patient);
+          if ((patient.confidence || 0) >= 0.55) merged.push(patient);
           continue;
         }
 
@@ -3647,7 +3812,7 @@ function fuseCandidatePasses(candidates) {
     for (const patient of candidate.patients) {
       const index = mergedPatients.findIndex(existing => shouldMerge(existing, patient));
       if (index === -1) {
-        if ((patient.confidence || 0) >= 0.84) mergedPatients.push(patient);
+        if ((patient.confidence || 0) >= 0.55) mergedPatients.push(patient);
         continue;
       }
       mergedPatients[index] = mergePatients(mergedPatients[index], patient);
