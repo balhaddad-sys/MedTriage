@@ -562,6 +562,7 @@ const sectionBader = sectionContextRoster.patients.find(patient => /^bader$/i.te
 assert.ok(sectionBader, 'expected Bader row from active section');
 assert.equal(sectionBader.ward, 'Ward 19');
 assert.equal(sectionBader.sheetStatus, 'ACTIVE');
+assert.equal(sectionBader.gender, 'M');
 assert.match(sectionBader.dx || '', /Chest infection/i);
 assert.match(sectionBader.dx || '', /UTI/i);
 
@@ -569,12 +570,14 @@ const sectionAli = sectionContextRoster.patients.find(patient => /ali hussain/i.
 assert.ok(sectionAli, 'expected ali hussain row from active section');
 assert.equal(sectionAli.ward, 'Ward 19');
 assert.equal(sectionAli.sheetStatus, 'ACTIVE');
+assert.equal(sectionAli.gender, 'M');
 assert.match(sectionAli.dx || '', /CVA/i);
 
 const sectionAhmad = sectionContextRoster.patients.find(patient => /ahmad alessa/i.test(patient.fullName || ''));
 assert.ok(sectionAhmad, 'expected ahmad alessa row with explicit status');
 assert.equal(sectionAhmad.ward, 'Ward 19');
 assert.equal(sectionAhmad.sheetStatus, 'ICU DISCHARGE');
+assert.equal(sectionAhmad.gender, 'M');
 assert.match(sectionAhmad.dx || '', /CVA left MCA occlusion/i);
 
 const sectionMohammad = sectionContextRoster.patients.find(patient => /mohammad/i.test(patient.fullName || ''));
@@ -610,5 +613,36 @@ const rajuDx = detailHeavyDiagnoses.patients.find(patient => /raju/i.test(patien
 assert.ok(rajuDx, 'expected Raju to remain a patient name');
 assert.match(rajuDx.dx || '', /stroke/i);
 assert.equal(rajuDx.assignedDoctor, 'Zahra');
+
+// Test 21: Female-list sections should infer gender when age/sex is missing
+const femaleSectionRoster = analyzeOcrWords([
+  word('Female list (active)', 40, 10, 98, 190),
+  word('Room / Ward', 20, 52, 98, 95),
+  word('Patient name', 170, 52, 98, 110),
+  word('Diagnosis', 410, 52, 98, 90),
+  word('Assigned Doctor', 650, 52, 98, 135),
+  word('Status', 860, 52, 98, 60),
+  word('Ward 22', 470, 84, 97, 80),
+  word('8', 70, 120, 92, 30),
+  word('Fatima Hassan', 180, 120, 92, 150),
+  word('Chest infection', 400, 120, 92, 140),
+  word('Noura', 700, 120, 92, 60),
+  word('Aisha', 190, 156, 92, 90),
+  word('UTI, weight loss', 390, 156, 92, 170),
+  word('Zahra', 700, 156, 92, 60),
+], 980, 240);
+
+assert.ok(['table-grid', 'schema-columns', 'row-bands'].includes(femaleSectionRoster.strategy), 'expected female-list roster to stay structural');
+assert.equal(femaleSectionRoster.patients.length, 2, 'expected two patients from female-list roster');
+const fatimaSection = femaleSectionRoster.patients.find(patient => /fatima hassan/i.test(patient.fullName || ''));
+assert.ok(fatimaSection, 'expected Fatima Hassan from female-list roster');
+assert.equal(fatimaSection.gender, 'F');
+assert.equal(fatimaSection.sheetStatus, 'ACTIVE');
+assert.equal(fatimaSection.ward, 'Ward 22');
+const aishaSection = femaleSectionRoster.patients.find(patient => /^aisha$/i.test(patient.fullName || ''));
+assert.ok(aishaSection, 'expected Aisha from female-list roster');
+assert.equal(aishaSection.gender, 'F');
+assert.equal(aishaSection.sheetStatus, 'ACTIVE');
+assert.match(aishaSection.dx || '', /weight loss/i);
 
 console.log('OCR verification passed');

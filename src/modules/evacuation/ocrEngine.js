@@ -302,6 +302,10 @@ const GENERIC_SHEET_HEADER_PATTERNS = [
   /^(?:male|female)\s+list(?:\s+(?:active|inactive|chronic|new|pending))?$/i,
   /^(?:male|female|active|chronic)\s+list(?:\s*\([^)]*\))?$/i,
   /^(?:\u0642\u0627\u0626\u0645\u0629|\u0646\u0645\u0648\u0630\u062C|\u0643\u0634\u0641)\s+(?:\u0627\u0644\u0645\u0631\u0636\u0649|\u0627\u0644\u0627\u062E\u0644\u0627\u0621|\u0627\u0644\u062C\u0646\u0627\u062D)$/i,
+  // Progress note / SOAP section headers
+  /^(?:subjective|objective|assessment(?:\s+(?:and|&)\s+plan)?|plan|impression|recommendations?|interval\s+history|progress\s+note|clinical\s+note|history\s+of\s+present\s+illness|hpi|pmh|psh|ros|review\s+of\s+systems|physical\s+exam|medications|social\s+history|family\s+history|allergies|chief\s+complaint|cc|discharge\s+summary|op\s+note|procedure\s+note)$/i,
+  // Nursing assessment headers
+  /^(?:nursing\s+(?:assessment|notes?|plan|diagnosis|interventions?|evaluation)|shift\s+report|handover|handoff|vital\s+signs?|i\s*&?\s*o|intake\s*&?\s*output|pain\s+assessment|fall\s+risk|braden\s+score|skin\s+assessment|neuro\s+checks?)$/i,
 ];
 
 function normalizeSheetLabel(text) {
@@ -991,7 +995,6 @@ const MedicalVocabulary = {
     'SOB': { category: 'resp', severity: 'YELLOW' }, 'DOE': { category: 'resp', severity: 'YELLOW' },
     'CP': { category: 'cardio', severity: 'YELLOW' },
     'URI': { category: 'resp', severity: 'GREEN' }, 'URTI': { category: 'resp', severity: 'GREEN' },
-    'LOC': { category: 'neuro', severity: 'RED' },
     'GCS': { category: 'neuro' },
     'PMH': { category: 'status' }, 'PSH': { category: 'status' },
     'ROS': { category: 'status' }, 'HPI': { category: 'status' },
@@ -1014,6 +1017,38 @@ const MedicalVocabulary = {
     'ESR': { category: 'invest' }, 'CRP': { category: 'invest' },
     'TSH': { category: 'invest' }, 'T3': { category: 'invest' }, 'T4': { category: 'invest' },
     'PSA': { category: 'invest' },
+    // Physical exam / progress note abbreviations (prevent misclassification)
+    'HEENT': { category: 'exam' }, 'PERRL': { category: 'exam' }, 'PERRLA': { category: 'exam' },
+    'EOMI': { category: 'exam' }, 'RRR': { category: 'exam' }, 'CTAB': { category: 'exam' },
+    'CTA': { category: 'exam' }, 'S1S2': { category: 'exam' }, 'HSM': { category: 'exam' },
+    'JVP': { category: 'exam' }, 'CVS': { category: 'exam' }, 'CNS': { category: 'exam' },
+    'MSK': { category: 'exam' }, 'GIT': { category: 'exam' }, 'GUS': { category: 'exam' },
+    'NCAT': { category: 'exam' }, 'WNWD': { category: 'exam' },
+    'SILT': { category: 'exam' }, 'DTR': { category: 'exam' },
+    // SOAP note section headers
+    'SUBJECTIVE': { category: 'note' }, 'OBJECTIVE': { category: 'note' },
+    'ASSESSMENT': { category: 'note' }, 'PLAN': { category: 'note' },
+    'IMPRESSION': { category: 'note' }, 'RECOMMENDATIONS': { category: 'note' },
+    'SUMMARY': { category: 'note' }, 'PROGRESS': { category: 'note' },
+    'INTERVAL': { category: 'note' }, 'HISTORY': { category: 'note' },
+    // Vital sign labels
+    'HR': { category: 'vitals' }, 'BP': { category: 'vitals' }, 'RR': { category: 'vitals' },
+    'SPO2': { category: 'vitals' }, 'TEMP': { category: 'vitals' }, 'SATS': { category: 'vitals' },
+    'MAP': { category: 'vitals' }, 'CVP': { category: 'vitals' }, 'ICP': { category: 'vitals' },
+    // Dosing routes and frequencies — only longer ones that won't fuzzy-match common words
+    'INFUSION': { category: 'route' }, 'NEBULIZER': { category: 'route' },
+    'TOPICAL': { category: 'route' }, 'SUBLINGUAL': { category: 'route' },
+    'INTRAMUSCULAR': { category: 'route' }, 'INTRAVENOUS': { category: 'route' },
+    'SUBCUTANEOUS': { category: 'route' },
+    'PRN': { category: 'freq' }, 'BID': { category: 'freq' },
+    'TID': { category: 'freq' }, 'QID': { category: 'freq' },
+    'STAT': { category: 'freq' }, 'NOCTE': { category: 'freq' },
+    // Lines / devices / procedures (ward sheet context)
+    'CVC': { category: 'device' }, 'PICC': { category: 'device' }, 'IJ': { category: 'device' },
+    'SC': { category: 'device' }, 'ART LINE': { category: 'device' }, 'FOLEY': { category: 'device' },
+    'NG': { category: 'device' }, 'NGT': { category: 'device' }, 'NJ': { category: 'device' },
+    'PEG': { category: 'device' }, 'ICC': { category: 'device' }, 'IDC': { category: 'device' },
+    'ETT': { category: 'device' }, 'TRACH': { category: 'device' },
     // Status
     'NKDA': { category: 'status' }, 'DNR': { category: 'status' }, 'DNAR': { category: 'status' },
     'FULL': { category: 'status' }, 'NFR': { category: 'status' }, 'COMFORT': { category: 'status' },
