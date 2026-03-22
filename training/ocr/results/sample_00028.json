@@ -1,0 +1,44 @@
+{
+  "file": "sample_00028.png",
+  "file_hash": "a6136171284bf6db31228a57d7bf1b81a9a7f47f939623936777bae3e23822b1",
+  "timestamp": "2026-03-22T05:38:20.803595+00:00",
+  "processing_time_s": 20.86,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 1,
+    "accepted": 1,
+    "flagged_for_review": 0,
+    "rejected": 0,
+    "avg_confidence": 0.9996
+  },
+  "elements": [
+    {
+      "text": "ICU discharge",
+      "confidence": 0.9996,
+      "coordinates": [
+        [
+          3,
+          25
+        ],
+        [
+          162,
+          25
+        ],
+        [
+          162,
+          49
+        ],
+        [
+          3,
+          49
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "ICU discharge",
+      "corrections": [],
+      "status": "accepted"
+    }
+  ]
+}

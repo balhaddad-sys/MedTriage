@@ -1,0 +1,100 @@
+{
+  "file": "sample_00005.png",
+  "file_hash": "0007b0f8f6882d7ba56d65c0a5fc1bd3a54b10fcdcbdfb84c1e8fc17c7b8c0f2",
+  "timestamp": "2026-03-22T02:47:25.629953+00:00",
+  "processing_time_s": 23.11,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 3,
+    "accepted": 3,
+    "flagged_for_review": 0,
+    "rejected": 0,
+    "avg_confidence": 0.9912
+  },
+  "elements": [
+    {
+      "text": "e/Se",
+      "confidence": 0.9986,
+      "coordinates": [
+        [
+          0,
+          74
+        ],
+        [
+          68,
+          72
+        ],
+        [
+          68,
+          103
+        ],
+        [
+          0,
+          105
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "e/Se",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "/Se",
+      "confidence": 0.9879,
+      "coordinates": [
+        [
+          0,
+          73
+        ],
+        [
+          68,
+          73
+        ],
+        [
+          68,
+          105
+        ],
+        [
+          0,
+          105
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "/Se",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "e/Se:",
+      "confidence": 0.9872,
+      "coordinates": [
+        [
+          0,
+          73
+        ],
+        [
+          68,
+          70
+        ],
+        [
+          68,
+          105
+        ],
+        [
+          0,
+          109
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "e/Se:",
+      "corrections": [],
+      "status": "accepted"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "totalSheets": 500,
+  "totalPatients": 3771,
+  "avgPatientsPerSheet": 7.5,
+  "byDifficulty": {
+    "photo": 94,
+    "clean": 92,
+    "scan": 123,
+    "hard": 70,
+    "medium": 121
+  },
+  "byStyle": {
+    "lined-table": 96,
+    "whiteboard": 101,
+    "handwritten-list": 91,
+    "clean-table": 111,
+    "sparse-list": 101
+  }
+}

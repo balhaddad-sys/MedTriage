@@ -1,0 +1,100 @@
+{
+  "file": "sample_00034.png",
+  "file_hash": "10451b33b7e9e05c44af887dbe7821c897421a7c49532e40a9c6cbf9ba1fb06a",
+  "timestamp": "2026-03-22T05:41:49.732695+00:00",
+  "processing_time_s": 43.62,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 3,
+    "accepted": 0,
+    "flagged_for_review": 3,
+    "rejected": 0,
+    "avg_confidence": 0.7395
+  },
+  "elements": [
+    {
+      "text": "lard",
+      "confidence": 0.8832,
+      "coordinates": [
+        [
+          0,
+          648
+        ],
+        [
+          68,
+          656
+        ],
+        [
+          68,
+          692
+        ],
+        [
+          0,
+          683
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "lard",
+      "corrections": [],
+      "status": "review"
+    },
+    {
+      "text": "puel",
+      "confidence": 0.7356,
+      "coordinates": [
+        [
+          4,
+          656
+        ],
+        [
+          68,
+          660
+        ],
+        [
+          67,
+          695
+        ],
+        [
+          1,
+          691
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "puel",
+      "corrections": [],
+      "status": "review"
+    },
+    {
+      "text": "pue!",
+      "confidence": 0.5997,
+      "coordinates": [
+        [
+          2,
+          648
+        ],
+        [
+          68,
+          655
+        ],
+        [
+          68,
+          690
+        ],
+        [
+          0,
+          683
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "pue!",
+      "corrections": [],
+      "status": "review"
+    }
+  ]
+}

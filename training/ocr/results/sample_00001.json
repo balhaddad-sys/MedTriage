@@ -1,15 +1,240 @@
 {
   "file": "sample_00001.png",
-  "file_hash": "afad8769cc9e9df67d2e3e630783bb2753732905eabd3295db8ec11577b60546",
-  "timestamp": "2026-03-22T02:37:57.654317+00:00",
-  "processing_time_s": 46.03,
+  "file_hash": "91e9b25787480e87aa06268cb5305d9049f24cebdf972c335dede7a253ff6ef5",
+  "timestamp": "2026-03-22T02:44:40.912218+00:00",
+  "processing_time_s": 84.58,
   "backend": "PaddleBackend",
   "summary": {
-    "total_elements": 0,
-    "accepted": 0,
-    "flagged_for_review": 0,
+    "total_elements": 8,
+    "accepted": 7,
+    "flagged_for_review": 1,
     "rejected": 0,
-    "avg_confidence": 0.0
+    "avg_confidence": 0.9648
   },
-  "elements": []
+  "elements": [
+    {
+      "text": "AMU",
+      "confidence": 0.9993,
+      "coordinates": [
+        [
+          104,
+          513
+        ],
+        [
+          162,
+          510
+        ],
+        [
+          163,
+          537
+        ],
+        [
+          105,
+          539
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "AMU",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "nosis",
+      "confidence": 0.9979,
+      "coordinates": [
+        [
+          0,
+          455
+        ],
+        [
+          49,
+          455
+        ],
+        [
+          49,
+          478
+        ],
+        [
+          0,
+          478
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "nosis",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "y sepsis",
+      "confidence": 0.9927,
+      "coordinates": [
+        [
+          0,
+          584
+        ],
+        [
+          80,
+          584
+        ],
+        [
+          80,
+          612
+        ],
+        [
+          0,
+          612
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "y sepsis",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "iet MCA occiusion",
+      "confidence": 0.9726,
+      "coordinates": [
+        [
+          0,
+          554
+        ],
+        [
+          182,
+          560
+        ],
+        [
+          181,
+          584
+        ],
+        [
+          0,
+          577
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "iet MCA occiusion",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "ieft iviCA occiusion",
+      "confidence": 0.9708,
+      "coordinates": [
+        [
+          0,
+          557
+        ],
+        [
+          183,
+          566
+        ],
+        [
+          182,
+          590
+        ],
+        [
+          0,
+          581
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "ieft iviCA occiusion",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "eft MCA occlusion",
+      "confidence": 0.9445,
+      "coordinates": [
+        [
+          0,
+          557
+        ],
+        [
+          182,
+          561
+        ],
+        [
+          181,
+          589
+        ],
+        [
+          0,
+          584
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "eft MCA occlusion",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "ieft iiCA occiusion",
+      "confidence": 0.9308,
+      "coordinates": [
+        [
+          0,
+          554
+        ],
+        [
+          183,
+          561
+        ],
+        [
+          182,
+          589
+        ],
+        [
+          0,
+          582
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "grayscale",
+      "original_text": "ieft iiCA occiusion",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "rv sepsis",
+      "confidence": 0.9097,
+      "coordinates": [
+        [
+          0,
+          600
+        ],
+        [
+          80,
+          602
+        ],
+        [
+          79,
+          623
+        ],
+        [
+          0,
+          621
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "rv sepsis",
+      "corrections": [],
+      "status": "review"
+    }
+  ]
 }

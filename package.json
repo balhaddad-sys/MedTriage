@@ -19,6 +19,9 @@
     "ocr:train:prepare": "node scripts/prepare-ocr-training-data.mjs",
     "ocr:train:run": "node scripts/train-ocr.mjs",
     "test:ocr:safety": "node --test scripts/test-ocr-safety.mjs",
+    "ocr:ground-truth": "python scripts/generate-ward-sheet-ground-truth.py --count 500 --output training/ocr/ground-truth",
+    "ocr:validate": "node scripts/run-ocr-validation.mjs",
+    "ocr:validate:headless": "node scripts/run-headless-ocr-validation.mjs",
     "test": "npm run test:ocr:safety && npm run validate:protocols && npm run verify:calculators && npm run verify:ocr && npm run verify:nfc",
     "cap:init": "npx cap sync",
     "cap:android": "npx cap open android",
@@ -41,6 +44,7 @@
   },
   "devDependencies": {
     "esbuild": "^0.24.2",
+    "puppeteer": "^24.40.0",
     "typescript": "^5.9.3"
   }
 }

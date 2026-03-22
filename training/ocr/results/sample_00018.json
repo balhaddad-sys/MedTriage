@@ -1,0 +1,15 @@
+{
+  "file": "sample_00018.png",
+  "file_hash": "871c8900ff22a92ccdb794ad7d77db3071c484913bb1e7def6e137e49d71b81f",
+  "timestamp": "2026-03-22T02:54:50.473619+00:00",
+  "processing_time_s": 19.22,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 0,
+    "accepted": 0,
+    "flagged_for_review": 0,
+    "rejected": 0,
+    "avg_confidence": 0.0
+  },
+  "elements": []
+}

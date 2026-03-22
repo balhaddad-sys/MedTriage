@@ -1,0 +1,212 @@
+{
+  "file": "sample_00043.png",
+  "file_hash": "75fd522866e71e564f6d61569f9c1bb2409db58fd7e15f07503aa89a2dfce7d6",
+  "timestamp": "2026-03-22T05:47:43.400027+00:00",
+  "processing_time_s": 75.27,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 7,
+    "accepted": 7,
+    "flagged_for_review": 0,
+    "rejected": 0,
+    "avg_confidence": 0.9925
+  },
+  "elements": [
+    {
+      "text": "ary sepsis",
+      "confidence": 0.9998,
+      "coordinates": [
+        [
+          0,
+          614
+        ],
+        [
+          103,
+          609
+        ],
+        [
+          105,
+          642
+        ],
+        [
+          0,
+          646
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "ary sepsis",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "ward 18",
+      "confidence": 0.9997,
+      "coordinates": [
+        [
+          90,
+          478
+        ],
+        [
+          196,
+          481
+        ],
+        [
+          195,
+          513
+        ],
+        [
+          89,
+          510
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "ward 18",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "ignosis",
+      "confidence": 0.9987,
+      "coordinates": [
+        [
+          0,
+          431
+        ],
+        [
+          71,
+          435
+        ],
+        [
+          70,
+          464
+        ],
+        [
+          0,
+          460
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "ignosis",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "A occlusion",
+      "confidence": 0.9985,
+      "coordinates": [
+        [
+          0,
+          572
+        ],
+        [
+          116,
+          570
+        ],
+        [
+          117,
+          598
+        ],
+        [
+          0,
+          600
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "A occlusion",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "A left",
+      "confidence": 0.9966,
+      "coordinates": [
+        [
+          0,
+          539
+        ],
+        [
+          58,
+          539
+        ],
+        [
+          58,
+          565
+        ],
+        [
+          0,
+          565
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "A left",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "agnosis",
+      "confidence": 0.9948,
+      "coordinates": [
+        [
+          0,
+          449
+        ],
+        [
+          69,
+          443
+        ],
+        [
+          72,
+          472
+        ],
+        [
+          0,
+          478
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "agnosis",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "CA occlusion",
+      "confidence": 0.9591,
+      "coordinates": [
+        [
+          0,
+          570
+        ],
+        [
+          118,
+          570
+        ],
+        [
+          118,
+          598
+        ],
+        [
+          0,
+          598
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "grayscale",
+      "original_text": "CA occlusion",
+      "corrections": [],
+      "status": "accepted"
+    }
+  ]
+}

@@ -1,0 +1,2 @@
+{"source_image": "sample_00009.png", "timestamp": "2026-03-22T02:50:08.569046+00:00", "text": "Boa", "original_text": "Boa", "confidence": 0.8286, "coordinates": [[7, 194], [70, 189], [70, 228], [10, 233]], "corrections": [], "human_correction": null}
+{"source_image": "sample_00009.png", "timestamp": "2026-03-22T02:50:08.570049+00:00", "text": "dBo", "original_text": "dBo", "confidence": 0.5493, "coordinates": [[0, 193], [70, 193], [70, 228], [0, 228]], "corrections": [], "human_correction": null}

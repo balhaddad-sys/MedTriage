@@ -22,3 +22,7 @@ med_ocr/training_data/
 med_ocr/pretrained/
 med_ocr/trained_model/
 med_ocr/PaddleOCR/
+__pycache__/
+*.pyc
+training/ocr/augmented/
+training/ocr/mega_training/

@@ -1,0 +1,12 @@
+{"source_image": "sample_00000.png", "timestamp": "2026-03-22T02:52:27.049432+00:00", "original_ocr": "atient", "corrected_text": "Patient", "reviewer": "dr_bader"}
+{"source_image": "sample_00000.png", "timestamp": "2026-03-22T02:52:27.058435+00:00", "original_ocr": "tient", "corrected_text": "Patient", "reviewer": "dr_bader"}
+{"source_image": "sample_00001.png", "timestamp": "2026-03-22T02:52:27.066433+00:00", "original_ocr": "nosis", "corrected_text": "Diagnosis", "reviewer": "dr_bader"}
+{"source_image": "sample_00008.png", "timestamp": "2026-03-22T02:52:27.075436+00:00", "original_ocr": "RPioPnRisansisCnltant", "corrected_text": "Prior Consultant", "reviewer": "dr_bader"}
+{"source_image": "sample_00009.png", "timestamp": "2026-03-22T02:52:27.082435+00:00", "original_ocr": "weigh", "corrected_text": "Weight", "reviewer": "dr_bader"}
+{"source_image": "sample_00010.png", "timestamp": "2026-03-22T02:52:27.090441+00:00", "original_ocr": "sepsis", "corrected_text": "Sepsis", "reviewer": "dr_bader"}
+{"source_image": "sample_00008.png", "timestamp": "2026-03-22T02:52:27.097437+00:00", "original_ocr": "atorvastain", "corrected_text": "atorvastatin", "reviewer": "dr_bader"}
+{"source_image": "sample_00008.png", "timestamp": "2026-03-22T02:52:27.105426+00:00", "original_ocr": "metformln", "corrected_text": "metformin", "reviewer": "dr_bader"}
+{"source_image": "sample_00009.png", "timestamp": "2026-03-22T02:52:27.112426+00:00", "original_ocr": "insulln", "corrected_text": "insulin", "reviewer": "dr_bader"}
+{"source_image": "sample_00009.png", "timestamp": "2026-03-22T02:52:27.119433+00:00", "original_ocr": "ciprofloxacn", "corrected_text": "ciprofloxacin", "reviewer": "dr_bader"}
+{"source_image": "sample_00010.png", "timestamp": "2026-03-22T02:52:27.127430+00:00", "original_ocr": "amoxiclllin", "corrected_text": "amoxicillin", "reviewer": "dr_bader"}
+{"source_image": "sample_00010.png", "timestamp": "2026-03-22T02:52:27.133444+00:00", "original_ocr": "furosemde", "corrected_text": "furosemide", "reviewer": "dr_bader"}

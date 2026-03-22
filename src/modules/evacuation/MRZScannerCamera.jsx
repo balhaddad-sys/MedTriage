@@ -157,7 +157,7 @@ export default function MRZScannerCamera({ onResult, onCancel }) {
       }
     };
 
-    scanRef.current = setInterval(scan, 600);
+    scanRef.current = setInterval(scan, 1200);
     return () => { if (scanRef.current) clearInterval(scanRef.current); };
   }, [scanning, found, frameCount]);
 

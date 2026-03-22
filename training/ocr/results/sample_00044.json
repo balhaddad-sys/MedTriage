@@ -1,0 +1,72 @@
+{
+  "file": "sample_00044.png",
+  "file_hash": "c7131d2fe12a14ed37764879a214cd55c9c3dc9ec2bff4d01832c1e0f6d172d8",
+  "timestamp": "2026-03-22T05:48:11.231210+00:00",
+  "processing_time_s": 27.81,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 2,
+    "accepted": 1,
+    "flagged_for_review": 1,
+    "rejected": 0,
+    "avg_confidence": 0.9337
+  },
+  "elements": [
+    {
+      "text": "Discl",
+      "confidence": 0.9832,
+      "coordinates": [
+        [
+          0,
+          191
+        ],
+        [
+          80,
+          185
+        ],
+        [
+          80,
+          228
+        ],
+        [
+          0,
+          234
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "grayscale",
+      "original_text": "Discl",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Disc",
+      "confidence": 0.8843,
+      "coordinates": [
+        [
+          0,
+          191
+        ],
+        [
+          80,
+          185
+        ],
+        [
+          80,
+          228
+        ],
+        [
+          2,
+          234
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "Disc",
+      "corrections": [],
+      "status": "review"
+    }
+  ]
+}

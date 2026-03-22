@@ -1,0 +1,100 @@
+{
+  "file": "sample_00016.png",
+  "file_hash": "92d8a269dfcfe93fc2f9b268acaec7415966eb62ed40639684eb46cf500bd874",
+  "timestamp": "2026-03-22T02:52:51.202306+00:00",
+  "processing_time_s": 17.12,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 3,
+    "accepted": 1,
+    "flagged_for_review": 1,
+    "rejected": 1,
+    "avg_confidence": 0.6924
+  },
+  "elements": [
+    {
+      "text": "/a",
+      "confidence": 0.9956,
+      "coordinates": [
+        [
+          0,
+          82
+        ],
+        [
+          21,
+          82
+        ],
+        [
+          21,
+          105
+        ],
+        [
+          0,
+          105
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "/a",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "wa",
+      "confidence": 0.6843,
+      "coordinates": [
+        [
+          0,
+          81
+        ],
+        [
+          21,
+          81
+        ],
+        [
+          21,
+          103
+        ],
+        [
+          0,
+          103
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "wa",
+      "corrections": [],
+      "status": "review"
+    },
+    {
+      "text": "e",
+      "confidence": 0.3973,
+      "coordinates": [
+        [
+          0,
+          78
+        ],
+        [
+          21,
+          78
+        ],
+        [
+          21,
+          102
+        ],
+        [
+          0,
+          102
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "e",
+      "corrections": [],
+      "status": "rejected"
+    }
+  ]
+}

@@ -1,0 +1,72 @@
+{
+  "file": "sample_00007.png",
+  "file_hash": "bde120f9d664a5e18212c9c40ba91b433460e98468192f4b6ba1b30367d96982",
+  "timestamp": "2026-03-22T02:48:37.873087+00:00",
+  "processing_time_s": 39.69,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 2,
+    "accepted": 2,
+    "flagged_for_review": 0,
+    "rejected": 0,
+    "avg_confidence": 0.9876
+  },
+  "elements": [
+    {
+      "text": "ALTERED MENTAL STATUS",
+      "confidence": 0.9952,
+      "coordinates": [
+        [
+          0,
+          21
+        ],
+        [
+          353,
+          20
+        ],
+        [
+          353,
+          54
+        ],
+        [
+          0,
+          55
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "ALTERED MENTAL STATUS",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "LTERED MENTAL STATUS",
+      "confidence": 0.9801,
+      "coordinates": [
+        [
+          17,
+          30
+        ],
+        [
+          352,
+          30
+        ],
+        [
+          352,
+          55
+        ],
+        [
+          17,
+          55
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "LTERED MENTAL STATUS",
+      "corrections": [],
+      "status": "accepted"
+    }
+  ]
+}

@@ -1,0 +1,20 @@
+[
+  {
+    "imageId": "gt_0000",
+    "error": "OCR engine init failed: no available backend found. ERR: [wasm] TypeError: Failed to fetch dynamically imported module: http://localhost:8765/ort-wasm-simd-threaded.jsep.mjs, [cpu] Error: previous call to 'initWasm()' failed., [webnn] Error: previous call to 'initWasm()' failed., [webgpu] Error: previous call to 'initWasm()' failed.. Clear browser data and reload.",
+    "rawText": "",
+    "patients": []
+  },
+  {
+    "imageId": "gt_0001",
+    "error": "OCR engine init failed: no available backend found. ERR: [wasm] TypeError: Failed to fetch dynamically imported module: http://localhost:8765/ort-wasm-simd-threaded.jsep.mjs, [cpu] Error: previous call to 'initWasm()' failed., [webnn] Error: previous call to 'initWasm()' failed., [webgpu] Error: previous call to 'initWasm()' failed.. Clear browser data and reload.",
+    "rawText": "",
+    "patients": []
+  },
+  {
+    "imageId": "gt_0002",
+    "error": "OCR engine init failed: no available backend found. ERR: [wasm] TypeError: Failed to fetch dynamically imported module: http://localhost:8765/ort-wasm-simd-threaded.jsep.mjs, [cpu] Error: previous call to 'initWasm()' failed., [webnn] Error: previous call to 'initWasm()' failed., [webgpu] Error: previous call to 'initWasm()' failed.. Clear browser data and reload.",
+    "rawText": "",
+    "patients": []
+  }
+]

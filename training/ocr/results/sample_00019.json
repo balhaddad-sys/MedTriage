@@ -1,0 +1,324 @@
+{
+  "file": "sample_00019.png",
+  "file_hash": "40ddbc4ffac1dede70368bc60a9104a43ea73780ad29fdd6be8f4ebd795dc8e7",
+  "timestamp": "2026-03-22T02:57:22.953198+00:00",
+  "processing_time_s": 152.47,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 11,
+    "accepted": 10,
+    "flagged_for_review": 1,
+    "rejected": 0,
+    "avg_confidence": 0.975
+  },
+  "elements": [
+    {
+      "text": "Sepsis, hypotension",
+      "confidence": 0.9998,
+      "coordinates": [
+        [
+          0,
+          555
+        ],
+        [
+          206,
+          566
+        ],
+        [
+          204,
+          596
+        ],
+        [
+          0,
+          586
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "grayscale",
+      "original_text": "Sepsis, hypotension",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Ward 27",
+      "confidence": 0.9997,
+      "coordinates": [
+        [
+          131,
+          516
+        ],
+        [
+          232,
+          519
+        ],
+        [
+          231,
+          552
+        ],
+        [
+          130,
+          549
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "Ward 27",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Ward 6",
+      "confidence": 0.9992,
+      "coordinates": [
+        [
+          130,
+          434
+        ],
+        [
+          222,
+          437
+        ],
+        [
+          221,
+          469
+        ],
+        [
+          129,
+          467
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "Ward 6",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "UTI, weight loss",
+      "confidence": 0.9979,
+      "coordinates": [
+        [
+          0,
+          597
+        ],
+        [
+          167,
+          607
+        ],
+        [
+          165,
+          638
+        ],
+        [
+          0,
+          628
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "UTI, weight loss",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Biliary sepsis",
+      "confidence": 0.9968,
+      "coordinates": [
+        [
+          0,
+          483
+        ],
+        [
+          130,
+          486
+        ],
+        [
+          130,
+          515
+        ],
+        [
+          0,
+          511
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "Biliary sepsis",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Dlagnosis",
+      "confidence": 0.9794,
+      "coordinates": [
+        [
+          3,
+          396
+        ],
+        [
+          98,
+          390
+        ],
+        [
+          100,
+          418
+        ],
+        [
+          4,
+          424
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "Dlagnosis",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Billiary sepsis",
+      "confidence": 0.9769,
+      "coordinates": [
+        [
+          14,
+          479
+        ],
+        [
+          138,
+          479
+        ],
+        [
+          138,
+          507
+        ],
+        [
+          14,
+          507
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "Billiary sepsis",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Diagnosls",
+      "confidence": 0.968,
+      "coordinates": [
+        [
+          0,
+          394
+        ],
+        [
+          99,
+          390
+        ],
+        [
+          100,
+          419
+        ],
+        [
+          0,
+          423
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "Diagnosls",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "UT!, weight loss",
+      "confidence": 0.9647,
+      "coordinates": [
+        [
+          0,
+          602
+        ],
+        [
+          166,
+          607
+        ],
+        [
+          165,
+          641
+        ],
+        [
+          0,
+          635
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "UT!, weight loss",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Dlagnosls",
+      "confidence": 0.9491,
+      "coordinates": [
+        [
+          0,
+          394
+        ],
+        [
+          98,
+          388
+        ],
+        [
+          100,
+          417
+        ],
+        [
+          2,
+          423
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "grayscale",
+      "original_text": "Dlagnosls",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Ward",
+      "confidence": 0.8938,
+      "coordinates": [
+        [
+          129,
+          434
+        ],
+        [
+          218,
+          434
+        ],
+        [
+          218,
+          463
+        ],
+        [
+          129,
+          463
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "grayscale",
+      "original_text": "Ward",
+      "corrections": [],
+      "status": "review"
+    }
+  ]
+}

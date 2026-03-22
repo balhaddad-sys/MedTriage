@@ -1,0 +1,72 @@
+{
+  "file": "sample_00033.png",
+  "file_hash": "1e1b96ad410eefdaed1dc87eb079cb0589f5cb8a23b5659853d36c64a5eb1661",
+  "timestamp": "2026-03-22T05:41:06.107562+00:00",
+  "processing_time_s": 30.05,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 2,
+    "accepted": 2,
+    "flagged_for_review": 0,
+    "rejected": 0,
+    "avg_confidence": 0.9904
+  },
+  "elements": [
+    {
+      "text": "ding",
+      "confidence": 0.9969,
+      "coordinates": [
+        [
+          0,
+          270
+        ],
+        [
+          66,
+          270
+        ],
+        [
+          66,
+          305
+        ],
+        [
+          0,
+          305
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "ding",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "dine",
+      "confidence": 0.9838,
+      "coordinates": [
+        [
+          0,
+          266
+        ],
+        [
+          68,
+          266
+        ],
+        [
+          68,
+          310
+        ],
+        [
+          0,
+          310
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "dine",
+      "corrections": [],
+      "status": "accepted"
+    }
+  ]
+}

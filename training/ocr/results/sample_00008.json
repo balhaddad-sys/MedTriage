@@ -1,0 +1,324 @@
+{
+  "file": "sample_00008.png",
+  "file_hash": "abd730a62cf8cf13c4663a535dc4495f6c852036f34228f2477eaeaf3990fefd",
+  "timestamp": "2026-03-22T02:49:41.641315+00:00",
+  "processing_time_s": 63.75,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 11,
+    "accepted": 4,
+    "flagged_for_review": 5,
+    "rejected": 2,
+    "avg_confidence": 0.7718
+  },
+  "elements": [
+    {
+      "text": "aaisha al fadl",
+      "confidence": 0.956,
+      "coordinates": [
+        [
+          117,
+          36
+        ],
+        [
+          342,
+          34
+        ],
+        [
+          342,
+          71
+        ],
+        [
+          117,
+          73
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "aaisha al fadl",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Ivfexacerbation",
+      "confidence": 0.9524,
+      "coordinates": [
+        [
+          398,
+          37
+        ],
+        [
+          640,
+          37
+        ],
+        [
+          640,
+          70
+        ],
+        [
+          398,
+          70
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "grayscale",
+      "original_text": "Ivfexacerbation",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "I vfexacerbation",
+      "confidence": 0.9394,
+      "coordinates": [
+        [
+          407,
+          36
+        ],
+        [
+          657,
+          36
+        ],
+        [
+          657,
+          72
+        ],
+        [
+          407,
+          72
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "I vfexacerbation",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "ivtexacerbation",
+      "confidence": 0.9282,
+      "coordinates": [
+        [
+          428,
+          35
+        ],
+        [
+          682,
+          35
+        ],
+        [
+          682,
+          71
+        ],
+        [
+          428,
+          71
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "ivtexacerbation",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "/Lvfexacerbation",
+      "confidence": 0.919,
+      "coordinates": [
+        [
+          373,
+          37
+        ],
+        [
+          643,
+          35
+        ],
+        [
+          643,
+          68
+        ],
+        [
+          373,
+          70
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "/Lvfexacerbation",
+      "corrections": [],
+      "status": "review"
+    },
+    {
+      "text": "aaisha al fadlli",
+      "confidence": 0.9068,
+      "coordinates": [
+        [
+          114,
+          37
+        ],
+        [
+          326,
+          36
+        ],
+        [
+          326,
+          70
+        ],
+        [
+          114,
+          71
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "grayscale",
+      "original_text": "aaisha al fadlli",
+      "corrections": [],
+      "status": "review"
+    },
+    {
+      "text": "aaisha aHad",
+      "confidence": 0.8249,
+      "coordinates": [
+        [
+          122,
+          39
+        ],
+        [
+          339,
+          37
+        ],
+        [
+          339,
+          69
+        ],
+        [
+          122,
+          71
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "aaisha aHad",
+      "corrections": [],
+      "status": "review"
+    },
+    {
+      "text": "daisha al taal",
+      "confidence": 0.7618,
+      "coordinates": [
+        [
+          66,
+          40
+        ],
+        [
+          290,
+          37
+        ],
+        [
+          290,
+          71
+        ],
+        [
+          67,
+          75
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "daisha al taal",
+      "corrections": [],
+      "status": "review"
+    },
+    {
+      "text": "I8",
+      "confidence": 0.5994,
+      "coordinates": [
+        [
+          0,
+          35
+        ],
+        [
+          41,
+          35
+        ],
+        [
+          41,
+          70
+        ],
+        [
+          0,
+          70
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "I8",
+      "corrections": [],
+      "status": "review"
+    },
+    {
+      "text": "B",
+      "confidence": 0.3539,
+      "coordinates": [
+        [
+          0,
+          33
+        ],
+        [
+          36,
+          33
+        ],
+        [
+          36,
+          69
+        ],
+        [
+          0,
+          69
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "B",
+      "corrections": [],
+      "status": "rejected"
+    },
+    {
+      "text": "aaiat",
+      "confidence": 0.3484,
+      "coordinates": [
+        [
+          127,
+          37
+        ],
+        [
+          391,
+          35
+        ],
+        [
+          392,
+          71
+        ],
+        [
+          127,
+          73
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "aaiat",
+      "corrections": [],
+      "status": "rejected"
+    }
+  ]
+}

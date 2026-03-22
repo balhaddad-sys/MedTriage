@@ -122,7 +122,7 @@ export default function CivilIdCameraScanner({ onResult, onCancel, autoStart }) 
     };
 
     // Scan every 500ms
-    scanRef.current = setInterval(scan, 500);
+    scanRef.current = setInterval(scan, 1200);
     return () => { if (scanRef.current) clearInterval(scanRef.current); };
   }, [scanning, found, onResult]);
 

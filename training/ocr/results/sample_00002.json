@@ -1,15 +1,44 @@
 {
   "file": "sample_00002.png",
-  "file_hash": "1d5ccdf841635f0f634ce90da0341fa689bce249d654e3646ba377e05204751f",
-  "timestamp": "2026-03-22T02:38:37.828544+00:00",
-  "processing_time_s": 40.16,
+  "file_hash": "0abbb4f4339ebef46a81262ba28ab7ae8efcbdfc97ca6bf9bb4ca951a9f5a25d",
+  "timestamp": "2026-03-22T02:45:22.831159+00:00",
+  "processing_time_s": 41.86,
   "backend": "PaddleBackend",
   "summary": {
-    "total_elements": 0,
-    "accepted": 0,
+    "total_elements": 1,
+    "accepted": 1,
     "flagged_for_review": 0,
     "rejected": 0,
-    "avg_confidence": 0.0
+    "avg_confidence": 0.9939
   },
-  "elements": []
+  "elements": [
+    {
+      "text": "stroke",
+      "confidence": 0.9939,
+      "coordinates": [
+        [
+          0,
+          514
+        ],
+        [
+          90,
+          514
+        ],
+        [
+          90,
+          551
+        ],
+        [
+          0,
+          551
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "stroke",
+      "corrections": [],
+      "status": "accepted"
+    }
+  ]
 }

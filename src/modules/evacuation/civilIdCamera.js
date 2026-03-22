@@ -38,27 +38,7 @@ export async function captureFrameAsync(video, canvas, quality) {
     } catch { /* fall through */ }
   }
 
-  // Method 2: ImageCapture.takePhoto() — captures a full photo frame
-  if (video.srcObject && 'ImageCapture' in window) {
-    try {
-      const track = video.srcObject.getVideoTracks()[0];
-      if (track && track.readyState === 'live') {
-        const capture = new ImageCapture(track);
-        const blob = await capture.takePhoto({ imageWidth: 1280 });
-        const bitmap = await createImageBitmap(blob);
-        const ctx = canvas.getContext('2d');
-        canvas.width = bitmap.width;
-        canvas.height = bitmap.height;
-        ctx.drawImage(bitmap, 0, 0);
-        bitmap.close();
-        if (isNonBlack(ctx, canvas.width, canvas.height)) {
-          return canvas.toDataURL('image/jpeg', quality || 0.8);
-        }
-      }
-    } catch { /* fall through */ }
-  }
-
-  // Method 3: canvas.drawImage(video) — standard but unreliable on Android
+  // Method 2: canvas.drawImage(video) — standard fallback
   try {
     const ctx = canvas.getContext('2d');
     const w = Math.min(video.videoWidth, 1280);

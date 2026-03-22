@@ -1,0 +1,184 @@
+{
+  "file": "sample_00017.png",
+  "file_hash": "f5f30cc52107ba5368eadff15a45f01c8cf7498a7eed7fcbb369101b270b652d",
+  "timestamp": "2026-03-22T02:54:31.228027+00:00",
+  "processing_time_s": 100.02,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 6,
+    "accepted": 6,
+    "flagged_for_review": 0,
+    "rejected": 0,
+    "avg_confidence": 0.991
+  },
+  "elements": [
+    {
+      "text": "Ward 5",
+      "confidence": 0.9999,
+      "coordinates": [
+        [
+          118,
+          562
+        ],
+        [
+          217,
+          562
+        ],
+        [
+          217,
+          594
+        ],
+        [
+          118,
+          594
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "Ward 5",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "gnosis",
+      "confidence": 0.9998,
+      "coordinates": [
+        [
+          0,
+          514
+        ],
+        [
+          94,
+          506
+        ],
+        [
+          97,
+          541
+        ],
+        [
+          0,
+          550
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "gnosis",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "with aphasia",
+      "confidence": 0.9997,
+      "coordinates": [
+        [
+          0,
+          618
+        ],
+        [
+          137,
+          614
+        ],
+        [
+          138,
+          644
+        ],
+        [
+          0,
+          649
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "with aphasia",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "agnosis",
+      "confidence": 0.9989,
+      "coordinates": [
+        [
+          0,
+          524
+        ],
+        [
+          96,
+          516
+        ],
+        [
+          99,
+          548
+        ],
+        [
+          0,
+          557
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "agnosis",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "A with aphasia",
+      "confidence": 0.9842,
+      "coordinates": [
+        [
+          0,
+          623
+        ],
+        [
+          138,
+          616
+        ],
+        [
+          139,
+          647
+        ],
+        [
+          0,
+          654
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "grayscale",
+      "original_text": "A with aphasia",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "ignosis",
+      "confidence": 0.9633,
+      "coordinates": [
+        [
+          0,
+          665
+        ],
+        [
+          91,
+          657
+        ],
+        [
+          94,
+          690
+        ],
+        [
+          0,
+          698
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "ignosis",
+      "corrections": [],
+      "status": "accepted"
+    }
+  ]
+}

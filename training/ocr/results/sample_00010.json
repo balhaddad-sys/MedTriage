@@ -1,0 +1,100 @@
+{
+  "file": "sample_00010.png",
+  "file_hash": "e4616f9867fe2cdc6eabd95d8dadf541f5a43dfda07507cce3b69adb00890e81",
+  "timestamp": "2026-03-22T02:50:33.091219+00:00",
+  "processing_time_s": 24.52,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 3,
+    "accepted": 2,
+    "flagged_for_review": 1,
+    "rejected": 0,
+    "avg_confidence": 0.9587
+  },
+  "elements": [
+    {
+      "text": "a",
+      "confidence": 0.9997,
+      "coordinates": [
+        [
+          30,
+          104
+        ],
+        [
+          67,
+          104
+        ],
+        [
+          67,
+          135
+        ],
+        [
+          30,
+          135
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "a",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "a al",
+      "confidence": 0.9685,
+      "coordinates": [
+        [
+          0,
+          106
+        ],
+        [
+          68,
+          97
+        ],
+        [
+          68,
+          137
+        ],
+        [
+          0,
+          146
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "a al",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "al",
+      "confidence": 0.908,
+      "coordinates": [
+        [
+          0,
+          106
+        ],
+        [
+          39,
+          106
+        ],
+        [
+          39,
+          140
+        ],
+        [
+          0,
+          140
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "al",
+      "corrections": [],
+      "status": "review"
+    }
+  ]
+}

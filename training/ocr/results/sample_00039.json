@@ -1,0 +1,72 @@
+{
+  "file": "sample_00039.png",
+  "file_hash": "fec7dabfef75019e18e2580eb2c2c11587f38b58315c0e35ed2674dc2066628f",
+  "timestamp": "2026-03-22T05:44:54.738754+00:00",
+  "processing_time_s": 48.14,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 2,
+    "accepted": 1,
+    "flagged_for_review": 1,
+    "rejected": 0,
+    "avg_confidence": 0.755
+  },
+  "elements": [
+    {
+      "text": "SIS",
+      "confidence": 0.9995,
+      "coordinates": [
+        [
+          0,
+          459
+        ],
+        [
+          58,
+          465
+        ],
+        [
+          53,
+          506
+        ],
+        [
+          0,
+          499
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "SIS",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "R",
+      "confidence": 0.5104,
+      "coordinates": [
+        [
+          6,
+          483
+        ],
+        [
+          25,
+          483
+        ],
+        [
+          25,
+          504
+        ],
+        [
+          6,
+          504
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "R",
+      "corrections": [],
+      "status": "review"
+    }
+  ]
+}

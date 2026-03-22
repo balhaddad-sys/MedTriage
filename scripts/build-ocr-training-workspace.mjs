@@ -160,9 +160,19 @@ function buildSheetHeaders() {
     'Patient name',
     'Patient Name',
     'Diagnosis',
+    'Medications',
+    'Medication / Notes',
+    'Medication Notes',
+    'Plan / Notes',
+    'Meds',
     'Assigned Doctor',
+    'Assigned Dr',
+    'Consultant Name',
+    'Assigned Consultant',
     'Assigned doctor',
     'Doctor',
+    'Primary Team',
+    'Responsible Doctor',
     'Consultant',
     'Team',
     'Status',
@@ -189,6 +199,13 @@ function buildSheetHeaderRows() {
     'Ward Patient name Diagnosis Assigned Doctor Status',
     'Ward / Room Patient name Diagnosis Team Status',
     'Patient name Diagnosis Status',
+    'Room / Ward Patient name Diagnosis Medication Assigned Doctor Status',
+    'Room / Ward Patient name Diagnosis Meds Assigned Dr Status',
+    'Room No Patient Name Diagnosis Medications Consultant Name Status',
+    'Ward / Room Patient name Diagnosis Medication Team Status',
+    'Room / Ward Patient name Diagnosis Medication Notes Primary Team Status',
+    'Room No Patient Name Diagnosis Plan / Notes Responsible Doctor Status',
+    'Ward / Room Pt Name Diagnosis Medications Assigned Consultant Status',
   ]);
 }
 
@@ -206,11 +223,16 @@ function buildSectionTitles() {
     'Female list chronic',
     'Male list pending',
     'Female list pending',
+    'Male list (pending review)',
+    'Female list (pending review)',
     'Male list transfer',
     'Female list transfer',
     'Active list',
     'Acute list',
     'Transfer list',
+    'Unassigned list',
+    'Observation list',
+    'Stepdown list',
     'Male list',
     'Female list',
     'Chronic list',
@@ -234,6 +256,12 @@ function buildSheetTitles() {
     'Bed Board',
     'Unit Census',
     'Daily Census',
+    'Ward Handover',
+    'Overnight Handover',
+    'Daily Transfer List',
+    'ER Census',
+    'Admission Board',
+    'Weekend Census',
   ]);
 }
 
@@ -260,6 +288,11 @@ function buildDetailDiagnosisPhrases() {
     'Biliary sepsis',
     'Chest infection, AKI',
     'NSTEMI, heart failure',
+    'Acute stroke, aspiration risk',
+    'Delirium, fall risk',
+    'DKA, AKI',
+    'Pneumonia, sepsis',
+    'COPD exacerbation',
   ]);
 }
 
@@ -279,6 +312,9 @@ function buildSheetStatuses() {
     'Ward discharge',
     'Resolved',
     'Deteriorating',
+    'Review',
+    'Transferred',
+    'Awaiting bed',
   ]);
 }
 
@@ -294,6 +330,9 @@ function buildDoctorTitles() {
     'On-call',
     'Consultant Dr',
     'Team Dr',
+    'Assigned Consultant',
+    'Primary Team',
+    'On-call Dr',
   ]);
 }
 
@@ -350,6 +389,7 @@ function buildPhrases(domain) {
   const sheetTitles = domain.sheetTitles;
   const sheetHeaders = domain.sheetHeaders;
   const sheetHeaderRows = domain.sheetHeaderRows;
+  const medicationHeaderRows = domain.sheetHeaderRows.filter(row => /medication|medications|meds/i.test(row));
   const sectionTitles = domain.sectionTitles;
   const sheetStatuses = domain.sheetStatuses;
   const detailDiagnosisPhrases = domain.detailDiagnosisPhrases;
@@ -402,19 +442,27 @@ function buildPhrases(domain) {
     const doctor = doctorNames[(i * 3 + 5) % doctorNames.length];
     const doctorLower = toLowerIfLatin(doctor);
     const doctorAlt = doctorNames[(i * 5 + 21) % doctorNames.length];
+    const doctorThird = doctorNames[(i * 7 + 27) % doctorNames.length];
     const doctorTitleAlt = doctorTitles[(i * 7 + 13) % doctorTitles.length];
+    const doctorTitleThird = doctorTitles[(i * 11 + 15) % doctorTitles.length];
     const diagnosis = diagnoses[(i * 5 + 11) % diagnoses.length];
     const detailDiagnosis = detailDiagnosisPhrases[i % detailDiagnosisPhrases.length];
     const detailDiagnosisAlt = detailDiagnosisPhrases[(i * 3 + 7) % detailDiagnosisPhrases.length];
     const detailDiagnosisThird = detailDiagnosisPhrases[(i * 7 + 15) % detailDiagnosisPhrases.length];
     const medication = meds[(i * 7 + 17) % meds.length];
+    const medicationAlt = meds[(i * 9 + 23) % meds.length];
+    const medicationThird = meds[(i * 11 + 29) % meds.length];
     const status = sheetStatuses[(i * 2 + 3) % sheetStatuses.length];
     const statusAlt = sheetStatuses[(i * 5 + 9) % sheetStatuses.length];
     const statusThird = sheetStatuses[(i * 7 + 11) % sheetStatuses.length];
     const section = sectionTitles[(i * 3 + 1) % sectionTitles.length];
+    const sectionAlt = sectionTitles[(i * 5 + 3) % sectionTitles.length];
+    const sectionThird = sectionTitles[(i * 7 + 5) % sectionTitles.length];
     const sheetTitle = sheetTitles[(i * 7 + 9) % sheetTitles.length];
+    const sheetTitleAlt = sheetTitles[(i * 9 + 13) % sheetTitles.length];
     const doctorTitle = doctorTitles[(i * 5 + 7) % doctorTitles.length];
     const headerRow = sheetHeaderRows[i % sheetHeaderRows.length];
+    const medicationHeaderRow = medicationHeaderRows[(i * 3 + 17) % Math.max(medicationHeaderRows.length, 1)] || headerRow;
 
     rows.push(sheetTitle);
     rows.push(`${sheetTitle} ${section}`);
@@ -467,6 +515,15 @@ function buildPhrases(domain) {
     rows.push(`${sheetTitle} ${section} ${headerRow} ${ward} ${numericRoom} ${patientNameHead} ${detailDiagnosis} ${doctorTitle} ${doctor} ${status} ${patientNameTail} ${roomAlt} ${patientNameAltHead} ${detailDiagnosisAlt} ${doctorTitleAlt} ${doctorAlt} ${statusAlt} ${patientNameAltTail}`);
     rows.push(`${sheetTitle} ${section} Patient name Diagnosis Assigned Dr ${ward} ${numericRoom} ${patientName} ${detailDiagnosis} ${doctorTitle} ${doctor} ${status} ${patientNameAlt} ${detailDiagnosisAlt} ${doctorTitleAlt} ${doctorAlt}`);
     rows.push(`${sheetTitle} ${section} Room / Ward Patient name Diagnosis Assigned Doctor ${ward} ${numericRoom} ${patientName} ${detailDiagnosis} ${doctorTitle} ${doctor} ${roomAlt} ${patientNameAlt} ${diagnosis}`);
+    rows.push(`${sheetTitle} ${section} ${medicationHeaderRow} ${ward} ${numericRoom} ${patientName} ${detailDiagnosis} ${medication} ${doctorTitle} ${doctor} ${status} ${roomAlt} ${patientNameAlt} ${detailDiagnosisAlt} ${medicationAlt} ${doctorTitleAlt} ${doctorAlt} ${statusAlt}`);
+    rows.push(`${sheetTitle} ${section} ${medicationHeaderRow} ${ward} ${numericRoom} ${patientName} ${detailDiagnosis} ${medication} ${doctorTitle} ${doctor} ${status} ${medicationAlt} ${roomAlt} ${patientNameAlt} ${detailDiagnosisAlt} ${medicationThird} ${doctorTitleAlt} ${doctorAlt} ${statusAlt}`);
+    rows.push(`${sheetTitle} ${section} ${headerRow} ${ward} ${numericRoom} ${patientName} ${detailDiagnosis} ${doctorTitle} ${doctor} ${status} ${sectionAlt} ${headerRow} ${wardAlt} ${roomAlt} ${patientNameAlt} ${detailDiagnosisAlt} ${doctorTitleAlt} ${doctorAlt} ${statusAlt} ${roomThird} ${patientNameThird} ${detailDiagnosisThird} ${doctorTitleThird} ${doctorThird} ${statusThird}`);
+    rows.push(`${sheetTitle} ${section} ${medicationHeaderRow} ${ward} ${numericRoom} ${patientName} ${detailDiagnosis} ${medication} ${doctorTitle} ${doctor} ${status} ${sectionAlt} ${medicationHeaderRow} ${wardAlt} ${roomAlt} ${patientNameAlt} ${detailDiagnosisAlt} ${medicationAlt} ${doctorTitleAlt} ${doctorAlt} ${statusAlt} ${sectionThird} ${wardTokens[(i * 17 + 9) % wardTokens.length]} ${roomThird} ${patientNameThird} ${detailDiagnosisThird} ${medicationThird} ${doctorTitleThird} ${doctorThird} ${statusThird}`);
+    rows.push(`${sheetTitle} ${section} ${headerRow} ${ward} ${numericRoom} ${patientNameHead} ${detailDiagnosis} ${doctorTitle} ${doctor} ${status} ${patientNameTail} ${roomAlt} ${patientNameAlt} ${detailDiagnosisAlt} ${doctorTitleAlt} ${doctorAlt} ${statusAlt} ${sectionAlt} ${headerRow} ${wardAlt} ${roomThird} ${patientNameThird} ${detailDiagnosisThird} ${doctorTitleThird} ${doctorThird} ${statusThird}`);
+    rows.push(`${sheetTitle} Male list (active) ${headerRow} ${ward} ${numericRoom} ${patientName} ${detailDiagnosis} ${doctorTitle} ${doctor} Active ${roomAlt} ${patientNameAlt} ${detailDiagnosisAlt} ${doctorTitleAlt} ${doctorAlt} New Chronic list ${headerRow} ${wardAlt} ${roomThird} ${patientNameThird} ${detailDiagnosisThird} ${doctorTitleThird} ${doctorThird} Chronic`);
+    rows.push(`${sheetTitleAlt} Unassigned list ${headerRow} ER/Unassigned ${numericRoom} ${patientName} ${detailDiagnosis} ${doctorTitle} ${doctor} Review ${patientNameAlt} ${detailDiagnosisAlt} Awaiting bed ${roomAlt} ${patientNameThird} ${detailDiagnosisThird} ${doctorTitleAlt} ${doctorAlt} Transferred`);
+    rows.push(`${sheetTitle} ${section} ${medicationHeaderRow} ${ward} ${numericRoom} ${patientName} ${detailDiagnosis} ${medication} ${doctorTitle} ${doctor} ${status} ${medicationAlt} ${statusAlt} ${roomAlt} ${patientNameAlt} ${detailDiagnosisAlt} ${medicationThird} ${doctorTitleAlt} ${doctorAlt} ${statusThird}`);
+    rows.push(`${sheetTitleAlt} ${sectionAlt} ${headerRow} ${wardAlt} ${numericRoom} ${patientName} ${detailDiagnosis} ${doctorTitle} ${doctor} ${status} ${patientNameAlt} ${detailDiagnosisAlt} ${statusAlt} ${patientNameThird} ${detailDiagnosisThird} ${doctorTitleThird} ${doctorThird} ${statusThird}`);
     rows.push(`${sheetHeaders[i % sheetHeaders.length]} ${sheetHeaders[(i + 1) % sheetHeaders.length]}`);
   }
 

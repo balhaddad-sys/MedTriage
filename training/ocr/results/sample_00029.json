@@ -1,0 +1,128 @@
+{
+  "file": "sample_00029.png",
+  "file_hash": "e7d794d68875ec926cdcc60995bf267d0e68e7671af6cfe230d781e52dbc427c",
+  "timestamp": "2026-03-22T05:38:44.321528+00:00",
+  "processing_time_s": 23.51,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 4,
+    "accepted": 1,
+    "flagged_for_review": 3,
+    "rejected": 0,
+    "avg_confidence": 0.8558
+  },
+  "elements": [
+    {
+      "text": "a",
+      "confidence": 0.9992,
+      "coordinates": [
+        [
+          1,
+          112
+        ],
+        [
+          22,
+          112
+        ],
+        [
+          22,
+          134
+        ],
+        [
+          1,
+          134
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "a",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "a AI-",
+      "confidence": 0.9011,
+      "coordinates": [
+        [
+          0,
+          104
+        ],
+        [
+          78,
+          96
+        ],
+        [
+          78,
+          133
+        ],
+        [
+          0,
+          140
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "a AI-",
+      "corrections": [],
+      "status": "review"
+    },
+    {
+      "text": "a ÅI-",
+      "confidence": 0.8637,
+      "coordinates": [
+        [
+          0,
+          105
+        ],
+        [
+          77,
+          105
+        ],
+        [
+          77,
+          138
+        ],
+        [
+          0,
+          138
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "a ÅI-",
+      "corrections": [],
+      "status": "review"
+    },
+    {
+      "text": "Al",
+      "confidence": 0.6593,
+      "coordinates": [
+        [
+          23,
+          105
+        ],
+        [
+          66,
+          105
+        ],
+        [
+          66,
+          136
+        ],
+        [
+          23,
+          136
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "Al",
+      "corrections": [],
+      "status": "review"
+    }
+  ]
+}

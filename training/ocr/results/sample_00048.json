@@ -1,0 +1,72 @@
+{
+  "file": "sample_00048.png",
+  "file_hash": "4567c78390545c3c439caa830481d735a80499a3e07c2bd2583f5ed436252019",
+  "timestamp": "2026-03-22T05:51:27.654448+00:00",
+  "processing_time_s": 38.72,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 2,
+    "accepted": 1,
+    "flagged_for_review": 1,
+    "rejected": 0,
+    "avg_confidence": 0.8519
+  },
+  "elements": [
+    {
+      "text": "Diag",
+      "confidence": 0.9244,
+      "coordinates": [
+        [
+          0,
+          452
+        ],
+        [
+          68,
+          457
+        ],
+        [
+          65,
+          492
+        ],
+        [
+          0,
+          487
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "Diag",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Diag1",
+      "confidence": 0.7795,
+      "coordinates": [
+        [
+          0,
+          460
+        ],
+        [
+          66,
+          455
+        ],
+        [
+          68,
+          490
+        ],
+        [
+          0,
+          495
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "Diag1",
+      "corrections": [],
+      "status": "review"
+    }
+  ]
+}

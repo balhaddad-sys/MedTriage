@@ -1,0 +1,72 @@
+{
+  "file": "sample_00047.png",
+  "file_hash": "13f6c391a1a55d487b5da3c36e96620f70764f649b9b981226cb2bf6ea081d54",
+  "timestamp": "2026-03-22T05:50:48.916258+00:00",
+  "processing_time_s": 30.36,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 2,
+    "accepted": 2,
+    "flagged_for_review": 0,
+    "rejected": 0,
+    "avg_confidence": 0.9692
+  },
+  "elements": [
+    {
+      "text": "ection",
+      "confidence": 0.9999,
+      "coordinates": [
+        [
+          0,
+          169
+        ],
+        [
+          82,
+          167
+        ],
+        [
+          82,
+          202
+        ],
+        [
+          0,
+          204
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "ection",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "ectior",
+      "confidence": 0.9385,
+      "coordinates": [
+        [
+          0,
+          172
+        ],
+        [
+          82,
+          170
+        ],
+        [
+          82,
+          202
+        ],
+        [
+          0,
+          204
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "ectior",
+      "corrections": [],
+      "status": "accepted"
+    }
+  ]
+}

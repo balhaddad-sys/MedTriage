@@ -1,0 +1,100 @@
+{
+  "file": "sample_00024.png",
+  "file_hash": "539e154628a0789ad7ef956cf8f499af7ce62b9c5f8ae9e3b94598060d5305e7",
+  "timestamp": "2026-03-22T05:36:12.665016+00:00",
+  "processing_time_s": 47.53,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 3,
+    "accepted": 1,
+    "flagged_for_review": 2,
+    "rejected": 0,
+    "avg_confidence": 0.8669
+  },
+  "elements": [
+    {
+      "text": "ab",
+      "confidence": 0.9209,
+      "coordinates": [
+        [
+          0,
+          412
+        ],
+        [
+          67,
+          407
+        ],
+        [
+          68,
+          437
+        ],
+        [
+          0,
+          442
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "ab",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "abo",
+      "confidence": 0.8862,
+      "coordinates": [
+        [
+          6,
+          412
+        ],
+        [
+          66,
+          405
+        ],
+        [
+          68,
+          436
+        ],
+        [
+          10,
+          443
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "abo",
+      "corrections": [],
+      "status": "review"
+    },
+    {
+      "text": ", abc",
+      "confidence": 0.7936,
+      "coordinates": [
+        [
+          0,
+          416
+        ],
+        [
+          66,
+          403
+        ],
+        [
+          68,
+          436
+        ],
+        [
+          1,
+          449
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": ", abc",
+      "corrections": [],
+      "status": "review"
+    }
+  ]
+}

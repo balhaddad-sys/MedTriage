@@ -1,0 +1,44 @@
+{
+  "file": "sample_00027.png",
+  "file_hash": "71458c09d3abe96785d4cc203a1b53cc40c4760ad3e7f397781bf4d74b2179d4",
+  "timestamp": "2026-03-22T05:37:59.924481+00:00",
+  "processing_time_s": 27.12,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 1,
+    "accepted": 1,
+    "flagged_for_review": 0,
+    "rejected": 0,
+    "avg_confidence": 0.9993
+  },
+  "elements": [
+    {
+      "text": "waha",
+      "confidence": 0.9993,
+      "coordinates": [
+        [
+          0,
+          216
+        ],
+        [
+          71,
+          209
+        ],
+        [
+          72,
+          243
+        ],
+        [
+          0,
+          250
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "waha",
+      "corrections": [],
+      "status": "accepted"
+    }
+  ]
+}

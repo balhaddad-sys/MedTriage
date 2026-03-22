@@ -1,0 +1,212 @@
+{
+  "file": "sample_00025.png",
+  "file_hash": "445a087b31ed3c80ff371392f27952c081921645ed3900fb3893726eda09393a",
+  "timestamp": "2026-03-22T05:37:04.881777+00:00",
+  "processing_time_s": 52.2,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 7,
+    "accepted": 6,
+    "flagged_for_review": 1,
+    "rejected": 0,
+    "avg_confidence": 0.9609
+  },
+  "elements": [
+    {
+      "text": "Diagnosis",
+      "confidence": 0.9998,
+      "coordinates": [
+        [
+          383,
+          23
+        ],
+        [
+          540,
+          23
+        ],
+        [
+          540,
+          63
+        ],
+        [
+          383,
+          63
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "Diagnosis",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Patient name",
+      "confidence": 0.9994,
+      "coordinates": [
+        [
+          978,
+          20
+        ],
+        [
+          1240,
+          26
+        ],
+        [
+          1239,
+          71
+        ],
+        [
+          976,
+          65
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "Patient name",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Assigned Dactc Status",
+      "confidence": 0.9953,
+      "coordinates": [
+        [
+          72,
+          20
+        ],
+        [
+          433,
+          20
+        ],
+        [
+          433,
+          76
+        ],
+        [
+          72,
+          76
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "grayscale",
+      "original_text": "Assigned Dactc Status",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Assigned Doctc Status",
+      "confidence": 0.9887,
+      "coordinates": [
+        [
+          24,
+          13
+        ],
+        [
+          66,
+          13
+        ],
+        [
+          66,
+          354
+        ],
+        [
+          24,
+          354
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "Assigned Doctc Status",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Room / Patient name",
+      "confidence": 0.9685,
+      "coordinates": [
+        [
+          21,
+          891
+        ],
+        [
+          69,
+          891
+        ],
+        [
+          71,
+          1236
+        ],
+        [
+          23,
+          1236
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "Room / Patient name",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Assigned Docto Starus",
+      "confidence": 0.9432,
+      "coordinates": [
+        [
+          848,
+          20
+        ],
+        [
+          1234,
+          24
+        ],
+        [
+          1234,
+          69
+        ],
+        [
+          847,
+          65
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "Assigned Docto Starus",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "m Patient name",
+      "confidence": 0.8314,
+      "coordinates": [
+        [
+          0,
+          18
+        ],
+        [
+          310,
+          18
+        ],
+        [
+          310,
+          73
+        ],
+        [
+          0,
+          73
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "m Patient name",
+      "corrections": [],
+      "status": "review"
+    }
+  ]
+}

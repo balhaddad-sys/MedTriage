@@ -1,0 +1,3 @@
+{"source_image": "sample_00034.png", "timestamp": "2026-03-22T05:41:49.726689+00:00", "text": "lard", "original_text": "lard", "confidence": 0.8832, "coordinates": [[0, 648], [68, 656], [68, 692], [0, 683]], "corrections": [], "human_correction": null}
+{"source_image": "sample_00034.png", "timestamp": "2026-03-22T05:41:49.730692+00:00", "text": "puel", "original_text": "puel", "confidence": 0.7356, "coordinates": [[4, 656], [68, 660], [67, 695], [1, 691]], "corrections": [], "human_correction": null}
+{"source_image": "sample_00034.png", "timestamp": "2026-03-22T05:41:49.731695+00:00", "text": "pue!", "original_text": "pue!", "confidence": 0.5997, "coordinates": [[2, 648], [68, 655], [68, 690], [0, 683]], "corrections": [], "human_correction": null}

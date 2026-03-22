@@ -1,0 +1,128 @@
+{
+  "file": "sample_00009.png",
+  "file_hash": "107c7ef7aa5606c8a518b32262de9a89949133082d42dcc9813a8af9db05ea2a",
+  "timestamp": "2026-03-22T02:50:08.570049+00:00",
+  "processing_time_s": 26.91,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 4,
+    "accepted": 2,
+    "flagged_for_review": 2,
+    "rejected": 0,
+    "avg_confidence": 0.817
+  },
+  "elements": [
+    {
+      "text": "dBoa",
+      "confidence": 0.9454,
+      "coordinates": [
+        [
+          0,
+          185
+        ],
+        [
+          70,
+          189
+        ],
+        [
+          70,
+          229
+        ],
+        [
+          0,
+          225
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "dBoa",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "d Boa",
+      "confidence": 0.9448,
+      "coordinates": [
+        [
+          0,
+          187
+        ],
+        [
+          70,
+          195
+        ],
+        [
+          70,
+          230
+        ],
+        [
+          0,
+          222
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "d Boa",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Boa",
+      "confidence": 0.8286,
+      "coordinates": [
+        [
+          7,
+          194
+        ],
+        [
+          70,
+          189
+        ],
+        [
+          70,
+          228
+        ],
+        [
+          10,
+          233
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "Boa",
+      "corrections": [],
+      "status": "review"
+    },
+    {
+      "text": "dBo",
+      "confidence": 0.5493,
+      "coordinates": [
+        [
+          0,
+          193
+        ],
+        [
+          70,
+          193
+        ],
+        [
+          70,
+          228
+        ],
+        [
+          0,
+          228
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "dBo",
+      "corrections": [],
+      "status": "review"
+    }
+  ]
+}

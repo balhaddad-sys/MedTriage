@@ -1,0 +1,156 @@
+{
+  "file": "sample_00031.png",
+  "file_hash": "55e6473042332d03640e55cf05f85625770a58a9b997845415656b4b5a35e9a8",
+  "timestamp": "2026-03-22T05:40:13.692056+00:00",
+  "processing_time_s": 48.02,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 5,
+    "accepted": 3,
+    "flagged_for_review": 2,
+    "rejected": 0,
+    "avg_confidence": 0.9198
+  },
+  "elements": [
+    {
+      "text": "ale list chronic) Ward 12\\ aaliya al hajri | Aspiration pneumonia | Resolve",
+      "confidence": 0.9428,
+      "coordinates": [
+        [
+          0,
+          30
+        ],
+        [
+          978,
+          31
+        ],
+        [
+          978,
+          62
+        ],
+        [
+          0,
+          61
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "ale list chronic) Ward 12\\ aaliya al hajri | Aspiration pneumonia | Resolve",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "male list chronicWard 12 aaliya al hajri \\ Aspiration preumonia Resolve",
+      "confidence": 0.9857,
+      "coordinates": [
+        [
+          0,
+          20
+        ],
+        [
+          979,
+          20
+        ],
+        [
+          979,
+          62
+        ],
+        [
+          0,
+          62
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "male list chronicWard 12  aaliya al hajri \\ Aspiration preumonia  Resolve",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "nalehnst chromic)Ward 12) aaliya al hajri Aspiration pneumoniaResolve",
+      "confidence": 0.9217,
+      "coordinates": [
+        [
+          0,
+          24
+        ],
+        [
+          978,
+          24
+        ],
+        [
+          978,
+          64
+        ],
+        [
+          0,
+          64
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "nalehnst chromic)Ward 12) aaliya al hajri Aspiration pneumoniaResolve",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "nale isi chrorc)Ward 12) aaliya al hajri Aspiration pneumonia Resolve",
+      "confidence": 0.9072,
+      "coordinates": [
+        [
+          0,
+          26
+        ],
+        [
+          977,
+          26
+        ],
+        [
+          977,
+          63
+        ],
+        [
+          0,
+          63
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "grayscale",
+      "original_text": "nale isi chrorc)Ward 12) aaliya al hajri Aspiration pneumonia Resolve",
+      "corrections": [],
+      "status": "review"
+    },
+    {
+      "text": "isi chronicWand Laaliva alhaini Aspiration pneumoniaResolv",
+      "confidence": 0.8414,
+      "coordinates": [
+        [
+          0,
+          22
+        ],
+        [
+          977,
+          20
+        ],
+        [
+          977,
+          56
+        ],
+        [
+          0,
+          58
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "isi chronicWand Laaliva alhaini Aspiration pneumoniaResolv",
+      "corrections": [],
+      "status": "review"
+    }
+  ]
+}

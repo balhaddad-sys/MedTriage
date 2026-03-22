@@ -13,7 +13,7 @@ It is designed around four stages:
 
 1. `npm run ocr:train:workspace`
 2. `npm run ocr:train:install`
-3. `npm run ocr:train:synth -- --count 1500`
+3. `npm run ocr:train:synth -- --count 3600`
 4. `npm run ocr:train:prepare`
 5. `npm run verify:ocr-training`
 
@@ -50,7 +50,7 @@ Each JSONL line should look like:
 - This machine currently looks CPU-only, so any local fine-tuning here will be a smoke test rather than a fast full training run.
 - The synthetic generator is meant to bootstrap the recognizer, not replace real hospital data.
 - The synthetic set now intentionally oversamples spreadsheet roster concepts like `Room / Ward`, `Ward / Bed`, `Room No`, `Patient name`, `Pt Name`, `Assigned Doctor`, `Assigned Dr`, `Consultant Name`, `Ward 20`, `Male list (active)`, `Transfer list`, `Ward Transfer Sheet`, `Evening Census`, `Bed Board`, `New`, `Pending`, and `Chronic`, plus lowercase transliterated names.
-- The generator also now emits sparse spreadsheet rows with blank doctor/status cells, numeric-room roster rows like `10 ali hussain ... Consultant saleh New`, ward-inline roster rows, ward pipe rows, title-section-header rows, header-alias rows, doctor-ward-status rows, title-header rows, doctor-status rows, numeric pipe rows, section-context rows, screenshot-style `sheet-block` sections with repeated headers and ward banners, mixed-language section blocks, wrapped-diagnosis continuation rows, stacked multi-ward blocks, split-name continuation blocks, partial-header blocks, and detail-heavy diagnoses like `CVA left MCA occlusion`, `Ischemic stroke with aphasia`, `Aspiration pneumonia`, `GI bleeding`, and `NSTEMI, heart failure`.
+- The generator also now emits sparse spreadsheet rows with blank doctor/status cells, numeric-room roster rows like `10 ali hussain ... Consultant saleh New`, ward-inline roster rows, ward pipe rows, title-section-header rows, header-alias rows, doctor-ward-status rows, title-header rows, doctor-status rows, numeric pipe rows, section-context rows, screenshot-style `sheet-block` sections with repeated headers and ward banners, mixed-language section blocks, wrapped-diagnosis continuation rows, stacked multi-ward blocks, split-name continuation blocks, partial-header blocks, deeper multi-section census blocks, medication-handover blocks with continuation rows, overnight handover blocks, active/chronic mixed sheet blocks, roomless status-mix blocks, medication-continuation blocks, unassigned transfer blocks, and detail-heavy diagnoses like `CVA left MCA occlusion`, `Ischemic stroke with aphasia`, `Aspiration pneumonia`, `GI bleeding`, `DKA, AKI`, and `COPD exacerbation`.
 - Synthetic rendering now tracks visual difficulty too, including washed-grid, soft-scan, banded-sheet, tight-crop, clipped-grid, dense-sheet, dense-line, merged-sheet, phone-capture, faded-block, dense-block, left-clipped-block, right-clipped-block, top-clipped-block, and bottom-clipped-block variants so the recognizer sees rougher screenshot-like sheet crops instead of only clean rows.
 - Synthetic generation is reproducible with `--seed` and now writes `training/ocr/raw/medtriage_synthetic/stats.json` so you can inspect coverage by kind, layout, style, difficulty, language, and split.
 - Public datasets listed in `manifest/datasets.json` are the external sources to add next.

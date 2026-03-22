@@ -1,0 +1,44 @@
+{
+  "file": "sample_00014.png",
+  "file_hash": "f094261929966b50546acf620b47c61f36dda9e39584c04ab11f7808725ea599",
+  "timestamp": "2026-03-22T02:52:11.199941+00:00",
+  "processing_time_s": 19.45,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 1,
+    "accepted": 1,
+    "flagged_for_review": 0,
+    "rejected": 0,
+    "avg_confidence": 0.9976
+  },
+  "elements": [
+    {
+      "text": "lisch",
+      "confidence": 0.9976,
+      "coordinates": [
+        [
+          0,
+          112
+        ],
+        [
+          68,
+          112
+        ],
+        [
+          68,
+          159
+        ],
+        [
+          0,
+          159
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "lisch",
+      "corrections": [],
+      "status": "accepted"
+    }
+  ]
+}

@@ -1,0 +1,44 @@
+{
+  "file": "sample_00030.png",
+  "file_hash": "46d6b5412564c1dc9ecdbb97ee5da70bdf1fe895a71c08199ed36a88bf90dca6",
+  "timestamp": "2026-03-22T05:39:25.651969+00:00",
+  "processing_time_s": 41.33,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 1,
+    "accepted": 1,
+    "flagged_for_review": 0,
+    "rejected": 0,
+    "avg_confidence": 0.9998
+  },
+  "elements": [
+    {
+      "text": "ab",
+      "confidence": 0.9998,
+      "coordinates": [
+        [
+          20,
+          520
+        ],
+        [
+          68,
+          520
+        ],
+        [
+          68,
+          560
+        ],
+        [
+          20,
+          560
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "ab",
+      "corrections": [],
+      "status": "accepted"
+    }
+  ]
+}

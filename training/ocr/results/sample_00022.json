@@ -1,0 +1,268 @@
+{
+  "file": "sample_00022.png",
+  "file_hash": "a0c5e551b044569435b9b267a638dfdc9ce52f5aa6607af2c85a8a357478287f",
+  "timestamp": "2026-03-22T05:34:16.920003+00:00",
+  "processing_time_s": 86.89,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 9,
+    "accepted": 6,
+    "flagged_for_review": 2,
+    "rejected": 1,
+    "avg_confidence": 0.8741
+  },
+  "elements": [
+    {
+      "text": "CVA left MCA occlusion",
+      "confidence": 0.9978,
+      "coordinates": [
+        [
+          429,
+          29
+        ],
+        [
+          733,
+          32
+        ],
+        [
+          733,
+          68
+        ],
+        [
+          429,
+          65
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "CVA left MCA occlusion",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Aaliya Alfahad",
+      "confidence": 0.9974,
+      "coordinates": [
+        [
+          102,
+          36
+        ],
+        [
+          290,
+          36
+        ],
+        [
+          290,
+          66
+        ],
+        [
+          102,
+          66
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "Aaliya Alfahad",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "abdulwahab",
+      "confidence": 0.9963,
+      "coordinates": [
+        [
+          954,
+          40
+        ],
+        [
+          1111,
+          40
+        ],
+        [
+          1111,
+          63
+        ],
+        [
+          954,
+          63
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "abdulwahab",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "abduiwahab",
+      "confidence": 0.9754,
+      "coordinates": [
+        [
+          921,
+          36
+        ],
+        [
+          1073,
+          36
+        ],
+        [
+          1073,
+          66
+        ],
+        [
+          921,
+          66
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "grayscale",
+      "original_text": "abduiwahab",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "CVA left MCA occlasion",
+      "confidence": 0.9562,
+      "coordinates": [
+        [
+          435,
+          33
+        ],
+        [
+          719,
+          36
+        ],
+        [
+          719,
+          69
+        ],
+        [
+          435,
+          66
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "CVA left MCA occlasion",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "CVA left MCA acclusion",
+      "confidence": 0.9369,
+      "coordinates": [
+        [
+          448,
+          34
+        ],
+        [
+          735,
+          37
+        ],
+        [
+          735,
+          66
+        ],
+        [
+          448,
+          63
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "CVA left MCA acclusion",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "9A.",
+      "confidence": 0.8255,
+      "coordinates": [
+        [
+          0,
+          34
+        ],
+        [
+          47,
+          34
+        ],
+        [
+          47,
+          68
+        ],
+        [
+          0,
+          68
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "9A.",
+      "corrections": [],
+      "status": "review"
+    },
+    {
+      "text": "Aaliva Aabad",
+      "confidence": 0.7119,
+      "coordinates": [
+        [
+          123,
+          30
+        ],
+        [
+          330,
+          32
+        ],
+        [
+          330,
+          68
+        ],
+        [
+          123,
+          66
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "Aaliva Aabad",
+      "corrections": [],
+      "status": "review"
+    },
+    {
+      "text": "GT",
+      "confidence": 0.4691,
+      "coordinates": [
+        [
+          1,
+          34
+        ],
+        [
+          18,
+          38
+        ],
+        [
+          12,
+          65
+        ],
+        [
+          0,
+          61
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "grayscale",
+      "original_text": "GT",
+      "corrections": [],
+      "status": "rejected"
+    }
+  ]
+}

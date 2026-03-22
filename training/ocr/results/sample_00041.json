@@ -1,0 +1,156 @@
+{
+  "file": "sample_00041.png",
+  "file_hash": "42407edab9311049b82964ccf5112e8e8c6a9481bc8b1a73cb6d40e152357c84",
+  "timestamp": "2026-03-22T05:45:58.492595+00:00",
+  "processing_time_s": 22.75,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 5,
+    "accepted": 0,
+    "flagged_for_review": 5,
+    "rejected": 0,
+    "avg_confidence": 0.6782
+  },
+  "elements": [
+    {
+      "text": "now",
+      "confidence": 0.7889,
+      "coordinates": [
+        [
+          0,
+          102
+        ],
+        [
+          68,
+          106
+        ],
+        [
+          68,
+          143
+        ],
+        [
+          0,
+          140
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "now",
+      "corrections": [],
+      "status": "review"
+    },
+    {
+      "text": "now!",
+      "confidence": 0.7197,
+      "coordinates": [
+        [
+          0,
+          105
+        ],
+        [
+          68,
+          109
+        ],
+        [
+          67,
+          142
+        ],
+        [
+          0,
+          138
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "grayscale",
+      "original_text": "now!",
+      "corrections": [],
+      "status": "review"
+    },
+    {
+      "text": "nowj",
+      "confidence": 0.6794,
+      "coordinates": [
+        [
+          0,
+          106
+        ],
+        [
+          68,
+          110
+        ],
+        [
+          67,
+          143
+        ],
+        [
+          0,
+          139
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "nowj",
+      "corrections": [],
+      "status": "review"
+    },
+    {
+      "text": "noup",
+      "confidence": 0.6108,
+      "coordinates": [
+        [
+          0,
+          109
+        ],
+        [
+          68,
+          111
+        ],
+        [
+          68,
+          140
+        ],
+        [
+          0,
+          138
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "noup",
+      "corrections": [],
+      "status": "review"
+    },
+    {
+      "text": "owj",
+      "confidence": 0.5922,
+      "coordinates": [
+        [
+          0,
+          107
+        ],
+        [
+          68,
+          107
+        ],
+        [
+          68,
+          141
+        ],
+        [
+          0,
+          141
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "owj",
+      "corrections": [],
+      "status": "review"
+    }
+  ]
+}

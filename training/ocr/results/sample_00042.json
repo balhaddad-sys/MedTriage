@@ -1,0 +1,44 @@
+{
+  "file": "sample_00042.png",
+  "file_hash": "35ddf1facb5f5bf97033e901a3bc53cb2157b7ba54e185befc713052450084a2",
+  "timestamp": "2026-03-22T05:46:28.121623+00:00",
+  "processing_time_s": 29.62,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 1,
+    "accepted": 1,
+    "flagged_for_review": 0,
+    "rejected": 0,
+    "avg_confidence": 0.9996
+  },
+  "elements": [
+    {
+      "text": "ousa",
+      "confidence": 0.9996,
+      "coordinates": [
+        [
+          0,
+          251
+        ],
+        [
+          67,
+          246
+        ],
+        [
+          68,
+          272
+        ],
+        [
+          0,
+          277
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "ousa",
+      "corrections": [],
+      "status": "accepted"
+    }
+  ]
+}

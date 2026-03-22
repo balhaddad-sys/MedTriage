@@ -1,0 +1,72 @@
+{
+  "file": "sample_00004.png",
+  "file_hash": "e3e51f58b481acfa4ca1c3cda14476a27d5b2f1623aba4e1f537386b8ee998ec",
+  "timestamp": "2026-03-22T02:46:22.934343+00:00",
+  "processing_time_s": 24.27,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 2,
+    "accepted": 2,
+    "flagged_for_review": 0,
+    "rejected": 0,
+    "avg_confidence": 0.9954
+  },
+  "elements": [
+    {
+      "text": "weigh",
+      "confidence": 0.9995,
+      "coordinates": [
+        [
+          0,
+          107
+        ],
+        [
+          72,
+          107
+        ],
+        [
+          72,
+          140
+        ],
+        [
+          0,
+          140
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "weigh",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "veigh",
+      "confidence": 0.9914,
+      "coordinates": [
+        [
+          0,
+          103
+        ],
+        [
+          72,
+          100
+        ],
+        [
+          72,
+          137
+        ],
+        [
+          0,
+          140
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "veigh",
+      "corrections": [],
+      "status": "accepted"
+    }
+  ]
+}

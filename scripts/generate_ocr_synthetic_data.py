@@ -210,9 +210,9 @@ def split_name_for_wrap(name: str):
     return tokens[0], ' '.join(tokens[1:])
 
 
-SHEET_TITLE_RE = re.compile(r'ward transfer sheet|morning census|evening census|night census|bed board|unit census|daily census', re.I)
-SECTION_TITLE_RE = re.compile(r'male list|female list|chronic list|acute list|transfer list|active patients', re.I)
-HEADER_ROW_RE = re.compile(r'patient name|pt name|assigned doctor|assigned dr|consultant name|doctor|status|diagnosis|room', re.I)
+SHEET_TITLE_RE = re.compile(r'ward transfer sheet|morning census|evening census|night census|bed board|unit census|daily census|ward handover|overnight handover|daily transfer list|er census|admission board|weekend census', re.I)
+SECTION_TITLE_RE = re.compile(r'male list|female list|chronic list|acute list|transfer list|active patients|unassigned list|observation list|stepdown list|pending review', re.I)
+HEADER_ROW_RE = re.compile(r'patient name|pt name|assigned doctor|assigned dr|consultant name|assigned consultant|primary team|responsible doctor|doctor|status|diagnosis|medication|medications|meds|medication notes|plan / notes|room', re.I)
 WARD_BANNER_RE = re.compile(r'^(?:ward \d+|icu|ccu|nicu|picu|hdu|mau|amu|er(?:/unassigned)?|er unassigned|observation|holding|medical ward|surgical ward)$', re.I)
 
 
@@ -227,8 +227,8 @@ def pick_render_style(sample):
             options = ['clean-sheet', 'washed-grid', 'tight-crop', 'clipped-grid']
             weights = [0.24, 0.34, 0.22, 0.20]
     elif layout == 'sheet-block':
-        options = ['merged-sheet', 'phone-capture', 'faded-block', 'dense-block', 'left-clipped-block', 'right-clipped-block', 'top-clipped-block', 'bottom-clipped-block']
-        weights = [0.17, 0.16, 0.15, 0.15, 0.11, 0.10, 0.08, 0.08]
+        options = ['merged-sheet', 'phone-capture', 'faded-block', 'dense-block', 'left-clipped-block', 'right-clipped-block', 'top-clipped-block', 'bottom-clipped-block', 'glare-block', 'shadow-block', 'title-clipped-block']
+        weights = [0.14, 0.13, 0.12, 0.12, 0.09, 0.09, 0.07, 0.07, 0.07, 0.05, 0.05]
     elif layout == 'banner':
         options = ['clean-banner', 'soft-banner', 'tight-banner']
         weights = [0.42, 0.34, 0.24]
@@ -240,9 +240,9 @@ def pick_render_style(sample):
 
 
 def classify_difficulty(style: str) -> str:
-    if style in {'washed-grid', 'tight-crop', 'tight-line', 'tight-banner', 'low-ink', 'clipped-grid', 'dense-sheet', 'dense-line', 'phone-capture', 'dense-block', 'left-clipped-block', 'right-clipped-block', 'top-clipped-block', 'bottom-clipped-block'}:
+    if style in {'washed-grid', 'tight-crop', 'tight-line', 'tight-banner', 'low-ink', 'clipped-grid', 'dense-sheet', 'dense-line', 'phone-capture', 'dense-block', 'left-clipped-block', 'right-clipped-block', 'top-clipped-block', 'bottom-clipped-block', 'glare-block', 'title-clipped-block'}:
         return 'hard'
-    if style in {'banded-sheet', 'soft-scan', 'soft-banner', 'merged-sheet', 'faded-block'}:
+    if style in {'banded-sheet', 'soft-scan', 'soft-banner', 'merged-sheet', 'faded-block', 'shadow-block'}:
         return 'medium'
     return 'easy'
 
@@ -265,6 +265,34 @@ def add_speckle_noise(canvas, density: float = 0.0025):
         shade = random.randint(170, 236)
         draw.point((x, y), fill=(shade, shade, shade))
     return canvas
+
+
+def add_glare_band(canvas, alpha: float = 0.16):
+    overlay = Image.new('RGB', canvas.size, color=(255, 255, 255))
+    draw = ImageDraw.Draw(overlay)
+    width = canvas.width
+    height = canvas.height
+    band_top = random.randint(0, max(8, height // 6))
+    band_height = random.randint(max(20, height // 8), max(28, height // 3))
+    left = random.randint(width // 4, max(width // 4 + 1, width // 2))
+    right = width - random.randint(0, max(8, width // 12))
+    draw.rectangle((left, band_top, right, min(height, band_top + band_height)), fill=(255, 252, 244))
+    return Image.blend(canvas, overlay, alpha)
+
+
+def add_margin_shadow(canvas, alpha: float = 0.12):
+    overlay = Image.new('RGB', canvas.size, color=(255, 255, 255))
+    draw = ImageDraw.Draw(overlay)
+    width = canvas.width
+    height = canvas.height
+    side = random.choice(['left', 'right'])
+    band_width = random.randint(max(18, width // 18), max(28, width // 10))
+    shade = random.randint(188, 214)
+    if side == 'left':
+        draw.rectangle((0, 0, band_width, height), fill=(shade, shade, shade))
+    else:
+        draw.rectangle((width - band_width, 0, width, height), fill=(shade, shade, shade))
+    return Image.blend(canvas, overlay, alpha)
 
 
 def crop_and_pad(canvas, max_trim_x: int = 10, max_trim_y: int = 6):
@@ -339,8 +367,12 @@ def build_samples(domain, count):
     room_headers = ['Room / Ward', 'Ward / Room', 'Room No', 'Ward / Bed']
     patient_headers = ['Patient name', 'Patient Name', 'Pt Name']
     diagnosis_headers = ['Diagnosis', 'Dx']
-    doctor_headers = ['Assigned Doctor', 'Assigned Dr', 'Consultant Name', 'Doctor']
-    status_headers = ['Status', 'List Status', 'Category']
+    medication_headers = ['Medication', 'Medications', 'Meds', 'Medication / Notes', 'Medication Notes', 'Plan / Notes']
+    doctor_headers = ['Assigned Doctor', 'Assigned Dr', 'Consultant Name', 'Assigned Consultant', 'Doctor', 'Primary Team', 'Responsible Doctor']
+    status_headers = ['Status', 'List Status', 'Category', 'Disposition']
+    active_sections = [item for item in section_titles if re.search(r'active|acute|pending', item, re.I)] or section_titles
+    chronic_sections = [item for item in section_titles if re.search(r'chronic', item, re.I)] or section_titles
+    transfer_sections = [item for item in section_titles if re.search(r'transfer|unassigned|observation|stepdown', item, re.I)] or section_titles
 
     sample_types = [
         'patient_name',
@@ -382,6 +414,13 @@ def build_samples(domain, count):
         'header_alias_row',
         'doctor_ward_status_row',
         'sheet_section_block',
+        'multi_section_census_block',
+        'medication_handover_block',
+        'overnight_handover_block',
+        'active_chronic_sheet_block',
+        'roomless_status_mix_block',
+        'medication_continuation_block',
+        'unassigned_transfer_block',
         'ward_round_block',
         'mixed_language_block',
         'repeated_header_block',
@@ -430,16 +469,24 @@ def build_samples(domain, count):
         detail_diagnosis_alt = choose(detail_diagnoses, index, 59)
         detail_diagnosis_third = choose(detail_diagnoses, index, 89)
         medication = choose(medications, index, 17)
+        medication_alt = choose(medications, index, 157)
+        medication_third = choose(medications, index, 179)
         status = apply_case_variant(choose(sheet_statuses, index, 23), 'status')
         status_alt = apply_case_variant(choose(sheet_statuses, index, 29), 'status')
         status_third = apply_case_variant(choose(sheet_statuses, index, 97), 'status')
         section_title = choose(section_titles, index, 2)
+        section_title_alt = choose(section_titles, index, 149)
+        section_title_third = choose(section_titles, index, 151)
+        active_section = choose(active_sections, index, 211)
+        chronic_section = choose(chronic_sections, index, 223)
+        transfer_section = choose(transfer_sections, index, 227)
         sheet_title = choose(sheet_titles, index, 43)
         header = choose(sheet_headers, index, 29)
         header_row = choose(sheet_header_rows, index, 31)
         room_header = choose(room_headers, index, 59)
         patient_header = choose(patient_headers, index, 61)
         diagnosis_header = choose(diagnosis_headers, index, 67)
+        medication_header = choose(medication_headers, index, 69)
         doctor_header = choose(doctor_headers, index, 71)
         status_header = choose(status_headers, index, 73)
         patient_name_alt = apply_case_variant(choose(roster_names, index, 79), 'patient')
@@ -449,6 +496,8 @@ def build_samples(domain, count):
         doctor_name_third = apply_case_variant(choose(doctor_names, index, 113), 'doctor')
         doctor_title_alt = choose(doctor_titles, index, 127)
         doctor_title_third = choose(doctor_titles, index, 131)
+        ward_alt = apply_case_variant(choose(ward_tokens, index, 141), 'ward')
+        ward_third = apply_case_variant(choose(ward_tokens, index, 173), 'ward')
         arabic_name = choose(arabic_roster, index, 31) if arabic_roster else patient_name
         patient_name_head, patient_name_tail = split_name_for_wrap(patient_name)
         patient_name_alt_head, patient_name_alt_tail = split_name_for_wrap(patient_name_alt)
@@ -513,6 +562,94 @@ def build_samples(domain, count):
                 [numeric_room, patient_name, detail_diagnosis, f"{doctor_title} {doctor_name}", status],
                 [room_alt, patient_name_alt, detail_diagnosis_alt, f"{doctor_title_alt} {doctor_name_alt}", status_alt],
             ], 'sheet-section-block')
+        elif sample_type == 'multi_section_census_block':
+            sample = build_sheet_block_sample([
+                sheet_title,
+                section_title,
+                [room_header, patient_header, diagnosis_header, medication_header, doctor_header, status_header],
+                ward,
+                [numeric_room, patient_name, detail_diagnosis, medication, f"{doctor_title} {doctor_name}", status],
+                [room_alt, patient_name_alt, detail_diagnosis_alt, medication_alt, f"{doctor_title_alt} {doctor_name_alt}", status_alt],
+                section_title_alt,
+                [room_header, patient_header, diagnosis_header, medication_header, doctor_header, status_header],
+                ward_alt,
+                [room_third, patient_name_third, detail_diagnosis_third, medication_third, f"{doctor_title_third} {doctor_name_third}", status_third],
+                [numeric_room, patient_name_fourth, diagnosis_alt, medication, '', status],
+            ], 'multi-section-census-block')
+        elif sample_type == 'medication_handover_block':
+            sample = build_sheet_block_sample([
+                sheet_title,
+                section_title,
+                [room_header, patient_header, diagnosis_header, medication_header, doctor_header, status_header],
+                ward,
+                [numeric_room, patient_name, detail_diagnosis, medication, f"{doctor_title} {doctor_name}", status],
+                ['', '', '', medication_alt, '', ''],
+                [room_alt, patient_name_alt, detail_diagnosis_alt, medication_third, f"{doctor_title_alt} {doctor_name_alt}", status_alt],
+                [room_third, patient_name_third, diagnosis_alt, medication, f"{doctor_title_third} {doctor_name_third}", status_third],
+            ], 'medication-handover-block')
+        elif sample_type == 'overnight_handover_block':
+            sample = build_sheet_block_sample([
+                sheet_title,
+                section_title,
+                [room_header, patient_header, diagnosis_header, doctor_header, status_header],
+                ward,
+                [numeric_room, patient_name, detail_diagnosis, f"{doctor_title} {doctor_name}", status],
+                ['', '', detail_diagnosis_alt, '', ''],
+                [room_header, patient_header, diagnosis_header, doctor_header, status_header],
+                ward_alt,
+                [room_alt, patient_name_head, detail_diagnosis_third, f"{doctor_title_alt} {doctor_name_alt}", status_alt],
+                ['', patient_name_tail, '', '', ''],
+                section_title_third,
+                ward_third,
+                [room_third, patient_name_fourth, diagnosis_alt, f"{doctor_title_third} {doctor_name_third}", status_third],
+            ], 'overnight-handover-block')
+        elif sample_type == 'active_chronic_sheet_block':
+            sample = build_sheet_block_sample([
+                sheet_title,
+                active_section,
+                [room_header, patient_header, diagnosis_header, doctor_header, status_header],
+                ward,
+                [numeric_room, patient_name, detail_diagnosis, f"{doctor_title} {doctor_name}", 'Active'],
+                [room_alt, patient_name_alt, detail_diagnosis_alt, f"{doctor_title_alt} {doctor_name_alt}", 'New'],
+                chronic_section,
+                [room_header, patient_header, diagnosis_header, doctor_header, status_header],
+                ward_alt,
+                [room_third, patient_name_third, detail_diagnosis_third, f"{doctor_title_third} {doctor_name_third}", 'Chronic'],
+                [numeric_room, patient_name_fourth, diagnosis_alt, '', 'Chronic'],
+            ], 'active-chronic-sheet-block')
+        elif sample_type == 'roomless_status_mix_block':
+            sample = build_sheet_block_sample([
+                sheet_title,
+                section_title,
+                [room_header, patient_header, diagnosis_header, doctor_header, status_header],
+                ward,
+                [numeric_room, patient_name, detail_diagnosis, f"{doctor_title} {doctor_name}", status],
+                ['', patient_name_alt, detail_diagnosis_alt, '', status_alt],
+                ['', patient_name_third, detail_diagnosis_third, f"{doctor_title_alt} {doctor_name_alt}", status_third],
+                [room_alt, patient_name_fourth, diagnosis_alt, '', ''],
+            ], 'roomless-status-mix-block')
+        elif sample_type == 'medication_continuation_block':
+            sample = build_sheet_block_sample([
+                sheet_title,
+                active_section,
+                [room_header, patient_header, diagnosis_header, medication_header, doctor_header, status_header],
+                ward,
+                [numeric_room, patient_name, detail_diagnosis, medication, f"{doctor_title} {doctor_name}", status],
+                ['', '', '', medication_alt, '', status_alt],
+                [room_alt, patient_name_alt, detail_diagnosis_alt, medication_third, f"{doctor_title_alt} {doctor_name_alt}", status_third],
+                ['', '', '', medication, '', ''],
+                [room_third, patient_name_third, diagnosis_alt, medication_alt, '', status],
+            ], 'medication-continuation-block')
+        elif sample_type == 'unassigned_transfer_block':
+            sample = build_sheet_block_sample([
+                sheet_title,
+                transfer_section,
+                [room_header, patient_header, diagnosis_header, doctor_header, status_header],
+                'ER/Unassigned',
+                [numeric_room, patient_name, detail_diagnosis, f"{doctor_title} {doctor_name}", 'Review'],
+                ['', patient_name_alt, detail_diagnosis_alt, '', 'Awaiting bed'],
+                [room_alt, patient_name_third, detail_diagnosis_third, f"{doctor_title_alt} {doctor_name_alt}", 'Transferred'],
+            ], 'unassigned-transfer-block')
         elif sample_type == 'ward_round_block':
             sample = build_sheet_block_sample([
                 section_title,
@@ -555,7 +692,6 @@ def build_samples(domain, count):
                 [room_alt, patient_name_alt, detail_diagnosis_alt, f"{doctor_title_alt} {doctor_name_alt}", status_alt],
             ], 'wrapped-diagnosis-block')
         elif sample_type == 'stacked_ward_block':
-            ward_alt = apply_case_variant(choose(ward_tokens, index, 141), 'ward')
             sample = build_sheet_block_sample([
                 section_title,
                 [room_header, patient_header, diagnosis_header, doctor_header, status_header],
@@ -739,6 +875,8 @@ def status_text_fill(status: str):
 
 
 def column_widths(count: int):
+    if count == 6:
+        return [118, 248, 360, 292, 212, 166]
     if count == 5:
         return [120, 270, 420, 220, 180]
     if count == 4:
@@ -907,7 +1045,7 @@ def render_sheet_block(sample, fonts, style: str):
 
         y += height
 
-    if style in {'merged-sheet', 'faded-block', 'dense-block', 'left-clipped-block', 'right-clipped-block', 'top-clipped-block', 'bottom-clipped-block'}:
+    if style in {'merged-sheet', 'faded-block', 'dense-block', 'left-clipped-block', 'right-clipped-block', 'top-clipped-block', 'bottom-clipped-block', 'glare-block', 'shadow-block', 'title-clipped-block'}:
         grid_color = (229, 232, 226) if style != 'merged-sheet' else (220, 225, 218)
         for line_y in range(margin_y + 8, total_height - margin_y, random.randint(12, 18)):
             draw.line((margin_x, line_y, canvas_width - margin_x, line_y), fill=grid_color, width=1)
@@ -999,7 +1137,7 @@ def render_sample(sample, fonts):
     else:
         canvas = render_text_line(sample, fonts, style)
 
-    if style in {'soft-scan', 'washed-grid', 'soft-banner', 'clipped-grid', 'phone-capture', 'faded-block', 'left-clipped-block', 'right-clipped-block', 'top-clipped-block', 'bottom-clipped-block'}:
+    if style in {'soft-scan', 'washed-grid', 'soft-banner', 'clipped-grid', 'phone-capture', 'faded-block', 'left-clipped-block', 'right-clipped-block', 'top-clipped-block', 'bottom-clipped-block', 'glare-block', 'title-clipped-block'}:
         canvas = ImageEnhance.Contrast(canvas).enhance(random.uniform(0.76, 0.92))
         canvas = ImageEnhance.Brightness(canvas).enhance(random.uniform(1.01, 1.08))
         canvas = ImageEnhance.Sharpness(canvas).enhance(random.uniform(0.55, 0.92))
@@ -1007,12 +1145,16 @@ def render_sample(sample, fonts):
         canvas = ImageEnhance.Contrast(canvas).enhance(random.uniform(0.66, 0.84))
         canvas = ImageEnhance.Brightness(canvas).enhance(random.uniform(1.03, 1.10))
         canvas = ImageEnhance.Sharpness(canvas).enhance(random.uniform(0.45, 0.80))
+    elif style == 'shadow-block':
+        canvas = ImageEnhance.Contrast(canvas).enhance(random.uniform(0.80, 0.95))
+        canvas = ImageEnhance.Brightness(canvas).enhance(random.uniform(0.98, 1.04))
+        canvas = ImageEnhance.Sharpness(canvas).enhance(random.uniform(0.62, 0.90))
     elif style in {'dense-sheet', 'dense-line', 'dense-block', 'merged-sheet'}:
         canvas = ImageEnhance.Contrast(canvas).enhance(random.uniform(0.84, 0.98))
         canvas = ImageEnhance.Brightness(canvas).enhance(random.uniform(0.98, 1.05))
         canvas = ImageEnhance.Sharpness(canvas).enhance(random.uniform(0.70, 1.00))
 
-    if style in {'washed-grid', 'soft-scan', 'low-ink', 'banded-sheet', 'clipped-grid', 'dense-sheet', 'phone-capture', 'faded-block', 'dense-block', 'left-clipped-block', 'right-clipped-block', 'top-clipped-block', 'bottom-clipped-block'}:
+    if style in {'washed-grid', 'soft-scan', 'low-ink', 'banded-sheet', 'clipped-grid', 'dense-sheet', 'phone-capture', 'faded-block', 'dense-block', 'left-clipped-block', 'right-clipped-block', 'top-clipped-block', 'bottom-clipped-block', 'glare-block', 'title-clipped-block'}:
         canvas = add_scan_lines(canvas, strength=14 if style in {'washed-grid', 'low-ink'} else 10)
     if style in {'tight-crop', 'tight-line', 'tight-banner', 'phone-capture'}:
         canvas = crop_and_pad(canvas)
@@ -1026,15 +1168,21 @@ def render_sample(sample, fonts):
         canvas = crop_vertical_side(canvas, 'top')
     if style == 'bottom-clipped-block':
         canvas = crop_vertical_side(canvas, 'bottom')
-    if style in {'low-ink', 'washed-grid', 'tight-crop', 'clipped-grid', 'dense-line', 'phone-capture', 'faded-block', 'left-clipped-block', 'right-clipped-block', 'top-clipped-block', 'bottom-clipped-block'}:
+    if style == 'title-clipped-block':
+        canvas = crop_vertical_side(canvas, 'top', max_trim_y=46, max_trim_x=14)
+    if style == 'glare-block':
+        canvas = add_glare_band(canvas, alpha=random.uniform(0.12, 0.20))
+    if style == 'shadow-block':
+        canvas = add_margin_shadow(canvas, alpha=random.uniform(0.10, 0.16))
+    if style in {'low-ink', 'washed-grid', 'tight-crop', 'clipped-grid', 'dense-line', 'phone-capture', 'faded-block', 'left-clipped-block', 'right-clipped-block', 'top-clipped-block', 'bottom-clipped-block', 'glare-block', 'title-clipped-block'}:
         canvas = add_speckle_noise(canvas, density=0.0032)
 
     if random.random() < 0.35:
-        blur_cap = 1.2 if style in {'washed-grid', 'soft-scan', 'low-ink', 'clipped-grid', 'phone-capture', 'faded-block', 'left-clipped-block', 'right-clipped-block', 'top-clipped-block', 'bottom-clipped-block'} else 0.9
+        blur_cap = 1.2 if style in {'washed-grid', 'soft-scan', 'low-ink', 'clipped-grid', 'phone-capture', 'faded-block', 'left-clipped-block', 'right-clipped-block', 'top-clipped-block', 'bottom-clipped-block', 'glare-block', 'title-clipped-block'} else 0.9
         canvas = canvas.filter(ImageFilter.GaussianBlur(radius=random.uniform(0.0, blur_cap)))
 
     if random.random() < 0.55:
-        angle = random.uniform(-3.4, 3.4) if style == 'phone-capture' else random.uniform(-2.5, 2.5)
+        angle = random.uniform(-3.4, 3.4) if style in {'phone-capture', 'glare-block'} else random.uniform(-2.5, 2.5)
         canvas = canvas.rotate(angle, expand=True, fillcolor=(255, 255, 255))
 
     return canvas
@@ -1044,7 +1192,7 @@ def main():
     parser = argparse.ArgumentParser(description='Generate synthetic OCR crops for MedTriage OCR training.')
     parser.add_argument('--lexicon', required=True)
     parser.add_argument('--output', required=True)
-    parser.add_argument('--count', type=int, default=1500)
+    parser.add_argument('--count', type=int, default=3600)
     parser.add_argument('--seed', type=int, default=1337)
     args = parser.parse_args()
 

@@ -1,15 +1,72 @@
 {
   "file": "sample_00000.png",
-  "file_hash": "f231ce762b8322e8fbeb5e0991265a37210acff1a21a810c43069c12bfe424ec",
-  "timestamp": "2026-03-22T02:37:11.580864+00:00",
-  "processing_time_s": 94.48,
+  "file_hash": "a6afe70d03691650b06490b31be2f8e29b25781394b3405524c496ef58c86da5",
+  "timestamp": "2026-03-22T02:43:16.278062+00:00",
+  "processing_time_s": 84.75,
   "backend": "PaddleBackend",
   "summary": {
-    "total_elements": 0,
-    "accepted": 0,
-    "flagged_for_review": 0,
+    "total_elements": 2,
+    "accepted": 1,
+    "flagged_for_review": 1,
     "rejected": 0,
-    "avg_confidence": 0.0
+    "avg_confidence": 0.9041
   },
-  "elements": []
+  "elements": [
+    {
+      "text": "tient",
+      "confidence": 0.999,
+      "coordinates": [
+        [
+          0,
+          666
+        ],
+        [
+          114,
+          633
+        ],
+        [
+          120,
+          680
+        ],
+        [
+          3,
+          713
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "tient",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "atient",
+      "confidence": 0.8091,
+      "coordinates": [
+        [
+          603,
+          0
+        ],
+        [
+          696,
+          0
+        ],
+        [
+          720,
+          120
+        ],
+        [
+          627,
+          120
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "atient",
+      "corrections": [],
+      "status": "review"
+    }
+  ]
 }

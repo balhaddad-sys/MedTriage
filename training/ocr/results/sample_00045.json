@@ -1,0 +1,828 @@
+{
+  "file": "sample_00045.png",
+  "file_hash": "631fbdfbf53c282a2c5ddcc4df1accefaa89f05771aef40d0650ffc8b759ccc9",
+  "timestamp": "2026-03-22T05:49:35.938666+00:00",
+  "processing_time_s": 84.7,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 29,
+    "accepted": 23,
+    "flagged_for_review": 4,
+    "rejected": 2,
+    "avg_confidence": 0.9144
+  },
+  "elements": [
+    {
+      "text": "abdelaziz",
+      "confidence": 0.9999,
+      "coordinates": [
+        [
+          90,
+          230
+        ],
+        [
+          183,
+          230
+        ],
+        [
+          183,
+          257
+        ],
+        [
+          90,
+          257
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "abdelaziz",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Active",
+      "confidence": 0.9999,
+      "coordinates": [
+        [
+          799,
+          230
+        ],
+        [
+          866,
+          230
+        ],
+        [
+          866,
+          259
+        ],
+        [
+          799,
+          259
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "Active",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "aasim",
+      "confidence": 0.9998,
+      "coordinates": [
+        [
+          86,
+          161
+        ],
+        [
+          146,
+          161
+        ],
+        [
+          146,
+          182
+        ],
+        [
+          86,
+          182
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "aasim",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Diagnosis",
+      "confidence": 0.9997,
+      "coordinates": [
+        [
+          303,
+          65
+        ],
+        [
+          401,
+          68
+        ],
+        [
+          401,
+          97
+        ],
+        [
+          303,
+          94
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "Diagnosis",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "alhashim",
+      "confidence": 0.9997,
+      "coordinates": [
+        [
+          93,
+          197
+        ],
+        [
+          177,
+          197
+        ],
+        [
+          177,
+          222
+        ],
+        [
+          93,
+          222
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "grayscale",
+      "original_text": "alhashim",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Doctor amro",
+      "confidence": 0.9993,
+      "coordinates": [
+        [
+          630,
+          228
+        ],
+        [
+          752,
+          232
+        ],
+        [
+          751,
+          257
+        ],
+        [
+          629,
+          253
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "Doctor amro",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "21",
+      "confidence": 0.9985,
+      "coordinates": [
+        [
+          0,
+          159
+        ],
+        [
+          28,
+          159
+        ],
+        [
+          28,
+          186
+        ],
+        [
+          0,
+          186
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "grayscale",
+      "original_text": "21",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "al-saadoun",
+      "confidence": 0.9981,
+      "coordinates": [
+        [
+          91,
+          273
+        ],
+        [
+          199,
+          273
+        ],
+        [
+          199,
+          301
+        ],
+        [
+          91,
+          301
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "al-saadoun",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Ward census",
+      "confidence": 0.9979,
+      "coordinates": [
+        [
+          0,
+          25
+        ],
+        [
+          125,
+          28
+        ],
+        [
+          124,
+          55
+        ],
+        [
+          0,
+          51
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "Ward census",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Ward 19",
+      "confidence": 0.9979,
+      "coordinates": [
+        [
+          426,
+          112
+        ],
+        [
+          515,
+          112
+        ],
+        [
+          515,
+          141
+        ],
+        [
+          426,
+          141
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "Ward 19",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "biliary cholecystitis",
+      "confidence": 0.9979,
+      "coordinates": [
+        [
+          304,
+          156
+        ],
+        [
+          481,
+          158
+        ],
+        [
+          481,
+          187
+        ],
+        [
+          304,
+          185
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "biliary cholecystitis",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Doctor abir almou Resolved",
+      "confidence": 0.9944,
+      "coordinates": [
+        [
+          631,
+          157
+        ],
+        [
+          887,
+          159
+        ],
+        [
+          887,
+          187
+        ],
+        [
+          631,
+          185
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "Doctor abir almou Resolved",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "NSTEMI, heart failure",
+      "confidence": 0.9932,
+      "coordinates": [
+        [
+          301,
+          231
+        ],
+        [
+          494,
+          231
+        ],
+        [
+          494,
+          257
+        ],
+        [
+          301,
+          257
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "NSTEMI, heart failure",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "5-1",
+      "confidence": 0.9915,
+      "coordinates": [
+        [
+          0,
+          231
+        ],
+        [
+          37,
+          231
+        ],
+        [
+          37,
+          259
+        ],
+        [
+          0,
+          259
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "5-1",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Assigned Doctor List Status",
+      "confidence": 0.9875,
+      "coordinates": [
+        [
+          636,
+          65
+        ],
+        [
+          904,
+          67
+        ],
+        [
+          903,
+          93
+        ],
+        [
+          636,
+          91
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "Assigned Doctor List Status",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "billiary cholecystitis",
+      "confidence": 0.9864,
+      "coordinates": [
+        [
+          303,
+          151
+        ],
+        [
+          483,
+          154
+        ],
+        [
+          483,
+          185
+        ],
+        [
+          303,
+          182
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "billiary cholecystitis",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Assighed Doctor' List Status",
+      "confidence": 0.9673,
+      "coordinates": [
+        [
+          634,
+          65
+        ],
+        [
+          899,
+          67
+        ],
+        [
+          898,
+          94
+        ],
+        [
+          634,
+          92
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "Assighed Doctor' List Status",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Room / V Patient Name",
+      "confidence": 0.9628,
+      "coordinates": [
+        [
+          0,
+          63
+        ],
+        [
+          221,
+          68
+        ],
+        [
+          221,
+          89
+        ],
+        [
+          0,
+          84
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "Room / V Patient Name",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Room / M Patient Name",
+      "confidence": 0.9613,
+      "coordinates": [
+        [
+          0,
+          60
+        ],
+        [
+          227,
+          66
+        ],
+        [
+          226,
+          93
+        ],
+        [
+          0,
+          87
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "Room / M Patient Name",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Assigned Doctor List Status",
+      "confidence": 0.99,
+      "coordinates": [
+        [
+          635,
+          65
+        ],
+        [
+          900,
+          69
+        ],
+        [
+          899,
+          97
+        ],
+        [
+          635,
+          93
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "Assigned Doctor  List Status",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Room/ M Patient Name",
+      "confidence": 0.9568,
+      "coordinates": [
+        [
+          0,
+          59
+        ],
+        [
+          224,
+          65
+        ],
+        [
+          223,
+          89
+        ],
+        [
+          0,
+          83
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "Room/ M Patient Name",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Room/ V Patient Name",
+      "confidence": 0.9425,
+      "coordinates": [
+        [
+          0,
+          65
+        ],
+        [
+          222,
+          71
+        ],
+        [
+          221,
+          96
+        ],
+        [
+          0,
+          90
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "grayscale",
+      "original_text": "Room/ V Patient Name",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "Room / W Patient Name",
+      "confidence": 0.9278,
+      "coordinates": [
+        [
+          0,
+          62
+        ],
+        [
+          223,
+          69
+        ],
+        [
+          222,
+          96
+        ],
+        [
+          0,
+          89
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "Room / W Patient Name",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "aid Transter Sheet",
+      "confidence": 0.8689,
+      "coordinates": [
+        [
+          29,
+          0
+        ],
+        [
+          297,
+          0
+        ],
+        [
+          297,
+          20
+        ],
+        [
+          29,
+          20
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "grayscale",
+      "original_text": "aid Transter Sheet",
+      "corrections": [],
+      "status": "review"
+    },
+    {
+      "text": "7",
+      "confidence": 0.8169,
+      "coordinates": [
+        [
+          0,
+          159
+        ],
+        [
+          17,
+          159
+        ],
+        [
+          17,
+          181
+        ],
+        [
+          0,
+          181
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "7",
+      "corrections": [],
+      "status": "review"
+    },
+    {
+      "text": "Tiailsie! Sheet",
+      "confidence": 0.7848,
+      "coordinates": [
+        [
+          75,
+          0
+        ],
+        [
+          297,
+          0
+        ],
+        [
+          297,
+          18
+        ],
+        [
+          75,
+          18
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "Tiailsie! Sheet",
+      "corrections": [],
+      "status": "review"
+    },
+    {
+      "text": "Sist siiee!",
+      "confidence": 0.659,
+      "coordinates": [
+        [
+          148,
+          0
+        ],
+        [
+          296,
+          0
+        ],
+        [
+          296,
+          12
+        ],
+        [
+          148,
+          12
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "Sist siiee!",
+      "corrections": [],
+      "status": "review"
+    },
+    {
+      "text": "-E:",
+      "confidence": 0.386,
+      "coordinates": [
+        [
+          258,
+          0
+        ],
+        [
+          298,
+          0
+        ],
+        [
+          298,
+          11
+        ],
+        [
+          258,
+          11
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "-E:",
+      "corrections": [],
+      "status": "rejected"
+    },
+    {
+      "text": "1",
+      "confidence": 0.353,
+      "coordinates": [
+        [
+          0,
+          233
+        ],
+        [
+          28,
+          233
+        ],
+        [
+          28,
+          257
+        ],
+        [
+          0,
+          257
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "1",
+      "corrections": [],
+      "status": "rejected"
+    }
+  ]
+}

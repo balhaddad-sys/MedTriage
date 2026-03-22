@@ -1,0 +1,44 @@
+{
+  "file": "sample_00032.png",
+  "file_hash": "098cb2e0cc626805bc6bd4fd4fd1511e94ce055141ceaa76da76ffab0816db88",
+  "timestamp": "2026-03-22T05:40:36.052116+00:00",
+  "processing_time_s": 22.34,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 1,
+    "accepted": 1,
+    "flagged_for_review": 0,
+    "rejected": 0,
+    "avg_confidence": 0.9998
+  },
+  "elements": [
+    {
+      "text": "aaliya alhajri",
+      "confidence": 0.9998,
+      "coordinates": [
+        [
+          12,
+          21
+        ],
+        [
+          203,
+          18
+        ],
+        [
+          203,
+          56
+        ],
+        [
+          12,
+          59
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "aaliya alhajri",
+      "corrections": [],
+      "status": "accepted"
+    }
+  ]
+}

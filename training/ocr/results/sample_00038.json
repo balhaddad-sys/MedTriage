@@ -1,0 +1,100 @@
+{
+  "file": "sample_00038.png",
+  "file_hash": "92769cdc1eafaf1eab2dcd7d47e71c7b2ff92d8e827192fef06d69cfdd12833e",
+  "timestamp": "2026-03-22T05:44:06.586386+00:00",
+  "processing_time_s": 24.72,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 3,
+    "accepted": 2,
+    "flagged_for_review": 1,
+    "rejected": 0,
+    "avg_confidence": 0.9607
+  },
+  "elements": [
+    {
+      "text": "-mo",
+      "confidence": 0.9975,
+      "coordinates": [
+        [
+          0,
+          127
+        ],
+        [
+          68,
+          127
+        ],
+        [
+          68,
+          159
+        ],
+        [
+          0,
+          159
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "grayscale",
+      "original_text": "-mo",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "ow-",
+      "confidence": 0.9821,
+      "coordinates": [
+        [
+          0,
+          126
+        ],
+        [
+          68,
+          126
+        ],
+        [
+          68,
+          158
+        ],
+        [
+          0,
+          158
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "ow-",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "ow",
+      "confidence": 0.9025,
+      "coordinates": [
+        [
+          0,
+          128
+        ],
+        [
+          61,
+          128
+        ],
+        [
+          61,
+          156
+        ],
+        [
+          0,
+          156
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "sharpened",
+      "original_text": "ow",
+      "corrections": [],
+      "status": "review"
+    }
+  ]
+}

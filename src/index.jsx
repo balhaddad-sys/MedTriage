@@ -1,6 +1,11 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './app.jsx';
+import { processPatientListImage, preloadOcrModels } from './modules/evacuation/ocrEngine.js';
+
+// Expose OCR engine for headless validation
+window.processPatientListImage = processPatientListImage;
+window.preloadOcrModels = preloadOcrModels;
 
 // Error boundary for crash protection
 class ErrorBoundary extends React.Component {

@@ -1,0 +1,162 @@
+[
+  {
+    "id": 1,
+    "timestamp": "2026-03-22T02:37:11.592866+00:00",
+    "user": "dr_bader",
+    "action": "ocr_process",
+    "file_path": "..\\raw\\medtriage_synthetic\\images\\sample_00000.png",
+    "file_hash": "f231ce762b8322e8fbeb5e0991265a37210acff1a21a810c43069c12bfe424ec",
+    "details": "{\"total_elements\": 0, \"accepted\": 0, \"flagged_for_review\": 0, \"rejected\": 0, \"avg_confidence\": 0.0}",
+    "created_at": "2026-03-22 02:37:11"
+  },
+  {
+    "id": 2,
+    "timestamp": "2026-03-22T02:37:57.656320+00:00",
+    "user": "dr_bader",
+    "action": "ocr_process",
+    "file_path": "..\\raw\\medtriage_synthetic\\images\\sample_00001.png",
+    "file_hash": "afad8769cc9e9df67d2e3e630783bb2753732905eabd3295db8ec11577b60546",
+    "details": "{\"total_elements\": 0, \"accepted\": 0, \"flagged_for_review\": 0, \"rejected\": 0, \"avg_confidence\": 0.0}",
+    "created_at": "2026-03-22 02:37:57"
+  },
+  {
+    "id": 3,
+    "timestamp": "2026-03-22T02:38:37.831587+00:00",
+    "user": "dr_bader",
+    "action": "ocr_process",
+    "file_path": "..\\raw\\medtriage_synthetic\\images\\sample_00002.png",
+    "file_hash": "1d5ccdf841635f0f634ce90da0341fa689bce249d654e3646ba377e05204751f",
+    "details": "{\"total_elements\": 0, \"accepted\": 0, \"flagged_for_review\": 0, \"rejected\": 0, \"avg_confidence\": 0.0}",
+    "created_at": "2026-03-22 02:38:37"
+  },
+  {
+    "id": 4,
+    "timestamp": "2026-03-22T02:43:16.282065+00:00",
+    "user": "dr_bader",
+    "action": "ocr_process",
+    "file_path": "..\\raw\\medtriage_synthetic\\images\\sample_00000.png",
+    "file_hash": "a6afe70d03691650b06490b31be2f8e29b25781394b3405524c496ef58c86da5",
+    "details": "{\"total_elements\": 2, \"accepted\": 1, \"flagged_for_review\": 1, \"rejected\": 0, \"avg_confidence\": 0.9041}",
+    "created_at": "2026-03-22 02:43:16"
+  },
+  {
+    "id": 5,
+    "timestamp": "2026-03-22T02:44:40.916218+00:00",
+    "user": "dr_bader",
+    "action": "ocr_process",
+    "file_path": "..\\raw\\medtriage_synthetic\\images\\sample_00001.png",
+    "file_hash": "91e9b25787480e87aa06268cb5305d9049f24cebdf972c335dede7a253ff6ef5",
+    "details": "{\"total_elements\": 8, \"accepted\": 7, \"flagged_for_review\": 1, \"rejected\": 0, \"avg_confidence\": 0.9648}",
+    "created_at": "2026-03-22 02:44:40"
+  },
+  {
+    "id": 6,
+    "timestamp": "2026-03-22T02:45:22.833556+00:00",
+    "user": "dr_bader",
+    "action": "ocr_process",
+    "file_path": "..\\raw\\medtriage_synthetic\\images\\sample_00002.png",
+    "file_hash": "0abbb4f4339ebef46a81262ba28ab7ae8efcbdfc97ca6bf9bb4ca951a9f5a25d",
+    "details": "{\"total_elements\": 1, \"accepted\": 1, \"flagged_for_review\": 0, \"rejected\": 0, \"avg_confidence\": 0.9939}",
+    "created_at": "2026-03-22 02:45:22"
+  },
+  {
+    "id": 7,
+    "timestamp": "2026-03-22T02:45:58.658248+00:00",
+    "user": "dr_bader",
+    "action": "ocr_process",
+    "file_path": "..\\raw\\medtriage_synthetic\\images\\sample_00003.png",
+    "file_hash": "9aa0fad21d35ff0b3115df3d2e942f2d8571743a1a1ea3dfbb103e7c2c29afbc",
+    "details": "{\"total_elements\": 0, \"accepted\": 0, \"flagged_for_review\": 0, \"rejected\": 0, \"avg_confidence\": 0.0}",
+    "created_at": "2026-03-22 02:45:58"
+  },
+  {
+    "id": 8,
+    "timestamp": "2026-03-22T02:46:22.937342+00:00",
+    "user": "dr_bader",
+    "action": "ocr_process",
+    "file_path": "..\\raw\\medtriage_synthetic\\images\\sample_00004.png",
+    "file_hash": "e3e51f58b481acfa4ca1c3cda14476a27d5b2f1623aba4e1f537386b8ee998ec",
+    "details": "{\"total_elements\": 2, \"accepted\": 2, \"flagged_for_review\": 0, \"rejected\": 0, \"avg_confidence\": 0.9954}",
+    "created_at": "2026-03-22 02:46:22"
+  },
+  {
+    "id": 9,
+    "timestamp": "2026-03-22T02:47:25.631955+00:00",
+    "user": "dr_bader",
+    "action": "ocr_process",
+    "file_path": "..\\raw\\medtriage_synthetic\\images\\sample_00005.png",
+    "file_hash": "0007b0f8f6882d7ba56d65c0a5fc1bd3a54b10fcdcbdfb84c1e8fc17c7b8c0f2",
+    "details": "{\"total_elements\": 3, \"accepted\": 3, \"flagged_for_review\": 0, \"rejected\": 0, \"avg_confidence\": 0.9912}",
+    "created_at": "2026-03-22 02:47:25"
+  },
+  {
+    "id": 10,
+    "timestamp": "2026-03-22T02:47:58.179996+00:00",
+    "user": "dr_bader",
+    "action": "ocr_process",
+    "file_path": "..\\raw\\medtriage_synthetic\\images\\sample_00006.png",
+    "file_hash": "db7b494a77688ea244c2607a7a9db371f703fb9fe9045e98ce622385309872bc",
+    "details": "{\"total_elements\": 3, \"accepted\": 3, \"flagged_for_review\": 0, \"rejected\": 0, \"avg_confidence\": 0.9499}",
+    "created_at": "2026-03-22 02:47:58"
+  },
+  {
+    "id": 11,
+    "timestamp": "2026-03-22T02:48:37.874087+00:00",
+    "user": "dr_bader",
+    "action": "ocr_process",
+    "file_path": "..\\raw\\medtriage_synthetic\\images\\sample_00007.png",
+    "file_hash": "bde120f9d664a5e18212c9c40ba91b433460e98468192f4b6ba1b30367d96982",
+    "details": "{\"total_elements\": 2, \"accepted\": 2, \"flagged_for_review\": 0, \"rejected\": 0, \"avg_confidence\": 0.9876}",
+    "created_at": "2026-03-22 02:48:37"
+  },
+  {
+    "id": 12,
+    "timestamp": "2026-03-22T02:49:41.643658+00:00",
+    "user": "dr_bader",
+    "action": "ocr_process",
+    "file_path": "..\\raw\\medtriage_synthetic\\images\\sample_00008.png",
+    "file_hash": "abd730a62cf8cf13c4663a535dc4495f6c852036f34228f2477eaeaf3990fefd",
+    "details": "{\"total_elements\": 11, \"accepted\": 4, \"flagged_for_review\": 5, \"rejected\": 2, \"avg_confidence\": 0.7718}",
+    "created_at": "2026-03-22 02:49:41"
+  },
+  {
+    "id": 13,
+    "timestamp": "2026-03-22T02:50:08.573049+00:00",
+    "user": "dr_bader",
+    "action": "ocr_process",
+    "file_path": "..\\raw\\medtriage_synthetic\\images\\sample_00009.png",
+    "file_hash": "107c7ef7aa5606c8a518b32262de9a89949133082d42dcc9813a8af9db05ea2a",
+    "details": "{\"total_elements\": 4, \"accepted\": 2, \"flagged_for_review\": 2, \"rejected\": 0, \"avg_confidence\": 0.817}",
+    "created_at": "2026-03-22 02:50:08"
+  },
+  {
+    "id": 14,
+    "timestamp": "2026-03-22T02:50:33.093220+00:00",
+    "user": "dr_bader",
+    "action": "ocr_process",
+    "file_path": "..\\raw\\medtriage_synthetic\\images\\sample_00010.png",
+    "file_hash": "e4616f9867fe2cdc6eabd95d8dadf541f5a43dfda07507cce3b69adb00890e81",
+    "details": "{\"total_elements\": 3, \"accepted\": 2, \"flagged_for_review\": 1, \"rejected\": 0, \"avg_confidence\": 0.9587}",
+    "created_at": "2026-03-22 02:50:33"
+  },
+  {
+    "id": 15,
+    "timestamp": "2026-03-22T02:50:53.138969+00:00",
+    "user": "dr_bader",
+    "action": "ocr_process",
+    "file_path": "..\\raw\\medtriage_synthetic\\images\\sample_00011.png",
+    "file_hash": "0f16a18a78660b29ec6fa50e80213b4ed8370f20a26ee8cba64cb9a9789001b6",
+    "details": "{\"total_elements\": 0, \"accepted\": 0, \"flagged_for_review\": 0, \"rejected\": 0, \"avg_confidence\": 0.0}",
+    "created_at": "2026-03-22 02:50:53"
+  },
+  {
+    "id": 16,
+    "timestamp": "2026-03-22T02:51:29.973088+00:00",
+    "user": "dr_bader",
+    "action": "ocr_process",
+    "file_path": "..\\raw\\medtriage_synthetic\\images\\sample_00012.png",
+    "file_hash": "94979b552ff7bf5b6a90ba60e4c3e340201529620bb1a80bb5d9aadf1415217d",
+    "details": "{\"total_elements\": 1, \"accepted\": 1, \"flagged_for_review\": 0, \"rejected\": 0, \"avg_confidence\": 0.9999}",
+    "created_at": "2026-03-22 02:51:29"
+  }
+]

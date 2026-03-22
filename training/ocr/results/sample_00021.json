@@ -1,0 +1,128 @@
+{
+  "file": "sample_00021.png",
+  "file_hash": "c03d4b0daf903cfe84cca0c52c88beaaa10a612379ea4a27584924a1b574ad8c",
+  "timestamp": "2026-03-22T05:32:49.977828+00:00",
+  "processing_time_s": 122.16,
+  "backend": "PaddleBackend",
+  "summary": {
+    "total_elements": 4,
+    "accepted": 3,
+    "flagged_for_review": 1,
+    "rejected": 0,
+    "avg_confidence": 0.9544
+  },
+  "elements": [
+    {
+      "text": "Chronic",
+      "confidence": 0.9996,
+      "coordinates": [
+        [
+          1069,
+          36
+        ],
+        [
+          1186,
+          36
+        ],
+        [
+          1186,
+          73
+        ],
+        [
+          1069,
+          73
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "original",
+      "original_text": "Chronic",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "aaliya al fahad",
+      "confidence": 0.9992,
+      "coordinates": [
+        [
+          112,
+          27
+        ],
+        [
+          313,
+          25
+        ],
+        [
+          313,
+          68
+        ],
+        [
+          113,
+          70
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "aaliya al fahad",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "NSTEMI, heart failure",
+      "confidence": 0.9935,
+      "coordinates": [
+        [
+          398,
+          30
+        ],
+        [
+          704,
+          30
+        ],
+        [
+          704,
+          65
+        ],
+        [
+          398,
+          65
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "denoised",
+      "original_text": "NSTEMI, heart failure",
+      "corrections": [],
+      "status": "accepted"
+    },
+    {
+      "text": "aajva a) Sahad NSTEMl, heart tailure",
+      "confidence": 0.8254,
+      "coordinates": [
+        [
+          91,
+          28
+        ],
+        [
+          720,
+          30
+        ],
+        [
+          720,
+          72
+        ],
+        [
+          90,
+          70
+        ]
+      ],
+      "type": "text",
+      "backend": "paddle",
+      "variant": "high_contrast",
+      "original_text": "aajva a) Sahad NSTEMl, heart tailure",
+      "corrections": [],
+      "status": "review"
+    }
+  ]
+}
