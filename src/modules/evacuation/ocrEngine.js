@@ -162,18 +162,21 @@ const OCR_PROFILES = [
 const REVIEW_PRIORITY = { READY: 0, REVIEW: 1, VERIFY: 2 };
 const OCR_CONFUSION_GROUPS = [
   ['0', 'O', 'Q', 'D'],
-  ['1', 'I', 'L', '|', '!'],
+  ['1', 'I', 'L', '|', '!', 'l'],
   ['2', 'Z'],
   ['5', 'S', '$'],
   ['6', 'G'],
   ['7', 'T'],
   ['8', 'B'],
+  ['f', 't'],       // handwritten confusion
+  ['rn', 'm'],      // ligature confusion: "burn" → "bum"
+  ['cl', 'd'],      // ligature confusion
 ];
 const OCR_CONFUSION_CANONICAL = Object.fromEntries(
   OCR_CONFUSION_GROUPS.flatMap(group => group.map(char => [char, group[0]]))
 );
 const HEADER_PATTERNS = [
-  /^(name|patient|pt|bed|room|rm|age|sex|gender|diagnosis|diag|dx|meds?|medications?|allerg(?:y|ies)|code|status|ward|location|notes?|id|mrn|mobil(?:ity)?|transport|blood\s*(?:type|group)|bt|bg|rh)$/i,
+  /^(name|patient|pt|bed|room|rm|age|sex|gender|dob|diagnosis|diag|dx|meds?|medications?|allerg(?:y|ies)|code|status|ward|location|notes?|id|mrn|mobil(?:ity)?|transport|blood\s*(?:type|group)|bt|bg|rh|consultant|doctor|attending|nurse|rn|diet|activity|iv|plan|tasks?|jobs?|adm\s*date|d\/?c\s*date|edd|day\s*#?|hosp\s*no|file\s*no|nationality|acuity|chief\s*complaint|cc|disposition|dispo|los|labs?|vitals?|i\s*&?\s*o)$/i,
   /^(اسم|المريض|سرير|غرفة|العمر|الجنس|التشخيص|أدوية|ادوية|حساسية|الحالة|الرقم|ملاحظات)$/i,
 ];
 
@@ -974,6 +977,22 @@ const MedicalVocabulary = {
     'POLYTRAUMA': { category: 'surg', severity: 'RED' },
     'RTA': { category: 'surg', severity: 'YELLOW' },
     'BLAST INJURY': { category: 'surg', severity: 'RED' },
+    // Ward round abbreviations (from research — prevent these from being classified as names)
+    'CXR': { category: 'invest' }, 'ABG': { category: 'invest' }, 'VBG': { category: 'invest' },
+    'ECG': { category: 'invest' }, 'EKG': { category: 'invest' },
+    'FBC': { category: 'invest' }, 'CBC': { category: 'invest' },
+    'LFT': { category: 'invest' }, 'TFT': { category: 'invest' },
+    'RFT': { category: 'invest' }, 'KFT': { category: 'invest' },
+    'CT': { category: 'invest' }, 'MRI': { category: 'invest' },
+    'USS': { category: 'invest' }, 'XR': { category: 'invest' },
+    'LP': { category: 'invest' }, 'EEG': { category: 'invest' },
+    'EMG': { category: 'invest' }, 'NCS': { category: 'invest' },
+    'BNP': { category: 'invest' }, 'TROPONIN': { category: 'invest' },
+    'HBA1C': { category: 'invest' }, 'INR': { category: 'invest' },
+    'PT': { category: 'invest' }, 'APTT': { category: 'invest' },
+    'ESR': { category: 'invest' }, 'CRP': { category: 'invest' },
+    'TSH': { category: 'invest' }, 'T3': { category: 'invest' }, 'T4': { category: 'invest' },
+    'PSA': { category: 'invest' },
     // Status
     'NKDA': { category: 'status' }, 'DNR': { category: 'status' }, 'DNAR': { category: 'status' },
     'FULL': { category: 'status' }, 'NFR': { category: 'status' }, 'COMFORT': { category: 'status' },
@@ -1449,6 +1468,16 @@ const EntityRecognizer = {
       return { entity: 'BED', confidence: 0.86, corrected: canonical.replace(/\s+/g, '') };
     if (/^[A-E]\d{1,2}$/i.test(canonical))
       return { entity: 'BED', confidence: 0.7, corrected: canonical };
+    // Kuwait formats: "401-1" (room-bed), "4A-12" (ward-bed), "B4" (bed 4)
+    if (/^\d{3}\s*-\s*\d{1,2}$/.test(canonical))
+      return { entity: 'BED', confidence: 0.82, corrected: canonical.replace(/\s+/g, '') };
+    if (/^\d[A-Z]\s*-\s*\d{1,2}$/i.test(canonical))
+      return { entity: 'BED', confidence: 0.84, corrected: canonical.replace(/\s+/g, '') };
+    if (/^(?:B|BED)\s*\d{1,3}$/i.test(canonical))
+      return { entity: 'BED', confidence: 0.78, corrected: canonical };
+    // ICU beds: "ICU-1", "ICU 3", "CCU-2"
+    if (/^(?:ICU|CCU|HDU|NICU|PICU)\s*-?\s*\d{1,2}$/i.test(t))
+      return { entity: 'BED', confidence: 0.90, corrected: t.replace(/\s+/g, '-').toUpperCase() };
     return { entity: 'BED', confidence: 0 };
   },
 
@@ -1709,7 +1738,7 @@ const EntityRecognizer = {
       const corrected = tokens.map(token => {
         const tokenMatch = MedicalVocabulary.correctTerm(token.toUpperCase(), 1);
         if (!tokenMatch) return token;
-        if ((tokenMatch.distance || 0) > 0 && stripForLexicon(token).length <= 3) return token;
+        if ((tokenMatch.distance || 0) > 0 && stripForLexicon(token).length <= 4) return token;
         return tokenMatch.term || token;
       }).join(' ');
       const confidence = clamp(0.52 + (average(tokenMatches.map(tokenMatch => tokenMatch.confidence), 0.55) * 0.28) + (Math.min(tokenMatches.length, 3) * 0.05));
@@ -1754,22 +1783,30 @@ const EntityRecognizer = {
     const normalized = `${t || ''}`.trim().replace(/\s+/g, ' ');
     const upper = normalized.toUpperCase();
     // Common ward sheet status terms
-    if (/^(?:NEW|ACTIVE|CHRONIC|PENDING|TRANSFER|FOLLOW[- ]?UP|STABLE|UNSTABLE|CRITICAL|IMPROVING|DETERIORATING|WORSENING)$/i.test(upper)) {
+    if (/^(?:NEW|ACTIVE|CHRONIC|PENDING|TRANSFER|FOLLOW[- ]?UP|STABLE|UNSTABLE|CRITICAL|IMPROVING|DETERIORATING|WORSENING|RESOLVED|DECEASED|EXPIRED|PALLIAT(?:IVE|ING))$/i.test(upper)) {
       return { entity: 'SHEET_STATUS', confidence: 0.76, corrected: normalized };
     }
-    // Discharge / admission status
+    // Discharge / admission / fitness status (from research: MOFD, FFD, EDD, DAMA, AMA)
     if (/^(?:ICU|ER|WARD|HDU|CCU)\s+(?:DISCHARGE|TRANSFER|ADMISSION)$/i.test(upper) ||
-        /^(?:DISCHARGE|DISCHARGED|D\/C|DC|DISCH)$/i.test(upper) ||
-        /^(?:ADMITTED|ADM|ADMISSION|RE-?ADM)$/i.test(upper)) {
+        /^(?:DISCHARGE|DISCHARGED|D\/C|DC|DISCH|MOFD|FFD|EDD|DAMA|AMA|LOA)$/i.test(upper) ||
+        /^(?:ADMITTED|ADM|ADMISSION|RE-?ADM|READMISSION)$/i.test(upper)) {
       return { entity: 'SHEET_STATUS', confidence: 0.82, corrected: normalized };
     }
-    // Ward operational abbreviations
-    if (/^(?:NBM|NPO|FOR OT|FOR OR|FOR CATH|FOR ERCP|FOR SCOPE|FOR CT|FOR MRI|FOR ECHO|FOR DIALYSIS|FOR HD|TCI|OBS|BOOKED|PLANNED|ELECTIVE|URGENT|ROUTINE|AWAITING|WAIT|READY|CLEARED)$/i.test(upper)) {
+    // Ward operational abbreviations (from research: TWOC, NEWS, q\dh, Day \d)
+    if (/^(?:NBM|NPO|FOR OT|FOR OR|FOR CATH|FOR ERCP|FOR SCOPE|FOR CT|FOR MRI|FOR ECHO|FOR DIALYSIS|FOR HD|TCI|OBS|BOOKED|PLANNED|ELECTIVE|URGENT|ROUTINE|AWAITING|WAIT|READY|CLEARED|TWOC|NEWS|DNACPR|FIT)$/i.test(upper)) {
       return { entity: 'SHEET_STATUS', confidence: 0.78, corrected: normalized };
     }
     // Transfer terms
-    if (/^(?:T\/F|TRANSFER|TRANSFERRED|TO ICU|TO HDU|TO WARD|FROM ICU|FROM ER|EX ICU|FROM HDU)$/i.test(upper)) {
+    if (/^(?:T\/F|TXF?|TRANSFER|TRANSFERRED|TO ICU|TO HDU|TO WARD|FROM ICU|FROM ER|EX ICU|FROM HDU|ADT)$/i.test(upper)) {
       return { entity: 'SHEET_STATUS', confidence: 0.80, corrected: normalized };
+    }
+    // Observation frequency (q4h, q2h, q1h)
+    if (/^(?:q\d+h?|obs\s+q\d+h?)$/i.test(upper)) {
+      return { entity: 'SHEET_STATUS', confidence: 0.72, corrected: normalized };
+    }
+    // Day number (Day 1, Day 3, D3)
+    if (/^(?:day\s*#?\s*\d+|d\d+)$/i.test(upper)) {
+      return { entity: 'SHEET_STATUS', confidence: 0.70, corrected: normalized };
     }
     return { entity: 'SHEET_STATUS', confidence: 0 };
   },
