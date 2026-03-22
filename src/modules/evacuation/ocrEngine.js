@@ -4,6 +4,7 @@
 
 import { boostEntityScore, resolveUnknownEntity, lookupLearnedName, lookupLearnedDiagnosis, lookupLearnedMedication } from './ocrLearner.js';
 import { disambiguate, inferAcuity, extractStructuredData, predictMissingFields, normalizeText, validateAgeDiagnosis } from './ocrBrain.js';
+import { isVlmAvailable, processWithVlm } from './ocrVlmBridge.js';
 
 // ====== IMAGE PREPROCESSING ======
 const ImagePreprocessor = {
@@ -4443,6 +4444,72 @@ function refineEntitiesByContext(entities, imageWidth) {
     }
   }
 
+  // ===== AMBIGUOUS ABBREVIATION DISAMBIGUATION =====
+  // 81% of clinical abbreviations have multiple meanings (avg 16 senses).
+  // Use row context to pick the right interpretation.
+  // Source: Nature Communications 2021, JMIR 2024
+  const AMBIGUOUS_TERMS = {
+    'PE': { // Pulmonary Embolism vs Physical Examination vs Pleural Effusion
+      cardioNeighbors: ['DVT', 'VTE', 'ANTICOAGUL', 'HEPARIN', 'CTPA', 'D-DIMER'],
+      respNeighbors: ['EFFUSION', 'PLEURAL', 'DRAIN', 'THORACENTESIS'],
+      default: 'PE (Pulmonary Embolism)',
+    },
+    'MS': { // Multiple Sclerosis vs Mental Status vs Morphine Sulfate vs Mitral Stenosis
+      neuroNeighbors: ['DEMYELINAT', 'RELAPS', 'MRI BRAIN', 'INTERFERON', 'GLATIRAMER'],
+      cardioNeighbors: ['VALV', 'ECHO', 'MURMUR', 'MITRAL'],
+      default: 'MS (Multiple Sclerosis)',
+    },
+    'PD': { // Parkinson Disease vs Peritoneal Dialysis vs Panic Disorder
+      neuroNeighbors: ['TREMOR', 'LEVODOPA', 'CARBIDOPA', 'RIGIDITY', 'BRADYKINES'],
+      renalNeighbors: ['DIALYSIS', 'CAPD', 'PERITON', 'TENCKHOFF'],
+      default: 'PD',
+    },
+    'HD': { // Haemodialysis vs Huntington Disease vs Heart Disease
+      renalNeighbors: ['DIALYSIS', 'FISTULA', 'CKD5', 'ESRD', 'ACCESS'],
+      default: 'HD (Haemodialysis)',
+    },
+    'OD': { // Overdose vs Once Daily
+      psyNeighbors: ['SUICID', 'INGEST', 'TOXIC', 'CHARCOAL', 'NALOXONE', 'PARACETAMOL'],
+      default: 'OD',
+    },
+    'CA': { // Carcinoma vs Cardiac Arrest
+      oncNeighbors: ['METS', 'STAGE', 'CHEMO', 'BIOPSY', 'PALLIATIVE', 'TUMOR'],
+      cardioNeighbors: ['ARREST', 'CPR', 'ROSC', 'DEFIB'],
+      default: 'CA (Carcinoma)',
+    },
+    'RF': { // Respiratory Failure vs Renal Failure vs Risk Factor
+      respNeighbors: ['VENTILAT', 'INTUBAT', 'BIPAP', 'TYPE 1', 'TYPE 2', 'ARDS'],
+      renalNeighbors: ['CREATININE', 'DIALYSIS', 'CKD', 'AKI', 'UREA'],
+      default: 'RF',
+    },
+  };
+
+  // For each ambiguous term, check row neighbors to disambiguate
+  for (const row of rows) {
+    const rowText = row.map(e => (e.corrected || e.text).toUpperCase()).join(' ');
+    for (const entity of row) {
+      const upper = (entity.corrected || entity.text).toUpperCase();
+      const rule = AMBIGUOUS_TERMS[upper];
+      if (!rule || entity.entity === 'HEADER' || entity.entity === 'NOISE') continue;
+
+      // Check which context matches
+      let bestContext = null;
+      for (const [key, neighbors] of Object.entries(rule)) {
+        if (key === 'default' || !Array.isArray(neighbors)) continue;
+        const matches = neighbors.filter(n => rowText.includes(n));
+        if (matches.length > 0) {
+          bestContext = key.replace('Neighbors', '');
+          break;
+        }
+      }
+
+      // Add disambiguation metadata
+      if (bestContext) {
+        entity.meta = { ...entity.meta, disambiguatedBy: bestContext, ambiguousTerm: upper };
+      }
+    }
+  }
+
   return entities;
 }
 
@@ -4616,6 +4683,21 @@ function fuseCandidatePasses(candidates) {
 export async function processPatientListImage(imageSource, onProgress) {
   const startTime = performance.now();
 
+  // VLM Enhancement: If the local VLM Docker engine is running, use it
+  // as a supplementary backend for higher accuracy on complex documents.
+  // The VLM results augment (not replace) the built-in PaddleOCR pipeline.
+  let vlmResult = null;
+  try {
+    const vlmReady = await isVlmAvailable();
+    if (vlmReady) {
+      onProgress?.('VLM engine detected — running enhanced analysis...');
+      vlmResult = await processWithVlm(imageSource, onProgress);
+      console.log('[OCR] VLM engine returned', vlmResult?.vlmElements?.length || 0, 'elements');
+    }
+  } catch (err) {
+    console.warn('[OCR] VLM engine unavailable, using built-in pipeline:', err.message);
+  }
+
   const runtime = await initContextOCR(onProgress);
 
   onProgress?.('Preparing image variants...');
@@ -4781,6 +4863,14 @@ export async function processPatientListImage(imageSource, onProgress) {
     consensusPasses: best.consensusPasses,
     strategy: best.strategy,
     hypotheses: best.hypotheses,
+    vlm: vlmResult ? {
+      available: true,
+      backend: vlmResult.backend,
+      elementsCount: vlmResult.vlmElements?.length || 0,
+      avgConfidence: vlmResult.vlmSummary?.avg_confidence || 0,
+      flaggedForReview: vlmResult.vlmSummary?.flagged_for_review || 0,
+      fileHash: vlmResult.fileHash,
+    } : { available: false },
     passes: candidates.map(c => ({
       profile: c.profileId, qualityScore: c.qualityScore,
       qualityBand: c.qualityBand, patients: c.patients.length,

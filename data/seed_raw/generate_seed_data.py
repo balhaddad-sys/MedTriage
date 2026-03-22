@@ -143,6 +143,55 @@ ALLERGIES = ['NKDA', 'Penicillin', 'Sulfa', 'NSAID', 'Codeine', 'Morphine',
              'Aspirin', 'Iodine', 'Latex', 'Vancomycin', 'PCN',
              'Metformin (lactic acidosis)', 'Ciprofloxacin']
 
+# OCR noise simulation — what PaddleOCR commonly misreads
+OCR_NOISE = {
+    '0': 'O', 'O': '0', '1': 'l', 'l': '1', 'I': '1',
+    '5': 'S', 'S': '5', '8': 'B', 'B': '8',
+    'rn': 'm', 'm': 'rn', 'cl': 'd', 'd': 'cl',
+}
+
+def apply_ocr_noise(text, noise_rate=0.05):
+    """Simulate OCR misreading at a given noise rate"""
+    if random.random() > noise_rate * 3:  # Most text is clean
+        return text
+    chars = list(text)
+    for i in range(len(chars)):
+        if random.random() < noise_rate:
+            replacement = OCR_NOISE.get(chars[i])
+            if replacement:
+                chars[i] = replacement
+    return ''.join(chars)
+
+# Clinical context patterns for realistic multi-diagnosis combinations
+DIAGNOSIS_COMBOS = [
+    # Cardiology presentations
+    ['NSTEMI', 'DM2', 'HTN'], ['STEMI', 'DM2', 'CKD3'], ['AF', 'CHF', 'CKD4'],
+    ['ADHF', 'AF', 'DM2', 'CKD3'], ['ACS', 'HTN', 'DM2'],
+    ['DVT', 'PE'], ['CAD', 'DM2', 'HTN', 'CKD3'],
+    # Respiratory
+    ['CAP', 'COPD'], ['AECOPD', 'DM2'], ['Pneumonia', 'Sepsis'],
+    ['Chest infection', 'COPD'], ['ARDS', 'Sepsis'], ['PTX'],
+    # Renal
+    ['AKI', 'Sepsis', 'DM2'], ['CKD5', 'ESRD', 'HTN'], ['Hypernatremia', 'AKI'],
+    ['Urosepsis', 'AKI'], ['UTI', 'DM2'],
+    # Neurological
+    ['CVA', 'AF', 'HTN'], ['CVA left MCA occlusion', 'AF'],
+    ['TIA', 'HTN', 'DM2'], ['Seizure', 'DM2'], ['Meningitis'],
+    # GI
+    ['UGIB', 'Liver cirrhosis'], ['SBO'], ['Acute pancreatitis', 'DM2'],
+    ['Cholangitis', 'Sepsis'], ['GI bleed', 'CKD3'],
+    # Endocrine
+    ['DKA', 'T1DM'], ['HHS', 'DM2'], ['DM2', 'HTN', 'CKD3'],
+    # Infectious
+    ['Sepsis', 'UTI', 'DM2'], ['Cellulitis', 'DM2'], ['COVID', 'Pneumonia'],
+    # Surgical
+    ['Post-op', 'Hip fracture'], ['Polytrauma'], ['Burns'],
+    # Mixed
+    ['Chest infection and UTI', 'DM2'], ['LVF exacerbation', 'CKD4'],
+    ['Hypernatremia/AKI/DVT/CAP'], ['Fall', 'Hip fracture', 'Osteoporosis'],
+    ['Fever', 'PUO'], ['Syncope', 'AF'],
+]
+
 
 def generate_patient(idx):
     gender = random.choice(['M', 'F'])
@@ -160,8 +209,12 @@ def generate_patient(idx):
         k=1
     )[0]
 
-    num_dx = random.choices([1, 2, 3, 4], weights=[30, 40, 20, 10], k=1)[0]
-    dx = ', '.join(random.sample(DIAGNOSES, min(num_dx, len(DIAGNOSES))))
+    # Use realistic clinical combinations 60% of the time, random 40%
+    if random.random() < 0.6 and DIAGNOSIS_COMBOS:
+        dx = ', '.join(random.choice(DIAGNOSIS_COMBOS))
+    else:
+        num_dx = random.choices([1, 2, 3, 4], weights=[30, 40, 20, 10], k=1)[0]
+        dx = ', '.join(random.sample(DIAGNOSES, min(num_dx, len(DIAGNOSES))))
 
     num_meds = random.choices([1, 2, 3, 4, 5], weights=[15, 25, 30, 20, 10], k=1)[0]
     meds = ', '.join(random.sample(MEDICATIONS, min(num_meds, len(MEDICATIONS))))
@@ -204,6 +257,9 @@ def generate_patient(idx):
         'wardSheetLine': f'{bed}\t{full_name}\t{age}/{gender}\t{dx}\t{meds}',
         'compactLine': f'{bed} {full_name} {age}/{gender} {dx}',
         'tableRow': f'{bed}|{full_name}|{age}/{gender}|{dx}|{meds}|{doctor}|{status}',
+        # OCR-noised versions (what PaddleOCR might actually output)
+        'ocrNoised': apply_ocr_noise(f'{bed} {full_name} {age}/{gender} {dx}', 0.03),
+        'ocrHeavyNoise': apply_ocr_noise(f'{bed} {full_name} {age}/{gender} {dx}', 0.08),
     }
 
 
