@@ -4,8 +4,9 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { colors, fonts } from '../../design/tokens.js';
-import { captureFrame, recognizeMRZ } from './civilIdCamera.js';
+import { captureFrameAsync, recognizeMRZ } from './civilIdCamera.js';
 import { parseTD1, validateMRZ } from './mrzParser.js';
+import { startSession, logFrame, logAccepted, logCorrected, flushSession, getStats, exportAsJSON, exportAsCSV } from './mrzDataCollector.js';
 
 const styles = {
   container: { width: '100%', display: 'flex', flexDirection: 'column', gap: '10px' },
@@ -73,6 +74,14 @@ export default function MRZScannerCamera({ onResult, onCancel }) {
   const [showManual, setShowManual] = useState(false);
   const [manualText, setManualText] = useState('');
   const [manualError, setManualError] = useState('');
+  const [showCorrection, setShowCorrection] = useState(false);
+  const [correctionText, setCorrectionText] = useState('');
+
+  // Start data collection session on mount
+  useEffect(() => {
+    startSession();
+    return () => flushSession();
+  }, []);
 
   // Start camera
   useEffect(() => {
@@ -125,12 +134,13 @@ export default function MRZScannerCamera({ onResult, onCancel }) {
       // Skip OCR during warmup
       if (frameCount < WARMUP_FRAMES) return;
 
-      const frame = captureFrame(video, canvas, 0.85);
+      const frame = await captureFrameAsync(video, canvas, 0.85);
       if (!frame) return;
 
       setStatus('Scanning MRZ...');
 
       const result = await recognizeMRZ(frame);
+      logFrame(result); // collect training data
       if (result.fullText) setLastOcrText(result.fullText);
       if (result.scores) setBestScores(prev =>
         result.scores.map((s, i) => Math.max(s, prev[i] || 0))
@@ -173,8 +183,23 @@ export default function MRZScannerCamera({ onResult, onCancel }) {
 
   const handleConfirm = useCallback(() => {
     if (!found) return;
+    logAccepted(mrzLines, found);
+    flushSession();
     onResult(found);
-  }, [found, onResult]);
+  }, [found, mrzLines, onResult]);
+
+  // Save a manual correction as ground truth
+  const handleSaveCorrection = useCallback(() => {
+    const validation = validateMRZ(correctionText);
+    if (!validation.valid) return;
+    const parsed = parseTD1(validation.lines[0], validation.lines[1], validation.lines[2]);
+    if (!parsed) return;
+    logAccepted(mrzLines, found); // log what OCR gave
+    logCorrected(validation.lines, parsed); // log the true value
+    flushSession();
+    // Use the corrected data instead
+    onResult(parsed);
+  }, [correctionText, mrzLines, found, onResult]);
 
   // Result view — MRZ parsed
   if (found) {
@@ -218,9 +243,35 @@ export default function MRZScannerCamera({ onResult, onCancel }) {
           onClick={handleConfirm}>
           Use MRZ for Chip Authentication
         </button>
+
+        {/* Correction UI — user can fix misread MRZ for training data */}
+        {!showCorrection ? (
+          <button
+            style={{ ...styles.btn, background: colors.amber + '22', color: colors.amber, height: '38px', fontSize: '12px' }}
+            onClick={() => { setShowCorrection(true); setCorrectionText(mrzLines ? mrzLines.join('\n') : ''); }}>
+            MRZ wrong? Tap to correct
+          </button>
+        ) : (
+          <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '6px' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: colors.amber }}>
+              Edit the 3 MRZ lines to match the card exactly:
+            </span>
+            <textarea
+              style={styles.textarea}
+              value={correctionText}
+              onChange={e => setCorrectionText(e.target.value.toUpperCase())}
+            />
+            <button
+              style={{ ...styles.btn, background: colors.amber, color: '#000', height: '40px', fontSize: '13px' }}
+              onClick={handleSaveCorrection}>
+              Save Correction & Use
+            </button>
+          </div>
+        )}
+
         <button
           style={{ ...styles.btn, background: colors.bg2, color: colors.text0 }}
-          onClick={() => { setFound(null); setMrzLines(null); setScanning(true); }}>
+          onClick={() => { setFound(null); setMrzLines(null); setShowCorrection(false); setScanning(true); }}>
           Scan Again
         </button>
       </div>
@@ -329,6 +380,45 @@ export default function MRZScannerCamera({ onResult, onCancel }) {
       </button>
       <button style={{ ...styles.btn, background: colors.bg2, color: colors.text3 }} onClick={onCancel}>
         Cancel
+      </button>
+      <TrainingDataBar />
+    </div>
+  );
+}
+
+// Compact bar showing collected training data count + export buttons
+function TrainingDataBar() {
+  const stats = getStats();
+  if (stats.sessions === 0) return null;
+
+  return (
+    <div style={{
+      width: '100%', display: 'flex', alignItems: 'center', gap: '6px',
+      padding: '6px 8px', borderRadius: '6px',
+      background: colors.bg2, border: `1px solid ${colors.border}`,
+      marginTop: '4px',
+    }}>
+      <span style={{ flex: 1, fontSize: '10px', color: colors.text3, fontFamily: fonts.mono }}>
+        Training: {stats.sessions} scans, {stats.totalFrames} frames
+        {stats.withCorrections > 0 && `, ${stats.withCorrections} corrected`}
+      </span>
+      <button
+        onClick={exportAsJSON}
+        style={{
+          padding: '3px 8px', borderRadius: '4px', border: 'none',
+          background: colors.blue + '22', color: colors.blue,
+          fontSize: '10px', fontWeight: 700, cursor: 'pointer',
+        }}>
+        JSON
+      </button>
+      <button
+        onClick={exportAsCSV}
+        style={{
+          padding: '3px 8px', borderRadius: '4px', border: 'none',
+          background: colors.blue + '22', color: colors.blue,
+          fontSize: '10px', fontWeight: 700, cursor: 'pointer',
+        }}>
+        CSV
       </button>
     </div>
   );
