@@ -724,32 +724,57 @@ function scoreTextDensity(rawText) {
   return clamp(useful / compact.length);
 }
 
+function isSparseStructuredRosterPatient(patient) {
+  const structuredSupportCount =
+    Number(Boolean(patient?.assignedDoctor)) +
+    Number(Boolean(patient?.sheetStatus)) +
+    Number(Boolean(patient?.ward));
+
+  return Boolean(
+    patient?.fullName &&
+    patient?.dx &&
+    structuredSupportCount >= 1 &&
+    !patient?.bed &&
+    patient?.age == null &&
+    !patient?.gender &&
+    !patient?.civilId &&
+    (patient?.rawEntityCount || 0) >= 3 &&
+    (patient?.fieldConfidence?.fullName || 0) >= 0.72 &&
+    (patient?.fieldConfidence?.dx || 0) >= 0.72 &&
+    (patient?.structuredConfidence || 0) >= 0.72
+  );
+}
+
 function enrichPatientForReview(patient) {
   const identifierCount = (patient.fullName ? 1 : 0) + (patient.bed ? 1 : 0) + ((patient.age != null || patient.gender) ? 1 : 0) + (patient.civilId ? 1 : 0);
+  const sparseStructuredRoster = isSparseStructuredRosterPatient(patient);
   const structuredIdentity = Boolean(
     patient.fullName &&
     patient.dx &&
     (
+      sparseStructuredRoster ||
       (patient.structuredConfidence || 0) >= 0.72 ||
       patient.assignedDoctor ||
       patient.sheetStatus ||
       patient.ward
     )
   );
-  const effectiveIdentifierCount = structuredIdentity && identifierCount < 2 ? identifierCount + 1 : identifierCount;
+  let effectiveIdentifierCount = structuredIdentity && identifierCount < 2 ? identifierCount + 1 : identifierCount;
+  if (sparseStructuredRoster && effectiveIdentifierCount < 3) effectiveIdentifierCount += 1;
   const severeWarning = (patient.warnings || []).some(w => ['ERROR', 'CLINICAL_ALERT'].includes(w.severity));
   const reasons = [];
 
   if (effectiveIdentifierCount < 2) reasons.push('Partial identifiers captured');
   if (patient.fullName && (patient.fieldConfidence?.fullName || 0) < 0.6) reasons.push('Name needs confirmation');
   if (patient.bed && (patient.fieldConfidence?.bed || 0) < 0.65) reasons.push('Bed needs confirmation');
-  if ((patient.rawEntityCount || 0) <= 2 && (patient.structuredConfidence || 0) < 0.72) reasons.push('Sparse OCR evidence');
-  if ((patient.confidence || 0) < 0.62 && (patient.structuredConfidence || 0) < 0.72) reasons.push('Low OCR confidence');
+  if (!sparseStructuredRoster && (patient.rawEntityCount || 0) <= 2 && (patient.structuredConfidence || 0) < 0.72) reasons.push('Sparse OCR evidence');
+  if (!sparseStructuredRoster && (patient.confidence || 0) < 0.62 && (patient.structuredConfidence || 0) < 0.72) reasons.push('Low OCR confidence');
   if (severeWarning) reasons.push('Clinical cross-check flagged this record');
 
+  const readyThreshold = sparseStructuredRoster ? 0.68 : (structuredIdentity ? 0.74 : 0.8);
   let reviewLevel = 'READY';
   if (severeWarning || ((patient.confidence || 0) < 0.52 && (patient.structuredConfidence || 0) < 0.72) || effectiveIdentifierCount === 0) reviewLevel = 'VERIFY';
-  else if (reasons.length > 0 || (patient.warnings || []).length > 0 || (patient.confidence || 0) < (structuredIdentity ? 0.74 : 0.8)) reviewLevel = 'REVIEW';
+  else if (reasons.length > 0 || (patient.warnings || []).length > 0 || (patient.confidence || 0) < readyThreshold) reviewLevel = 'REVIEW';
 
   patient.identifierCount = effectiveIdentifierCount;
   patient.reviewLevel = reviewLevel;
@@ -3604,6 +3629,7 @@ function mergeProjectedRows(rows, initialContext = {}) {
 
 function patientHasStrongIdentity(patient) {
   return Boolean(
+    isSparseStructuredRosterPatient(patient) ||
     (patient?.bed && patient?.fullName) ||
     (patient?.civilId && patient?.fullName) ||
     (patient?.fullName && (patient?.age != null || patient?.gender)) ||
@@ -4233,6 +4259,108 @@ function finalizePatients(patients) {
   return deduplicatePatients(patients).map(p => enrichPatientForReview(ClinicalValidator.validate(p)));
 }
 
+// ====== CONTEXT-AWARE ENTITY REFINEMENT ======
+// Uses spatial neighbors and sequential patterns to fix misclassifications
+function refineEntitiesByContext(entities, imageWidth) {
+  if (entities.length <= 1) return entities;
+
+  // Sort by reading order (top-to-bottom, left-to-right)
+  const sorted = [...entities].sort((a, b) => {
+    const rowDiff = Math.abs(a.box.cy - b.box.cy);
+    if (rowDiff < Math.max(a.box.h, b.box.h) * 0.6) return a.box.cx - b.box.cx;
+    return a.box.cy - b.box.cy;
+  });
+
+  // Group into rows for sequential analysis
+  const avgHeight = average(sorted.map(e => e.box.h), 20);
+  const rows = [];
+  for (const entity of sorted) {
+    const lastRow = rows[rows.length - 1];
+    if (!lastRow || Math.abs(entity.box.cy - lastRow[lastRow.length - 1].box.cy) > avgHeight * 0.7) {
+      rows.push([entity]);
+    } else {
+      lastRow.push(entity);
+    }
+  }
+
+  // Rule 1: UNKNOWN token immediately after BED → likely NAME
+  // Rule 2: UNKNOWN token immediately after NAME → likely continuation of NAME
+  // Rule 3: DIAGNOSIS/MEDICATION between two NAME entities on same row → keep as-is (it's clinical)
+  // Rule 4: NAME token that's the only one on a row with no BED → keep as NAME but mark for review
+  // Rule 5: If a row has BED + UNKNOWN + AGE_GENDER, the UNKNOWN is almost certainly NAME
+  for (const row of rows) {
+    const meaningful = row.filter(e => e.entity !== 'NOISE' && e.entity !== 'HEADER');
+    if (meaningful.length === 0) continue;
+
+    for (let i = 0; i < meaningful.length; i++) {
+      const current = meaningful[i];
+      const prev = i > 0 ? meaningful[i - 1] : null;
+      const next = i < meaningful.length - 1 ? meaningful[i + 1] : null;
+
+      // Rule 1: UNKNOWN after BED → NAME
+      if (current.entity === 'UNKNOWN' && prev?.entity === 'BED') {
+        const nameCheck = MedicalVocabulary.lookupName(current.text);
+        if (!MedicalVocabulary.MEDICAL_TERMS[current.text.toUpperCase()]) {
+          current.entity = 'NAME';
+          current.confidence = Math.max(current.confidence, nameCheck ? nameCheck.confidence : 0.55);
+          current.meta = { ...current.meta, contextRefined: 'after-bed' };
+        }
+      }
+
+      // Rule 2: UNKNOWN after NAME → likely continuation (family name)
+      if (current.entity === 'UNKNOWN' && prev?.entity === 'NAME') {
+        if (/^[A-Za-z\u0600-\u06FF]{2,}$/.test(current.text) && !MedicalVocabulary.MEDICAL_TERMS[current.text.toUpperCase()]) {
+          current.entity = 'NAME';
+          current.confidence = Math.max(current.confidence, 0.52);
+          current.meta = { ...current.meta, contextRefined: 'after-name' };
+        }
+      }
+
+      // Rule 5: UNKNOWN between BED and AGE_GENDER → NAME
+      if (current.entity === 'UNKNOWN' && prev?.entity === 'BED' && next?.entity === 'AGE_GENDER') {
+        current.entity = 'NAME';
+        current.confidence = Math.max(current.confidence, 0.70);
+        current.meta = { ...current.meta, contextRefined: 'bed-X-age' };
+      }
+      if (current.entity === 'UNKNOWN' &&
+          meaningful.some(e => e.entity === 'BED') &&
+          meaningful.some(e => e.entity === 'AGE_GENDER') &&
+          current.box.cx > (meaningful.find(e => e.entity === 'BED')?.box.cx || 0) &&
+          current.box.cx < (meaningful.find(e => e.entity === 'AGE_GENDER')?.box.cx || Infinity)) {
+        if (/^[A-Za-z\u0600-\u06FF]{2,}$/.test(current.text)) {
+          current.entity = 'NAME';
+          current.confidence = Math.max(current.confidence, 0.65);
+          current.meta = { ...current.meta, contextRefined: 'between-bed-age' };
+        }
+      }
+
+      // Rule: Low-confidence NAME after DIAGNOSIS → probably more diagnosis text
+      if (current.entity === 'NAME' && current.confidence < 0.55 && prev?.entity === 'DIAGNOSIS') {
+        if (!MedicalVocabulary.lookupName(current.text)) {
+          current.entity = 'DIAGNOSIS';
+          current.confidence = prev.confidence * 0.8;
+          current.meta = { ...current.meta, contextRefined: 'after-diagnosis' };
+        }
+      }
+
+      // Rule: MEDICATION entity that's also a strong NAME → keep as NAME if in name column position
+      if (current.entity === 'MEDICATION' && current.confidence < 0.7) {
+        const nameMatch = MedicalVocabulary.lookupName(current.text);
+        if (nameMatch && nameMatch.confidence >= 0.8) {
+          // Check if it's in the left third of the image (name column position)
+          if (current.box.cx < imageWidth * 0.35) {
+            current.entity = 'NAME';
+            current.confidence = nameMatch.confidence;
+            current.meta = { ...current.meta, contextRefined: 'medication-to-name-by-position' };
+          }
+        }
+      }
+    }
+  }
+
+  return entities;
+}
+
 export function analyzeOcrWords(words, imageWidth, imageHeight) {
   // 1. Normalize bounding boxes
   const detections = words
@@ -4253,7 +4381,10 @@ export function analyzeOcrWords(words, imageWidth, imageHeight) {
   const split = splitDetections(detections);
 
   // 3. Classify every detection as an entity type
-  const entities = split.map(detection => EntityRecognizer.classify(detection));
+  const rawEntities = split.map(detection => EntityRecognizer.classify(detection));
+
+  // 3b. Context-aware refinement — use spatial neighbors to fix misclassifications
+  const entities = refineEntitiesByContext(rawEntities, imageWidth);
   const entityCount = entities.filter(entity => entity.entity !== 'NOISE' && entity.entity !== 'HEADER').length;
   console.log(`[OCR] Entities: ${entityCount} meaningful out of ${entities.length} total`);
   entities.filter(e => e.entity !== 'NOISE').slice(0, 15).forEach(e =>
