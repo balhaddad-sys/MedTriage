@@ -473,11 +473,13 @@ export function lookupLearnedMedication(text) {
   if (!text || !models.medications) return null;
 
   const key = text.trim().toLowerCase();
-  // Exact match
+  // Safety: scale max edit distance by length to prevent dangerous drug name cross-matches
+  const safeMaxDist = key.length <= 4 ? 0 : key.length <= 6 ? 1 : 2;
   for (const [k, v] of Object.entries(models.medications)) {
+    // Exact match
     if (k === key) return { confidence: v.confidence, count: v.count };
-    // Fuzzy for meds — OCR often drops/adds a letter
-    if (key.length >= 5 && editDistance(key, k) <= 2) {
+    // Fuzzy for meds — only when names are long enough to be safe
+    if (key.length >= 5 && Math.abs(key.length - k.length) <= safeMaxDist && editDistance(key, k) <= safeMaxDist) {
       return { confidence: v.confidence * 0.8, count: v.count, corrected: k };
     }
   }

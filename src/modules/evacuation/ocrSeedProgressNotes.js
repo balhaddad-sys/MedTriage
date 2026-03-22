@@ -531,8 +531,6 @@ export const CLINICAL_ABBREVIATIONS = {
   'IM': 'Intramuscular',
   'SC': 'Subcutaneous',
   'SL': 'Sublingual',
-  'PO': 'By mouth',
-  'PR': 'Per rectum',
   'INH': 'Inhaled',
   'TOP': 'Topical',
   'GTT': 'Drops/Drip',

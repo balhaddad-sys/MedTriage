@@ -1,0 +1,25 @@
+########################################
+# MedGrade LoRA Fine-Tuning — GPU
+########################################
+FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    HF_HUB_OFFLINE=1 \
+    DO_NOT_TRACK=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.12 python3.12-venv python3-pip git \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN ln -sf /usr/bin/python3.12 /usr/bin/python
+
+WORKDIR /app
+
+COPY requirements-finetune.txt .
+RUN pip install --upgrade pip && pip install -r requirements-finetune.txt
+
+COPY finetune_lora.py ./
+
+CMD ["python", "finetune_lora.py"]

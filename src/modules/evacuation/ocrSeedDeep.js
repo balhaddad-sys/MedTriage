@@ -511,7 +511,6 @@ export const SOCIAL_DISCHARGE = [
 
 export const DEEP_WORD_CORRECTIONS = {
   // m↔rn is THE most common OCR error in medical text
-  'rnorning': { truth: 'Morning', entity: 'CLINICAL' },
   'rnonth': { truth: 'Month', entity: 'CLINICAL' },
   'rnorning': { truth: 'Morning', entity: 'CLINICAL' },
   'rnalignant': { truth: 'Malignant', entity: 'CLINICAL' },
@@ -547,7 +546,6 @@ export const DEEP_WORD_CORRECTIONS = {
   'sympton': { truth: 'Symptom', entity: 'CLINICAL' },
   'syrnptom': { truth: 'Symptom', entity: 'CLINICAL' },
   'syrnptoms': { truth: 'Symptoms', entity: 'CLINICAL' },
-  'extrernity': { truth: 'Extremity', entity: 'CLINICAL' },
   'extrernity': { truth: 'Extremity', entity: 'CLINICAL' },
   'extrernities': { truth: 'Extremities', entity: 'CLINICAL' },
   'inflarnnation': { truth: 'Inflammation', entity: 'CLINICAL' },

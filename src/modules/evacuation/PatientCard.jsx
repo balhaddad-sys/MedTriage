@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import { useApp } from '../../app.jsx';
 import { colors, fonts, triageColors, triageTextColors } from '../../design/tokens.js';
 import { EvacTag } from '../../shared/Tag.jsx';
@@ -72,9 +72,17 @@ const tagStyle = (color) => ({
   background: color + '22', color: color,
 });
 
-export default function PatientCard({ patient }) {
-  const { updatePatient } = useApp();
+export default function PatientCard({ patient, forceExpand, onExpanded }) {
+  const { updatePatient, removePatient } = useApp();
   const [expanded, setExpanded] = useState(false);
+
+  // Auto-expand when NFC detects this patient
+  useEffect(() => {
+    if (forceExpand && !expanded) {
+      setExpanded(true);
+      if (onExpanded) onExpanded();
+    }
+  }, [forceExpand]);
 
   const cycleTriage = useCallback(async (e) => {
     e.stopPropagation();
@@ -224,6 +232,23 @@ export default function PatientCard({ patient }) {
               })}
             </div>
           </div>
+
+          {/* Delete button */}
+          <button
+            style={{
+              width: '100%', marginTop: '8px', padding: '10px', border: 'none',
+              borderRadius: '6px', background: colors.red + '15',
+              color: colors.red, fontSize: '12px', fontWeight: 700,
+              cursor: 'pointer', fontFamily: fonts.sans,
+            }}
+            onClick={(e) => {
+              e.stopPropagation();
+              if (confirm(`Delete patient ${patient.fullName || patient.civilId || 'unknown'}?`)) {
+                removePatient(patient.id);
+              }
+            }}>
+            Delete Patient
+          </button>
         </div>
       )}
     </div>

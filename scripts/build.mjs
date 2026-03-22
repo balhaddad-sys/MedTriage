@@ -43,7 +43,7 @@ const dataOut = join(outdir, 'data');
 if (existsSync(dataDir)) {
   if (!existsSync(dataOut)) mkdirSync(dataOut, { recursive: true });
   for (const file of readdirSync(dataDir)) {
-    copyFileSync(join(dataDir, file), join(dataOut, file));
+    cpSync(join(dataDir, file), join(dataOut, file), { recursive: true });
   }
 }
 

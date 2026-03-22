@@ -343,13 +343,39 @@ async function scanCapacitorNfc(onResult, onError, onReading, mrzData, onProgres
 
       // If IsoDep is connected, try ICAO MRTD protocol read
       let icaoData = null;
-      console.log('[NFC] Tag event:', JSON.stringify({ id: event.id, hasIsoDep: event.hasIsoDep, connected: event.connected, useIsoDep }));
+      // Use the best available unique identifier:
+      // 1. chipSerial (from GET DATA / file reads — most unique)
+      // 2. historicalBytes + hiLayerResponse (ATR data — may be unique per card type)
+      // 3. UID (may be random on NfcB cards)
+      const chipSerial = event.chipSerial || '';
+      const histBytes = event.historicalBytes || '';
+      const hiLayer = event.hiLayerResponse || '';
+      const uid = event.id || '';
+
+      // Build stable ID from chip data
+      let stableId = chipSerial || '';
+      if (!stableId && (histBytes || hiLayer)) {
+        stableId = 'ATR:' + histBytes + ':' + hiLayer;
+      }
+      if (!stableId) stableId = uid;
+
+      parsed.serialNumber = stableId;
+      parsed.chipSerial = chipSerial;
+      parsed.historicalBytes = histBytes;
+      parsed.hiLayerResponse = hiLayer;
+      parsed.rawUid = uid;
+
+      console.log('[NFC] Card identifiers:', JSON.stringify({
+        uid, chipSerial, histBytes, hiLayer, stableId
+      }));
+
+      console.log('[NFC] Tag event:', JSON.stringify({ id: event.id, stableId, hasIsoDep: event.hasIsoDep, connected: event.connected, useIsoDep }));
       if (useIsoDep && (event.connected === true || event.connected === 'true')) {
         try {
           onProgress?.('Reading chip...');
           console.log('[NFC] Starting ICAO read with IsoDep plugin...');
           icaoData = await attemptICAORead(isoDepPlugin, mrzData || null, onProgress, { readPhoto: true });
-          console.log('[NFC] ICAO result:', JSON.stringify(icaoData ? { detected: icaoData.icaoDetected, needsBAC: icaoData.needsBAC, groups: icaoData.availableGroups, hasMrz: !!icaoData.mrz } : null));
+          console.log('[NFC] ICAO result:', JSON.stringify(icaoData ? { detected: icaoData.icaoDetected, needsBAC: icaoData.needsBAC, groups: icaoData.availableGroups, hasMrz: !!icaoData.mrz, selectedApp: icaoData.selectedApp, probeResults: icaoData.probeResults } : null));
         } catch (e) {
           console.error('[NFC] ICAO read error:', e);
         }
@@ -385,11 +411,25 @@ async function scanCapacitorNfc(onResult, onError, onReading, mrzData, onProgres
         }
       }
 
+      // If direct Civil ID file read succeeded, use that data
+      if (icaoData?.civilIdFromChip) {
+        if (icaoData.civilId) parsed.civilId = icaoData.civilId;
+        if (icaoData.fullName) parsed.fullName = icaoData.fullName;
+        if (icaoData.fullNameArabic) parsed.fullNameArabic = icaoData.fullNameArabic;
+        if (icaoData.age != null) parsed.age = icaoData.age;
+        if (icaoData.gender) parsed.gender = icaoData.gender;
+        if (icaoData.nationality) parsed.nationality = icaoData.nationality;
+        parsed.needsManualId = !parsed.civilId;
+        parsed.filesFound = icaoData.filesFound || [];
+      }
+
       // Attach ICAO metadata
       if (icaoData) {
-        parsed.icaoDetected = true;
+        parsed.icaoDetected = icaoData.icaoDetected || false;
         parsed.icaoNeedsBAC = icaoData.needsBAC || false;
         parsed.icaoGroups = icaoData.availableGroups || [];
+        parsed.probeResults = icaoData.probeResults || [];
+        parsed.selectedApp = icaoData.selectedApp || null;
         if (icaoData.additionalDetails?.fullNameNative) {
           parsed.fullNameArabic = icaoData.additionalDetails.fullNameNative;
         }
@@ -526,6 +566,14 @@ export function findExistingPatient(patients, civilId) {
   const clean = `${civilId}`.replace(/\D/g, '');
   if (!clean) return null;
   return patients.find(p => p.civilId && p.civilId.replace(/\D/g, '') === clean) || null;
+}
+
+// Find existing patient by NFC UID (serial number)
+export function findPatientByNfcUid(patients, uid) {
+  if (!uid || !Array.isArray(patients)) return null;
+  const clean = uid.trim().toUpperCase();
+  if (!clean) return null;
+  return patients.find(p => p.nfcSerial && p.nfcSerial.trim().toUpperCase() === clean) || null;
 }
 
 // Convert ICAO photo data to displayable data URL

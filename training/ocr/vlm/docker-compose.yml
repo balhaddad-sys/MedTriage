@@ -1,0 +1,125 @@
+##############################################################
+# MedGrade VLM-OCR Stack — Air-Gapped Medical Deployment
+#
+# Services:
+#   vlm-engine   — PaddleOCR + inference API (GPU)
+#   finetune     — LoRA training with Unsloth (GPU, on-demand)
+#   audit-viewer — SQLite audit log web viewer (CPU)
+#
+# Usage:
+#   docker compose up vlm-engine        # Start inference only
+#   docker compose run finetune          # Run one-shot fine-tune
+#   docker compose up audit-viewer       # View audit logs
+#   docker compose up                    # Start everything
+#
+# SECURITY: All outbound traffic is blocked via the
+#           "medocr_airgap" network (internal: true).
+##############################################################
+
+version: "3.9"
+
+networks:
+  medocr_airgap:
+    driver: bridge
+    internal: true    # No internet access — air-gapped
+
+volumes:
+  model_cache:        # Cached model weights (persist across restarts)
+  training_data:      # Training pairs + corrections
+  audit_data:         # SQLite audit database
+
+services:
+  # ────────────────────────────────────────────────────────────
+  # VLM INFERENCE ENGINE
+  # PaddleOCR + Medical Corrector + Audit Logger
+  # ────────────────────────────────────────────────────────────
+  vlm-engine:
+    build:
+      context: .
+      dockerfile: Dockerfile.vlm
+    container_name: medocr-vlm
+    networks:
+      - medocr_airgap
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - model_cache:/app/models
+      - training_data:/app/results/training_pairs
+      - audit_data:/app/results
+      - ../raw:/app/data/raw:ro
+      - ../augmented:/app/data/augmented:ro
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - CUDA_VISIBLE_DEVICES=0
+      - PADDLE_OCR_USE_GPU=1
+      - PYTHONUNBUFFERED=1
+      # Disable ALL telemetry
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+      - PADDLE_NO_TELEMETRY=1
+      - DO_NOT_TRACK=1
+    ports:
+      - "8701:8701"    # Inference API
+    command: >
+      python -m uvicorn serve:app
+      --host 0.0.0.0
+      --port 8701
+      --workers 1
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8701/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  # ────────────────────────────────────────────────────────────
+  # LORA FINE-TUNING (on-demand)
+  # Run with: docker compose run finetune
+  # ────────────────────────────────────────────────────────────
+  finetune:
+    build:
+      context: .
+      dockerfile: Dockerfile.finetune
+    container_name: medocr-finetune
+    networks:
+      - medocr_airgap
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    volumes:
+      - model_cache:/app/models
+      - training_data:/app/results/training_pairs
+      - ./adapters:/app/adapters
+    environment:
+      - NVIDIA_VISIBLE_DEVICES=all
+      - CUDA_VISIBLE_DEVICES=0
+      - HF_HUB_OFFLINE=1
+      - TRANSFORMERS_OFFLINE=1
+      - DO_NOT_TRACK=1
+    command: python finetune_lora.py --min-pairs 10 --epochs 1
+    profiles:
+      - training    # Only starts with: docker compose --profile training up
+
+  # ────────────────────────────────────────────────────────────
+  # AUDIT LOG VIEWER (lightweight web UI)
+  # ────────────────────────────────────────────────────────────
+  audit-viewer:
+    image: ghcr.io/nicedoc/sqlite-web:latest
+    container_name: medocr-audit
+    networks:
+      - medocr_airgap
+    volumes:
+      - audit_data:/data:ro
+    ports:
+      - "8702:8080"
+    command: ["sqlite_web", "/data/audit.db", "--host", "0.0.0.0", "--read-only"]
+    restart: unless-stopped

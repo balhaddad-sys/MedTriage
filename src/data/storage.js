@@ -1,17 +1,9 @@
-// IndexedDB + Multi-layer backup storage engine
-import { get, set, del, keys, entries, createStore } from 'idb-keyval';
+// IndexedDB storage engine — single database, multiple object stores
+// Replaces idb-keyval which creates separate DBs per store (causes transaction conflicts)
 
-const DB_NAME = 'medevac-db';
-const stores = {};
+const DB_NAME = 'medevac-v3';
+const DB_VERSION = 1;
 
-function getStore(storeName) {
-  if (!stores[storeName]) {
-    stores[storeName] = createStore(DB_NAME, storeName);
-  }
-  return stores[storeName];
-}
-
-// Store names matching spec
 const STORES = {
   patients: 'patients',
   syncQueue: 'syncQueue',
@@ -27,38 +19,95 @@ const STORES = {
   backupMeta: 'backupMeta',
 };
 
+const ALL_STORE_NAMES = Object.values(STORES);
+
+let dbPromise = null;
+
+function openDB() {
+  if (dbPromise) return dbPromise;
+  dbPromise = new Promise((resolve, reject) => {
+    const req = indexedDB.open(DB_NAME, DB_VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      for (const name of ALL_STORE_NAMES) {
+        if (!db.objectStoreNames.contains(name)) {
+          db.createObjectStore(name);
+        }
+      }
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+  return dbPromise;
+}
+
+async function tx(storeName, mode, fn) {
+  const db = await openDB();
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction(storeName, mode);
+    const store = transaction.objectStore(storeName);
+    const result = fn(store);
+    transaction.oncomplete = () => resolve(result._result);
+    transaction.onerror = () => reject(transaction.error);
+    // For get operations, resolve with the request result
+    if (result instanceof IDBRequest) {
+      result.onsuccess = () => { result._result = result.result; };
+    }
+  });
+}
+
 // ====== GENERIC CRUD ======
 
+// Robust transaction with retry + timeout
+async function txRetry(storeName, mode, fn, retries = 3) {
+  for (let attempt = 0; attempt < retries; attempt++) {
+    try {
+      const db = await openDB();
+      return await new Promise((resolve, reject) => {
+        let t, timeout;
+        try {
+          t = db.transaction(storeName, mode);
+        } catch (e) {
+          dbPromise = null; // Force reconnect
+          throw e;
+        }
+        const store = t.objectStore(storeName);
+        const result = fn(store);
+        timeout = setTimeout(() => reject(new Error('Transaction timeout')), 15000);
+        t.oncomplete = () => { clearTimeout(timeout); resolve(result instanceof IDBRequest ? result.result : undefined); };
+        t.onerror = () => { clearTimeout(timeout); reject(t.error); };
+        t.onabort = () => { clearTimeout(timeout); reject(new Error('Transaction aborted')); };
+        if (result instanceof IDBRequest) { result.onsuccess = () => {}; }
+      });
+    } catch (e) {
+      if (attempt === retries - 1) throw e;
+      dbPromise = null;
+      await new Promise(r => setTimeout(r, 100 * (attempt + 1)));
+    }
+  }
+}
+
 export async function getItem(storeName, key) {
-  return get(key, getStore(storeName));
+  return txRetry(storeName, 'readonly', s => s.get(key));
 }
 
 export async function setItem(storeName, key, value) {
-  await set(key, value, getStore(storeName));
-  // Trigger backup if patient data
-  if (storeName === STORES.patients) {
-    scheduleBackup();
-  }
+  await txRetry(storeName, 'readwrite', s => s.put(value, key));
+  if (storeName === STORES.patients) scheduleBackup();
 }
 
 export async function deleteItem(storeName, key) {
-  await del(key, getStore(storeName));
-  if (storeName === STORES.patients) {
-    scheduleBackup();
-  }
+  await txRetry(storeName, 'readwrite', s => s.delete(key));
+  if (storeName === STORES.patients) scheduleBackup();
 }
 
 export async function getAllKeys(storeName) {
-  return keys(getStore(storeName));
-}
-
-export async function getAllEntries(storeName) {
-  return entries(getStore(storeName));
+  return txRetry(storeName, 'readonly', s => s.getAllKeys());
 }
 
 export async function getAllItems(storeName) {
-  const items = await entries(getStore(storeName));
-  return items.map(([, value]) => value);
+  const result = await txRetry(storeName, 'readonly', s => s.getAll());
+  return result || [];
 }
 
 // ====== PATIENT-SPECIFIC OPERATIONS ======
@@ -98,15 +147,10 @@ async function performBackup() {
       timestamp: new Date().toISOString(),
       version: '3.0.0',
     };
-
-    // Layer 2: localStorage compressed snapshot
     try {
       localStorage.setItem('medevac-backup', JSON.stringify(snapshot));
-    } catch (e) {
-      // localStorage full — acceptable
-    }
+    } catch { /* localStorage full */ }
 
-    // Layer 3: Cache API via service worker
     if (navigator.serviceWorker && navigator.serviceWorker.controller) {
       navigator.serviceWorker.controller.postMessage({
         type: 'BACKUP_PATIENTS',
@@ -122,26 +166,19 @@ async function performBackup() {
 // ====== STARTUP RECOVERY ======
 
 export async function recoverData() {
-  // Step 1: Try IndexedDB
   try {
     const patients = await getPatients();
-    if (patients.length > 0) {
-      return { source: 'indexeddb', patients };
-    }
+    if (patients.length > 0) return { source: 'indexeddb', patients };
   } catch (e) {
     console.warn('IndexedDB read failed:', e);
   }
 
-  // Step 2: Try localStorage
   try {
     const backup = localStorage.getItem('medevac-backup');
     if (backup) {
       const data = JSON.parse(backup);
       if (data.patients && data.patients.length > 0) {
-        // Restore to IndexedDB
-        for (const p of data.patients) {
-          await setItem(STORES.patients, p.id, p);
-        }
+        for (const p of data.patients) await setItem(STORES.patients, p.id, p);
         return { source: 'localStorage', patients: data.patients, warning: true };
       }
     }
@@ -149,22 +186,16 @@ export async function recoverData() {
     console.warn('localStorage recovery failed:', e);
   }
 
-  // Step 3: Try Cache API
   try {
     if (navigator.serviceWorker && navigator.serviceWorker.controller) {
       const data = await new Promise((resolve) => {
         const ch = new MessageChannel();
         ch.port1.onmessage = (e) => resolve(e.data);
-        navigator.serviceWorker.controller.postMessage(
-          { type: 'GET_BACKUP' },
-          [ch.port2]
-        );
+        navigator.serviceWorker.controller.postMessage({ type: 'GET_BACKUP' }, [ch.port2]);
         setTimeout(() => resolve(null), 3000);
       });
-      if (data && data.patients && data.patients.length > 0) {
-        for (const p of data.patients) {
-          await setItem(STORES.patients, p.id, p);
-        }
+      if (data?.patients?.length > 0) {
+        for (const p of data.patients) await setItem(STORES.patients, p.id, p);
         return { source: 'cacheAPI', patients: data.patients, warning: true };
       }
     }
@@ -172,7 +203,6 @@ export async function recoverData() {
     console.warn('Cache API recovery failed:', e);
   }
 
-  // Step 4: No data found
   return { source: 'empty', patients: [] };
 }
 
@@ -210,19 +240,9 @@ export function startAutoExport() {
     try {
       const patients = await getPatients();
       if (patients.length === 0) return;
-      const blob = new Blob(
-        [JSON.stringify({ patients, exportedAt: new Date().toISOString(), version: '3.0.0' }, null, 2)],
-        { type: 'application/json' }
-      );
-      // Use File System Access API if available
-      if ('showSaveFilePicker' in window) {
-        // Don't show picker automatically — just update backup meta
-        await setItem(STORES.backupMeta, 'lastAutoBackup', new Date().toISOString());
-      }
-    } catch (e) {
-      // Silent fail for auto-export
-    }
-  }, 30 * 60 * 1000); // Every 30 minutes
+      await setItem(STORES.backupMeta, 'lastAutoBackup', new Date().toISOString());
+    } catch { /* silent */ }
+  }, 30 * 60 * 1000);
 }
 
 export { STORES };

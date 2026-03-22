@@ -1,51 +1,41 @@
+// Civil ID Scanner — clean step-by-step wizard
+// Step 1: NFC tap → detect card UID (if known → show patient, done)
+// Step 2: Camera → scan front of card (Civil ID number + blood type)
+// Step 3: Camera → scan back of card (MRZ → name, DOB, gender, nationality)
+// Step 4: Confirm → save patient
+
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useApp } from '../../app.jsx';
 import { colors, fonts } from '../../design/tokens.js';
 import Modal from '../../shared/Modal.jsx';
 import { CheckIcon } from '../../design/icons.jsx';
-import { scanNFC, validateCivilId, getNfcPlatformInfo, findExistingPatient, findPatientByNfcUid, getDisplayablePhotoUrl, parseCivilIdNumber } from './nfcReader.js';
-import { BLOOD_TYPES, getNationalityLabel } from './mrzParser.js';
+import { scanNFC, getNfcPlatformInfo, findPatientByNfcUid, findExistingPatient, parseCivilIdNumber } from './nfcReader.js';
+import { BLOOD_TYPES, getNationalityLabel, parseTD1 } from './mrzParser.js';
 import { logAction } from '../../data/audit.js';
 import CivilIdCameraScanner from './MRZCamera.jsx';
 import MRZScannerCamera from './MRZScannerCamera.jsx';
 
-const styles = {
-  container: { display: 'flex', flexDirection: 'column', gap: '16px', alignItems: 'center', padding: '4px 0' },
-  nfcArea: {
-    display: 'flex', flexDirection: 'column', alignItems: 'center',
-    gap: '14px', padding: '24px 0', width: '100%',
-  },
+const s = {
+  container: { display: 'flex', flexDirection: 'column', gap: '14px', padding: '4px 0' },
+  stepLabel: { fontSize: '11px', fontWeight: 800, color: colors.blue, textTransform: 'uppercase', letterSpacing: '1px' },
+  statusText: { fontSize: '15px', fontWeight: 700, color: colors.text0, textAlign: 'center' },
+  subText: { fontSize: '12px', color: colors.text3, textAlign: 'center' },
   nfcRing: {
-    width: '100px', height: '100px', borderRadius: '50%',
+    width: '90px', height: '90px', borderRadius: '50%', margin: '0 auto',
     border: `3px solid ${colors.blue}`, display: 'flex',
     alignItems: 'center', justifyContent: 'center',
   },
-  nfcRingScanning: { animation: 'nfcPulse 2s ease-in-out infinite' },
-  nfcRingDetected: { borderColor: colors.green, animation: 'none' },
-  statusText: { fontSize: '14px', fontWeight: 600, color: colors.text0, textAlign: 'center' },
-  subText: { fontSize: '12px', color: colors.text3, textAlign: 'center', lineHeight: 1.4 },
-  resultCard: {
-    width: '100%', padding: '16px', borderRadius: '12px',
-    border: `1px solid ${colors.green}44`, background: colors.green + '11',
-    display: 'flex', flexDirection: 'column', gap: '8px',
+  nfcRingPulse: { animation: 'nfcPulse 2s ease-in-out infinite' },
+  dataCard: {
+    width: '100%', padding: '14px', borderRadius: '12px',
+    background: colors.green + '11', border: `1px solid ${colors.green}44`,
+    display: 'flex', flexDirection: 'column', gap: '6px',
   },
-  resultRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
-  resultLabel: { fontSize: '11px', fontWeight: 700, color: colors.text3, textTransform: 'uppercase' },
-  resultValue: { fontSize: '14px', fontWeight: 600, color: colors.text0, fontFamily: fonts.mono },
-  manualInput: {
-    width: '100%', padding: '14px', borderRadius: '10px',
-    border: `1px solid ${colors.border}`, background: colors.bg2,
-    color: colors.text0, fontSize: '20px', fontFamily: fonts.mono,
-    textAlign: 'center', letterSpacing: '3px', outline: 'none',
-  },
-  smallInput: {
-    width: '100%', padding: '10px', borderRadius: '8px',
-    border: `1px solid ${colors.border}`, background: colors.bg2,
-    color: colors.text0, fontSize: '14px', fontFamily: fonts.mono,
-    textAlign: 'center', outline: 'none',
-  },
+  dataRow: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' },
+  dataLabel: { fontSize: '11px', fontWeight: 700, color: colors.text3, textTransform: 'uppercase' },
+  dataValue: { fontSize: '14px', fontWeight: 600, color: colors.text0, fontFamily: fonts.mono },
   btn: {
-    width: '100%', height: '48px', border: 'none', borderRadius: '10px',
+    width: '100%', height: '50px', border: 'none', borderRadius: '10px',
     fontSize: '15px', fontWeight: 700, cursor: 'pointer', fontFamily: fonts.sans,
   },
   btnSmall: {
@@ -57,853 +47,367 @@ const styles = {
     background: colors.red + '15', border: `1px solid ${colors.red}33`,
     fontSize: '12px', color: colors.red, fontWeight: 600,
   },
-  warningBox: {
-    width: '100%', padding: '10px', borderRadius: '8px',
-    background: colors.amber + '15', border: `1px solid ${colors.amber}33`,
-    fontSize: '12px', color: colors.amber, fontWeight: 600,
-    display: 'flex', alignItems: 'center', gap: '8px',
-  },
-  successBox: {
-    width: '100%', padding: '10px', borderRadius: '8px',
-    background: colors.green + '15', border: `1px solid ${colors.green}33`,
-    fontSize: '13px', color: colors.green, fontWeight: 600,
-    display: 'flex', alignItems: 'center', gap: '8px',
-  },
-  infoBox: {
-    width: '100%', padding: '10px', borderRadius: '8px',
-    background: colors.blue + '15', border: `1px solid ${colors.blue}33`,
-    fontSize: '12px', color: colors.blue, fontWeight: 600,
-  },
-  metaBox: {
-    width: '100%', padding: '10px', borderRadius: '8px',
-    background: colors.bg2, border: `1px solid ${colors.border}`,
-    display: 'flex', flexDirection: 'column', gap: '6px',
-  },
-  metaText: { fontSize: '11px', color: colors.text3, fontFamily: fonts.mono, wordBreak: 'break-word' },
-  divider: {
-    width: '100%', display: 'flex', alignItems: 'center', gap: '12px',
-    margin: '4px 0',
-  },
-  dividerLine: { flex: 1, height: '1px', background: colors.border },
-  dividerText: { fontSize: '11px', fontWeight: 700, color: colors.text3, textTransform: 'uppercase' },
-  photo: {
-    width: '64px', height: '80px', borderRadius: '6px',
-    objectFit: 'cover', border: `2px solid ${colors.green}44`,
-  },
-  bloodTypeRow: {
-    display: 'flex', gap: '6px', flexWrap: 'wrap',
-  },
-  bloodTypeBtn: {
-    padding: '6px 10px', borderRadius: '6px',
-    border: `1px solid ${colors.border}`, background: colors.bg2,
-    color: colors.text2, fontSize: '12px', fontWeight: 700,
-    cursor: 'pointer', fontFamily: fonts.mono,
-    transition: 'all 100ms',
-  },
-  bloodTypeBtnActive: {
-    background: colors.red + '22', borderColor: colors.red, color: colors.red,
-  },
-  fieldRow: {
-    display: 'flex', gap: '8px', width: '100%',
-  },
-  fieldGroup: {
-    flex: 1, display: 'flex', flexDirection: 'column', gap: '4px',
-  },
-  fieldLabel: {
-    fontSize: '11px', fontWeight: 700, color: colors.text3, textTransform: 'uppercase',
-  },
 };
 
-// Format YYMMDD from a date input value (YYYY-MM-DD)
-function dateToMrzFormat(dateStr) {
-  if (!dateStr) return '';
-  const parts = dateStr.split('-');
-  if (parts.length !== 3) return '';
-  const yy = parts[0].slice(-2);
-  return `${yy}${parts[1]}${parts[2]}`;
-}
-
-// Derive DOB and expiry from Civil ID for BAC key
-function civilIdToMrzDates(civilId) {
-  const parsed = parseCivilIdNumber(civilId);
-  if (!parsed) return null;
-  const yy = String(parsed.birthYear).slice(-2).padStart(2, '0');
-  const mm = String(parsed.birthMonth).padStart(2, '0');
-  const dd = String(parsed.birthDay).padStart(2, '0');
-  return { dateOfBirth: `${yy}${mm}${dd}` };
-}
-
 export default function NFCScanner({ onClose }) {
-  const { addPatient, updatePatient, patients, auth } = useApp();
+  const { addPatient, patients, auth } = useApp();
   const nfcInfo = getNfcPlatformInfo();
 
-  // Scan states
+  // Wizard steps: 'nfc' | 'front' | 'back' | 'confirm' | 'known'
+  const [step, setStep] = useState(nfcInfo.supported ? 'nfc' : 'front');
   const [scanning, setScanning] = useState(false);
-  const [nfcData, setNfcData] = useState(null);
-  const [scanMeta, setScanMeta] = useState(null);
   const [error, setError] = useState(null);
-  const [cardDetected, setCardDetected] = useState(false);
-  const [chipProgress, setChipProgress] = useState('');
+  const [saving, setSaving] = useState(false);
   const abortRef = useRef(null);
 
-  // Camera scan states
-  const [showCamera, setShowCamera] = useState(false);
-  const [showMRZ, setShowMRZ] = useState(false);
-  const [cameraMrzData, setCameraMrzData] = useState(null);
-
-  // Known patient — found by NFC UID on re-tap
+  // Collected data
+  const [nfcUid, setNfcUid] = useState('');
+  const [civilId, setCivilId] = useState('');
+  const [age, setAge] = useState(null);
+  const [bloodType, setBloodType] = useState('');
+  const [gender, setGender] = useState('');
+  const [nameEn, setNameEn] = useState('');
+  const [nameAr, setNameAr] = useState('');
+  const [nationality, setNationality] = useState('');
+  const [docNumber, setDocNumber] = useState('');
   const [knownPatient, setKnownPatient] = useState(null);
 
-  // Store latest NFC serial in a ref so camera can access it immediately
-  const lastNfcSerialRef = useRef('');
+  // Manual Civil ID input
+  const [manualId, setManualId] = useState('');
 
-  // Input states
-  const [civilId, setCivilId] = useState('');
-  const [civilIdError, setCivilIdError] = useState('');
-  const [bloodType, setBloodType] = useState('');
-  const [duplicatePatient, setDuplicatePatient] = useState(null);
-
-  // BAC authentication states
-  const [showBacForm, setShowBacForm] = useState(false);
-  const [bacDocNumber, setBacDocNumber] = useState('');
-  const [bacDob, setBacDob] = useState('');
-  const [bacExpiry, setBacExpiry] = useState('');
-  const [bacStatus, setBacStatus] = useState(''); // '', 'authenticating', 'reading', 'done', 'error'
-  const [bacError, setBacError] = useState('');
-
-  // Build MRZ data for BAC authentication
-  const getMrzData = useCallback(() => {
-    const docNum = bacDocNumber.trim();
-    const dob = dateToMrzFormat(bacDob);
-    const expiry = dateToMrzFormat(bacExpiry);
-    if (!docNum || dob.length !== 6 || expiry.length !== 6) return null;
-    return { documentNumber: docNum, dateOfBirth: dob, dateOfExpiry: expiry };
-  }, [bacDocNumber, bacDob, bacExpiry]);
-
-  // Auto-fill DOB from Civil ID
+  // ═══ STEP 1: NFC ═══
   useEffect(() => {
-    if (civilId.length === 12 && !bacDob) {
-      const dates = civilIdToMrzDates(civilId);
-      if (dates) {
-        const parsed = parseCivilIdNumber(civilId);
-        if (parsed) {
-          const yyyy = String(parsed.birthYear);
-          const mm = String(parsed.birthMonth).padStart(2, '0');
-          const dd = String(parsed.birthDay).padStart(2, '0');
-          setBacDob(`${yyyy}-${mm}-${dd}`);
-        }
-      }
-    }
-  }, [civilId]);
+    if (step !== 'nfc') return;
+    if (!nfcInfo.supported) { setStep('front'); return; }
 
-  // Start NFC scan with optional MRZ data for BAC
-  const startScan = useCallback(async (mrzData) => {
-    if (!nfcInfo.supported) return;
     setScanning(true);
     setError(null);
-    setCardDetected(false);
-    setScanMeta(null);
-    setDuplicatePatient(null);
 
-    if (mrzData) {
-      setBacStatus('authenticating');
-    }
-
-    const abort = await scanNFC(
+    scanNFC(
       (data) => {
-        setChipProgress('');
         setScanning(false);
-        setScanMeta(data);
+        const uid = data.serialNumber || '';
+        setNfcUid(uid);
 
-        if (mrzData) {
-          setBacStatus(data.icaoDetected && !data.icaoNeedsBAC ? 'done' : 'error');
-          if (data.icaoDetected && data.icaoNeedsBAC) {
-            setBacError('BAC authentication failed — check document number, DOB, and expiry date');
+        // Check if known patient
+        if (uid) {
+          const found = findPatientByNfcUid(patients, uid);
+          if (found) {
+            setKnownPatient(found);
+            setStep('known');
+            return;
           }
         }
 
-        // Save serial for camera flow
-        if (data.serialNumber) lastNfcSerialRef.current = data.serialNumber;
-
-        // Check if this card UID is already registered
-        if (data.serialNumber) {
-          const existingByUid = findPatientByNfcUid(patients, data.serialNumber);
-          if (existingByUid) {
-            setKnownPatient(existingByUid);
-            return; // Show known patient view
-          }
-        }
-
-        if (data.civilId) {
-          const existing = findExistingPatient(patients, data.civilId);
-          if (existing) setDuplicatePatient(existing);
-          setNfcData(data);
-        } else if (data.tagDetected) {
-          setCardDetected(true);
-          // If card detected but no data, auto-open camera to read Civil ID number
-          if (data.likelyCivilId && !data.civilId) {
-            setShowCamera(true);
-          }
-          // If ICAO detected but needs BAC, show the form
-          if (data.icaoDetected && data.icaoNeedsBAC) {
-            setShowBacForm(true);
-          }
-        } else {
-          setError('NFC tag detected but could not be classified.');
-        }
+        // Unknown card → next step (camera front)
+        setStep('front');
       },
       (err) => {
-        setError(err.message);
         setScanning(false);
-        if (mrzData) setBacStatus('error');
+        setError(err.message);
       },
-      () => {
-        if (mrzData) setBacStatus('reading');
-      },
-      mrzData,
-      (stage) => setChipProgress(stage),
-    );
-    abortRef.current = abort;
-  }, [nfcInfo.supported, patients]);
+      null, null, null,
+    ).then(abort => { abortRef.current = abort; });
 
-  // Auto-start NFC on mount (without BAC)
-  useEffect(() => {
-    if (nfcInfo.supported) startScan(null);
     return () => { abortRef.current?.(); };
-  }, []);
+  }, [step]);
 
-  // Camera MRZ callback — auto-start authenticated NFC scan
-  const handleCameraMRZ = useCallback((mrzParsed) => {
-    setShowCamera(false);
-    setCameraMrzData(mrzParsed);
-    // Auto-fill BAC fields
-    setBacDocNumber(mrzParsed.documentNumber || '');
-    if (mrzParsed.dateOfBirth) {
-      const d = mrzParsed.dateOfBirth;
-      setBacDob(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
+  // ═══ STEP 2: Camera Front — Civil ID number + blood type ═══
+  const handleFrontResult = useCallback((data) => {
+    if (data.civilId) {
+      // Check if this Civil ID is already registered
+      const existing = findExistingPatient(patients, data.civilId);
+      if (existing) {
+        // Already registered — show as known patient
+        setKnownPatient(existing);
+        setStep('known');
+        return;
+      }
+      setCivilId(data.civilId);
+      const parsed = parseCivilIdNumber(data.civilId);
+      if (parsed) setAge(parsed.age);
     }
-    if (mrzParsed.dateOfExpiry) {
-      const d = mrzParsed.dateOfExpiry;
-      setBacExpiry(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`);
-    }
-    // Auto-fill name/age/gender from MRZ
-    if (mrzParsed.age != null) {
-      setCivilId(''); // Will come from chip
-    }
-    // Show BAC form with pre-filled data, ready for NFC tap
-    setShowBacForm(true);
-    setCardDetected(true); // Skip initial scan phase
-    // Auto-start NFC scan with MRZ BAC key
-    const mrzKey = mrzParsed.bacKey;
-    if (mrzKey) {
-      abortRef.current?.();
-      startScan(mrzKey);
-    }
-  }, [startScan]);
+    if (data.bloodType) setBloodType(data.bloodType);
+    if (data.gender) setGender(data.gender);
+    if (data.nameEn) setNameEn(data.nameEn);
+    if (data.nameAr) setNameAr(data.nameAr);
+    setStep('back');
+  }, [patients]);
 
-  // Handle BAC-authenticated rescan
-  const handleBacScan = useCallback(() => {
-    const mrzData = getMrzData();
-    if (!mrzData) {
-      setBacError('Enter document number, date of birth, and expiry date');
+  // ═══ STEP 3: Camera Back — MRZ → auto-save ═══
+  const handleMrzResult = useCallback(async (mrzData) => {
+    const finalName = mrzData.fullName || nameEn;
+    const finalGender = mrzData.sex || gender;
+    const finalNationality = getNationalityLabel(mrzData.nationality) || nationality;
+    const finalAge = mrzData.age ?? age;
+    const finalCivilId = civilId;
+
+    // Update state for display
+    if (finalName) setNameEn(finalName);
+    if (finalGender) setGender(finalGender);
+    if (finalNationality) setNationality(finalNationality);
+    if (mrzData.documentNumber) setDocNumber(mrzData.documentNumber);
+    if (finalAge != null) setAge(finalAge);
+
+    // If we have Civil ID, auto-save immediately
+    if (finalCivilId && finalCivilId.length === 12) {
+      setSaving(true);
+      const parsed = parseCivilIdNumber(finalCivilId);
+      const patient = {
+        civilId: finalCivilId,
+        fullName: finalName || '',
+        fullNameArabic: nameAr || '',
+        age: finalAge ?? parsed?.age ?? null,
+        gender: finalGender || 'M',
+        triage: 'GREEN',
+        mobility: 'AMBULATORY',
+        o2: 'NONE',
+        iso: 'NONE',
+        code: 'FULL',
+        allergies: 'NKDA',
+        dx: '', meds: '', notes: '',
+        nationality: finalNationality || '',
+        bloodType: bloodType || '',
+        ward: auth?.ward?.name || '',
+        evac: 'IN_WARD',
+        nfcScanned: !!nfcUid,
+        nfcBackend: nfcUid ? 'isodep' : 'camera',
+        nfcSerial: nfcUid,
+        source: 'mrz-scanner',
+      };
+      try {
+        const saved = await addPatient(patient);
+        // Audit log is non-blocking — don't let it break the save
+        logAction('MRZ_IMPORT', 'patient', saved.id, {
+          newValue: { civilId: finalCivilId, name: finalName, source: 'mrz' },
+        }).catch(() => {});
+        onClose();
+        return;
+      } catch (e) {
+        console.error('[SAVE] Failed:', e);
+        setError('Save failed: ' + (e?.message || 'Unknown error'));
+        setSaving(false);
+      }
+    }
+
+    // Fallback: go to confirm step if no Civil ID
+    setStep('confirm');
+  }, [nameEn, nameAr, age, gender, nationality, bloodType, civilId, nfcUid, auth, addPatient, onClose]);
+
+  // ═══ STEP 4: Save patient ═══
+  const handleSave = useCallback(async () => {
+    const finalCivilId = civilId || manualId.replace(/\D/g, '');
+    if (!finalCivilId || finalCivilId.length !== 12) {
+      setError('Civil ID must be 12 digits');
       return;
     }
-    setBacError('');
-    setBacStatus('');
-    abortRef.current?.();
-    startScan(mrzData);
-  }, [getMrzData, startScan]);
-
-  const handleValidate = useCallback(() => {
-    setCivilIdError('');
-    const result = validateCivilId(civilId);
-    if (!result.valid) {
-      setCivilIdError(result.error);
-      return;
-    }
-    const existing = findExistingPatient(patients, result.civilId);
-    if (existing) setDuplicatePatient(existing);
-
-    setNfcData({
-      ...(scanMeta || {}),
-      civilId: result.civilId,
-      age: result.age,
-      fullName: scanMeta?.fullName || scanMeta?.fullNameArabic || '',
-      gender: scanMeta?.gender || '',
-      nfcBackend: scanMeta?.nfcBackend || (cardDetected ? 'webnfc' : 'manual'),
-      tagDetected: !!scanMeta?.tagDetected || cardDetected,
-      needsManualId: false,
-    });
-  }, [civilId, cardDetected, scanMeta, patients]);
-
-  const handleAddPatient = useCallback(async () => {
-    if (!nfcData) return;
+    setSaving(true);
+    const parsed = parseCivilIdNumber(finalCivilId);
     const patient = {
-      civilId: nfcData.civilId || '',
-      fullName: nfcData.fullName || nfcData.fullNameArabic || '',
-      fullNameArabic: nfcData.fullNameArabic || '',
-      age: nfcData.age,
-      gender: nfcData.gender || 'M',
+      civilId: finalCivilId,
+      fullName: nameEn,
+      fullNameArabic: nameAr,
+      age: age ?? parsed?.age ?? null,
+      gender: gender || 'M',
       triage: 'GREEN',
       mobility: 'AMBULATORY',
       o2: 'NONE',
       iso: 'NONE',
       code: 'FULL',
       allergies: 'NKDA',
-      dx: '',
-      meds: '',
-      notes: nfcData.nationality ? `Nationality: ${nfcData.nationality}` : '',
-      nationality: nfcData.nationalityCode || nfcData.nationality || '',
-      bloodType: bloodType || '',
+      dx: '', meds: '', notes: '',
+      nationality: nationality,
+      bloodType: bloodType,
       ward: auth?.ward?.name || '',
       evac: 'IN_WARD',
-      nfcScanned: !!nfcData.tagDetected,
-      nfcBackend: nfcData.nfcBackend || 'unknown',
-      nfcSerial: nfcData.serialNumber || '',
-      nfcTagType: nfcData.tagType || '',
-      nfcTechTypes: Array.isArray(nfcData.techTypes) ? nfcData.techTypes : [],
-      nfcLikelyCivilId: !!nfcData.likelyCivilId,
-      icaoDetected: nfcData.icaoDetected || false,
-      icaoGroups: nfcData.icaoGroups || [],
-      bacAuthenticated: nfcData.bacAuthenticated || false,
+      nfcScanned: !!nfcUid,
+      nfcBackend: nfcUid ? 'isodep' : 'camera',
+      nfcSerial: nfcUid,
+      source: 'scanner',
     };
-    const saved = await addPatient(patient);
-    await logAction('NFC_IMPORT', 'patient', saved.id, {
-      newValue: {
-        nfcBackend: patient.nfcBackend,
-        nfcSerial: patient.nfcSerial,
-        icaoDetected: patient.icaoDetected,
-        bacAuthenticated: patient.bacAuthenticated,
-        bloodType: patient.bloodType,
-      },
-    });
-    onClose();
-  }, [nfcData, bloodType, addPatient, auth, onClose]);
-
-  const handleUpdateExisting = useCallback(async () => {
-    if (!duplicatePatient || !nfcData) return;
-    const updated = {
-      ...duplicatePatient,
-      fullName: nfcData.fullName || duplicatePatient.fullName,
-      fullNameArabic: nfcData.fullNameArabic || duplicatePatient.fullNameArabic || '',
-      age: nfcData.age ?? duplicatePatient.age,
-      gender: nfcData.gender || duplicatePatient.gender,
-      nationality: nfcData.nationalityCode || nfcData.nationality || duplicatePatient.nationality || '',
-      bloodType: bloodType || duplicatePatient.bloodType || '',
-      nfcScanned: true,
-      nfcBackend: nfcData.nfcBackend || duplicatePatient.nfcBackend || 'unknown',
-      nfcSerial: nfcData.serialNumber || duplicatePatient.nfcSerial || '',
-      icaoDetected: nfcData.icaoDetected || duplicatePatient.icaoDetected || false,
-      bacAuthenticated: nfcData.bacAuthenticated || duplicatePatient.bacAuthenticated || false,
-    };
-    await updatePatient(updated);
-    await logAction('NFC_UPDATE', 'patient', updated.id, {
-      newValue: { nfcBackend: updated.nfcBackend, bacAuthenticated: updated.bacAuthenticated },
-    });
-    onClose();
-  }, [duplicatePatient, nfcData, bloodType, updatePatient, onClose]);
-
-  const resetAll = useCallback(() => {
-    abortRef.current?.();
-    setNfcData(null);
-    setCivilId('');
-    setCardDetected(false);
-    setBloodType('');
-    setDuplicatePatient(null);
-    setShowBacForm(false);
-    setBacStatus('');
-    setBacError('');
-    setScanMeta(null);
-    setError(null);
-    if (nfcInfo.supported) startScan(null);
-  }, [nfcInfo.supported, startScan]);
-
-  // Photo data URL from ICAO DG2 (async with JP2 fallback)
-  const [photoUrl, setPhotoUrl] = useState(null);
-  useEffect(() => {
-    if (nfcData?.photo) {
-      getDisplayablePhotoUrl(nfcData.photo).then(url => setPhotoUrl(url));
-    } else {
-      setPhotoUrl(null);
+    try {
+      const saved = await addPatient(patient);
+      logAction('SCANNER_IMPORT', 'patient', saved.id, { newValue: { civilId: finalCivilId } }).catch(() => {});
+      onClose();
+    } catch (e) {
+      console.error('[SAVE] Failed:', e);
+      setError('Failed to save: ' + (e?.message || 'Unknown error'));
+      setSaving(false);
     }
-  }, [nfcData?.photo]);
+  }, [civilId, manualId, nameEn, nameAr, age, gender, bloodType, nationality, nfcUid, auth, addPatient, onClose]);
 
-  // ====== RESULT VIEW — data read successfully ======
-  if (nfcData) {
+  // ═══ KNOWN PATIENT VIEW ═══
+  if (step === 'known' && knownPatient) {
     return (
-      <Modal title="Civil ID Scanner" onClose={onClose}>
-        <div style={styles.container}>
-          {duplicatePatient && (
-            <div style={styles.warningBox}>
-              Patient already registered: {duplicatePatient.fullName || duplicatePatient.civilId}
-              {' '}(Ward: {duplicatePatient.ward || '—'}, Bed: {duplicatePatient.bed || '—'})
+      <Modal title="Patient Found" onClose={onClose}>
+        <div style={s.container}>
+          <div style={{ ...s.dataCard, borderColor: colors.blue + '44', background: colors.blue + '11' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+              <CheckIcon size={18} color={colors.blue} />
+              <span style={{ fontSize: '15px', fontWeight: 700, color: colors.blue }}>Known Patient</span>
             </div>
-          )}
-
-          <div style={styles.resultCard}>
-            <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px' }}>
-              <div style={{ flex: 1 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-                  <CheckIcon size={18} color={colors.green} />
-                  <span style={{ fontSize: '14px', fontWeight: 700, color: colors.green }}>
-                    {nfcData.bacAuthenticated ? 'ICAO Chip Read (BAC)' :
-                     nfcData.icaoDetected ? 'ICAO Chip Detected' :
-                     'Civil ID Verified'}
-                  </span>
-                </div>
-                {nfcData.civilId && (
-                  <div style={styles.resultRow}>
-                    <span style={styles.resultLabel}>Civil ID</span>
-                    <span style={styles.resultValue}>{nfcData.civilId}</span>
-                  </div>
-                )}
-                {nfcData.age != null && (
-                  <div style={styles.resultRow}>
-                    <span style={styles.resultLabel}>Age</span>
-                    <span style={styles.resultValue}>{nfcData.age} years</span>
-                  </div>
-                )}
-                {nfcData.fullName && (
-                  <div style={styles.resultRow}>
-                    <span style={styles.resultLabel}>Name</span>
-                    <span style={{ ...styles.resultValue, fontFamily: fonts.sans }}>{nfcData.fullName}</span>
-                  </div>
-                )}
-                {nfcData.fullNameArabic && nfcData.fullNameArabic !== nfcData.fullName && (
-                  <div style={styles.resultRow}>
-                    <span style={styles.resultLabel}>Arabic</span>
-                    <span style={{ ...styles.resultValue, fontFamily: fonts.sans, direction: 'rtl' }}>{nfcData.fullNameArabic}</span>
-                  </div>
-                )}
-                {nfcData.gender && (
-                  <div style={styles.resultRow}>
-                    <span style={styles.resultLabel}>Gender</span>
-                    <span style={styles.resultValue}>{nfcData.gender === 'M' ? 'Male' : 'Female'}</span>
-                  </div>
-                )}
-                {(nfcData.nationality || nfcData.nationalityCode) && (
-                  <div style={styles.resultRow}>
-                    <span style={styles.resultLabel}>Nationality</span>
-                    <span style={styles.resultValue}>
-                      {nfcData.nationality || getNationalityLabel(nfcData.nationalityCode)}
-                    </span>
-                  </div>
-                )}
-              </div>
-              {photoUrl && (
-                <img src={photoUrl} alt="Patient photo" style={styles.photo}
-                  onError={e => { e.target.style.display = 'none'; }} />
-              )}
-            </div>
-            {nfcData.serialNumber && (
-              <div style={styles.resultRow}>
-                <span style={styles.resultLabel}>Tag UID</span>
-                <span style={{ ...styles.resultValue, fontSize: '12px' }}>{nfcData.serialNumber}</span>
-              </div>
-            )}
-            {nfcData.icaoDetected && nfcData.icaoGroups?.length > 0 && (
-              <div style={styles.resultRow}>
-                <span style={styles.resultLabel}>ICAO Data</span>
-                <span style={{ ...styles.resultValue, fontSize: '11px' }}>{nfcData.icaoGroups.join(', ')}</span>
-              </div>
-            )}
+            {knownPatient.fullName && <Row label="Name" value={knownPatient.fullName} />}
+            {knownPatient.civilId && <Row label="Civil ID" value={knownPatient.civilId} mono />}
+            {knownPatient.age != null && <Row label="Age" value={`${knownPatient.age} years`} />}
+            {knownPatient.gender && <Row label="Gender" value={knownPatient.gender === 'F' ? 'Female' : 'Male'} />}
+            {knownPatient.bloodType && <Row label="Blood Type" value={knownPatient.bloodType} red />}
+            <Row label="Triage" value={knownPatient.triage || 'GREEN'} />
+            <Row label="Evac" value={(knownPatient.evac || 'IN_WARD').replace('_', ' ')} />
           </div>
+          <button style={{ ...s.btn, background: colors.blue, color: '#fff' }} onClick={onClose}>OK</button>
+        </div>
+      </Modal>
+    );
+  }
 
-          {/* Blood type */}
+  // ═══ STEP 1: NFC TAP ═══
+  if (step === 'nfc') {
+    return (
+      <Modal title="Step 1: Tap Card" onClose={onClose}>
+        <style>{`@keyframes nfcPulse { 0%,100%{box-shadow:0 0 0 0 ${colors.blue}44} 50%{box-shadow:0 0 0 20px ${colors.blue}00} }`}</style>
+        <div style={s.container}>
+          <div style={{ ...s.nfcRing, ...(scanning ? s.nfcRingPulse : {}) }}>
+            <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke={colors.blue} strokeWidth="1.5">
+              <path d="M6 8.32a7.43 7.43 0 010 7.36" />
+              <path d="M9.46 6.21a11.76 11.76 0 010 11.58" />
+              <path d="M12.91 4.1a16.1 16.1 0 010 15.8" />
+              <path d="M16.37 2a20.43 20.43 0 010 20" />
+            </svg>
+          </div>
+          <span style={s.statusText}>Hold Civil ID on back of phone</span>
+          <span style={s.subText}>Keep it steady for 3 seconds</span>
+          {error && <div style={s.errorBox}>{error}</div>}
+          <button style={{ ...s.btnSmall, background: colors.bg2, color: colors.text0 }}
+            onClick={() => setStep('front')}>
+            Skip NFC — use camera only
+          </button>
+        </div>
+      </Modal>
+    );
+  }
+
+  // ═══ STEP 2: CAMERA FRONT ═══
+  if (step === 'front') {
+    return (
+      <Modal title="Step 2: Scan Front of Card" onClose={onClose}>
+        <div style={s.container}>
+          <span style={s.stepLabel}>Point camera at FRONT of Civil ID</span>
+          <CivilIdCameraScanner
+            onResult={handleFrontResult}
+            onCancel={() => setStep('back')}
+            autoStart
+          />
+        </div>
+      </Modal>
+    );
+  }
+
+  // ═══ STEP 3: CAMERA BACK (MRZ) ═══
+  if (step === 'back') {
+    return (
+      <Modal title="Step 3: Scan Back of Card" onClose={onClose}>
+        <div style={s.container}>
+          <span style={s.stepLabel}>Flip card — point camera at BACK (MRZ lines)</span>
+          <MRZScannerCamera
+            onResult={handleMrzResult}
+            onCancel={() => setStep('confirm')}
+          />
+        </div>
+      </Modal>
+    );
+  }
+
+  // ═══ STEP 4: CONFIRM ═══
+  return (
+    <Modal title="Step 4: Confirm Patient" onClose={onClose}>
+      <div style={s.container}>
+        <div style={s.dataCard}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <CheckIcon size={18} color={colors.green} />
+            <span style={{ fontSize: '14px', fontWeight: 700, color: colors.green }}>Patient Data</span>
+          </div>
+          {civilId && <Row label="Civil ID" value={civilId} mono />}
+          {age != null && <Row label="Age" value={`${age} years`} />}
+          {nameEn && <Row label="Name" value={nameEn} />}
+          {nameAr && <Row label="Arabic" value={nameAr} rtl />}
+          {gender && <Row label="Gender" value={gender === 'F' ? 'Female' : 'Male'} />}
+          {bloodType && <Row label="Blood Type" value={bloodType} red />}
+          {nationality && <Row label="Nationality" value={nationality} />}
+          {nfcUid && <Row label="NFC UID" value={nfcUid} mono small />}
+        </div>
+
+        {/* Manual Civil ID if camera didn't detect */}
+        {!civilId && (
           <div style={{ width: '100%' }}>
-            <span style={{ ...styles.fieldLabel, display: 'block', marginBottom: '6px' }}>
-              Blood Type (manual — not on NFC chip)
+            <span style={{ fontSize: '13px', fontWeight: 600, color: colors.text0, marginBottom: '6px', display: 'block' }}>
+              Enter Civil ID manually
             </span>
-            <div style={styles.bloodTypeRow}>
+            <input
+              style={{
+                width: '100%', padding: '14px', borderRadius: '10px',
+                border: `1px solid ${colors.border}`, background: colors.bg2,
+                color: colors.text0, fontSize: '20px', fontFamily: fonts.mono,
+                textAlign: 'center', letterSpacing: '3px', outline: 'none',
+              }}
+              placeholder="281234567890"
+              value={manualId}
+              onChange={e => { setManualId(e.target.value.replace(/\D/g, '').slice(0, 12)); setError(null); }}
+              maxLength={12}
+              inputMode="numeric"
+            />
+            <span style={{ fontSize: '11px', color: colors.text3, fontFamily: fonts.mono }}>{manualId.length}/12</span>
+          </div>
+        )}
+
+        {/* Blood type picker if not detected */}
+        {!bloodType && (
+          <div style={{ width: '100%' }}>
+            <span style={{ fontSize: '11px', fontWeight: 700, color: colors.text3, textTransform: 'uppercase', marginBottom: '4px', display: 'block' }}>Blood Type</span>
+            <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
               {BLOOD_TYPES.map(bt => (
-                <button key={bt}
-                  style={{ ...styles.bloodTypeBtn, ...(bloodType === bt ? styles.bloodTypeBtnActive : {}) }}
-                  onClick={() => setBloodType(bloodType === bt ? '' : bt)}>
+                <button key={bt} onClick={() => setBloodType(bloodType === bt ? '' : bt)}
+                  style={{
+                    padding: '6px 10px', borderRadius: '6px', cursor: 'pointer',
+                    border: `1px solid ${bloodType === bt ? colors.red : colors.border}`,
+                    background: bloodType === bt ? colors.red + '22' : colors.bg2,
+                    color: bloodType === bt ? colors.red : colors.text2,
+                    fontSize: '12px', fontWeight: 700, fontFamily: fonts.mono,
+                  }}>
                   {bt}
                 </button>
               ))}
             </div>
           </div>
-
-          <div style={{ display: 'flex', gap: '8px', width: '100%' }}>
-            <button style={{ ...styles.btn, flex: 1, background: colors.bg2, color: colors.text0 }}
-              onClick={resetAll}>
-              Start Over
-            </button>
-            {duplicatePatient ? (
-              <>
-                <button style={{ ...styles.btn, flex: 1, background: colors.amber, color: '#000' }}
-                  onClick={handleUpdateExisting}>
-                  Update
-                </button>
-                <button style={{ ...styles.btn, flex: 1, background: colors.green, color: '#fff' }}
-                  onClick={handleAddPatient}>
-                  Add New
-                </button>
-              </>
-            ) : (
-              <button style={{ ...styles.btn, flex: 1, background: colors.green, color: '#fff' }}
-                onClick={handleAddPatient}>
-                Add Patient
-              </button>
-            )}
-          </div>
-        </div>
-      </Modal>
-    );
-  }
-
-  // ====== KNOWN PATIENT VIEW — card already registered ======
-  if (knownPatient) {
-    return (
-      <Modal title="Patient Found" onClose={onClose}>
-        <div style={styles.container}>
-          <div style={{ ...styles.resultCard, borderColor: colors.blue + '44', background: colors.blue + '11' }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-              <CheckIcon size={18} color={colors.blue} />
-              <span style={{ fontSize: '14px', fontWeight: 700, color: colors.blue }}>
-                Known Patient
-              </span>
-            </div>
-            {knownPatient.fullName && (
-              <div style={styles.resultRow}>
-                <span style={styles.resultLabel}>Name</span>
-                <span style={{ ...styles.resultValue, fontFamily: fonts.sans }}>{knownPatient.fullName}</span>
-              </div>
-            )}
-            {knownPatient.fullNameArabic && knownPatient.fullNameArabic !== knownPatient.fullName && (
-              <div style={styles.resultRow}>
-                <span style={styles.resultLabel}>Arabic</span>
-                <span style={{ ...styles.resultValue, fontFamily: fonts.sans, direction: 'rtl' }}>{knownPatient.fullNameArabic}</span>
-              </div>
-            )}
-            {knownPatient.civilId && (
-              <div style={styles.resultRow}>
-                <span style={styles.resultLabel}>Civil ID</span>
-                <span style={styles.resultValue}>{knownPatient.civilId}</span>
-              </div>
-            )}
-            {knownPatient.age != null && (
-              <div style={styles.resultRow}>
-                <span style={styles.resultLabel}>Age</span>
-                <span style={styles.resultValue}>{knownPatient.age} years</span>
-              </div>
-            )}
-            {knownPatient.gender && (
-              <div style={styles.resultRow}>
-                <span style={styles.resultLabel}>Gender</span>
-                <span style={styles.resultValue}>{knownPatient.gender === 'F' ? 'Female' : 'Male'}</span>
-              </div>
-            )}
-            {knownPatient.bloodType && (
-              <div style={styles.resultRow}>
-                <span style={styles.resultLabel}>Blood Type</span>
-                <span style={{ ...styles.resultValue, color: colors.red }}>{knownPatient.bloodType}</span>
-              </div>
-            )}
-            <div style={styles.resultRow}>
-              <span style={styles.resultLabel}>Triage</span>
-              <span style={styles.resultValue}>{knownPatient.triage || 'GREEN'}</span>
-            </div>
-            <div style={styles.resultRow}>
-              <span style={styles.resultLabel}>Ward</span>
-              <span style={styles.resultValue}>{knownPatient.ward || '—'}</span>
-            </div>
-            <div style={styles.resultRow}>
-              <span style={styles.resultLabel}>Evac Status</span>
-              <span style={styles.resultValue}>{(knownPatient.evac || 'IN_WARD').replace('_', ' ')}</span>
-            </div>
-          </div>
-          <button style={{ ...styles.btn, background: colors.blue, color: '#fff' }}
-            onClick={onClose}>
-            OK
-          </button>
-          <button style={{ ...styles.btn, background: colors.bg2, color: colors.text0 }}
-            onClick={() => { setKnownPatient(null); if (nfcInfo.supported) startScan(null); }}>
-            Scan Another Card
-          </button>
-        </div>
-      </Modal>
-    );
-  }
-
-  // ====== MRZ CAMERA SCANNER (back of card) ======
-  if (showMRZ) {
-    return (
-      <Modal title="Scan MRZ (Back of Card)" onClose={() => setShowMRZ(false)}>
-        <MRZScannerCamera
-          onResult={(mrzParsed) => {
-            setShowMRZ(false);
-            handleCameraMRZ(mrzParsed);
-          }}
-          onCancel={() => setShowMRZ(false)}
-        />
-      </Modal>
-    );
-  }
-
-  // ====== CAMERA CIVIL ID SCANNER ======
-  if (showCamera) {
-    return (
-      <Modal title="Scan Civil ID" onClose={() => setShowCamera(false)}>
-        <CivilIdCameraScanner
-          onResult={(data) => {
-            if (!data.civilId) return;
-            // Add patient then close
-            const patient = {
-              civilId: data.civilId,
-              fullName: data.nameEn || scanMeta?.fullName || '',
-              fullNameArabic: data.nameAr || scanMeta?.fullNameArabic || '',
-              age: data.age,
-              gender: data.gender || scanMeta?.gender || 'M',
-              triage: 'GREEN',
-              mobility: 'AMBULATORY',
-              o2: 'NONE',
-              iso: 'NONE',
-              code: 'FULL',
-              allergies: 'NKDA',
-              dx: '',
-              meds: '',
-              notes: '',
-              nationality: scanMeta?.nationality || '',
-              bloodType: data.bloodType || '',
-              ward: auth?.ward?.name || '',
-              evac: 'IN_WARD',
-              nfcScanned: !!scanMeta?.tagDetected || !!lastNfcSerialRef.current,
-              nfcBackend: scanMeta?.nfcBackend || 'camera',
-              nfcSerial: lastNfcSerialRef.current || scanMeta?.serialNumber || '',
-              source: 'camera-ocr',
-            };
-            addPatient(patient).then((saved) => {
-              logAction('CAMERA_IMPORT', 'patient', saved.id, {
-                newValue: { civilId: data.civilId, source: 'camera-ocr' },
-              });
-              onClose();
-            }).catch(err => {
-              console.error('Failed to add patient:', err);
-            });
-          }}
-          onCancel={() => setShowCamera(false)}
-          autoStart
-        />
-      </Modal>
-    );
-  }
-
-  // ====== SCAN + INPUT VIEW ======
-  return (
-    <Modal title="Civil ID Scanner" onClose={onClose}>
-      <style>{`
-        @keyframes nfcPulse {
-          0%, 100% { box-shadow: 0 0 0 0 ${colors.blue}44; }
-          50% { box-shadow: 0 0 0 20px ${colors.blue}00; }
-        }
-      `}</style>
-
-      <div style={styles.container}>
-        {/* Camera scan buttons — always available */}
-        {!cardDetected && (
-          <>
-            <button
-              style={{ ...styles.btn, background: colors.blue, color: '#fff' }}
-              onClick={() => { abortRef.current?.(); setScanning(false); setShowCamera(true); }}>
-              Scan Civil ID with Camera
-            </button>
-            <button
-              style={{ ...styles.btn, background: colors.amber, color: '#000', marginBottom: '4px' }}
-              onClick={() => { abortRef.current?.(); setScanning(false); setShowMRZ(true); }}>
-              Scan MRZ (Back of Card)
-            </button>
-          </>
         )}
 
-        {/* Show MRZ data if camera scanned */}
-        {cameraMrzData && (
-          <div style={styles.infoBox}>
-            MRZ scanned: {cameraMrzData.fullName} — now tap card on phone to read chip
-          </div>
-        )}
+        {error && <div style={s.errorBox}>{error}</div>}
 
-        {/* NFC scanning area */}
-        {nfcInfo.supported && !cardDetected && (
-          <div style={styles.nfcArea}>
-            <div style={{ ...styles.nfcRing, ...(scanning ? styles.nfcRingScanning : {}) }}>
-              <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke={colors.blue} strokeWidth="1.5">
-                <path d="M6 8.32a7.43 7.43 0 010 7.36" />
-                <path d="M9.46 6.21a11.76 11.76 0 010 11.58" />
-                <path d="M12.91 4.1a16.1 16.1 0 010 15.8" />
-                <path d="M16.37 2a20.43 20.43 0 010 20" />
-              </svg>
-            </div>
-            <span style={styles.statusText}>
-              {chipProgress ? chipProgress :
-               scanning && bacStatus === 'authenticating' ? 'Authenticating with chip (BAC)...' :
-               scanning && bacStatus === 'reading' ? 'Reading chip data...' :
-               scanning ? 'Tap Civil ID on back of phone...' : 'NFC Ready'}
-            </span>
-            <span style={styles.subText}>{nfcInfo.hint}</span>
-            {nfcInfo.canReadCard && !showBacForm && (
-              <span style={{ fontSize: '10px', color: colors.green, fontWeight: 600 }}>
-                ICAO chip reading enabled — hold card steady for 3-5 seconds
-              </span>
-            )}
-            {error && <div style={styles.errorBox}>{error}</div>}
-          </div>
-        )}
-
-        {/* Card detected — show NFC metadata */}
-        {cardDetected && (
-          <>
-            <div style={styles.successBox}>
-              <CheckIcon size={16} color={colors.green} />
-              {scanMeta?.likelyCivilId ? 'Kuwait Civil ID detected.' : 'NFC tag detected.'}
-              {scanMeta?.icaoDetected && scanMeta?.icaoNeedsBAC &&
-                ' ICAO chip requires authentication.'}
-            </div>
-            <div style={styles.metaBox}>
-              <span style={styles.metaText}>Backend: {scanMeta?.nfcBackend || 'unknown'}</span>
-              {scanMeta?.tagType && <span style={styles.metaText}>Tag type: {scanMeta.tagType}</span>}
-              {scanMeta?.serialNumber && <span style={styles.metaText}>UID: {scanMeta.serialNumber}</span>}
-              {scanMeta?.techTypes?.length > 0 && (
-                <span style={styles.metaText}>Tech: {scanMeta.techTypes.join(', ')}</span>
-              )}
-              {scanMeta?.icaoDetected && (
-                <span style={{ ...styles.metaText, color: colors.green }}>ICAO MRTD applet detected</span>
-              )}
-              {scanMeta?.probeResults?.length > 0 && (
-                <span style={styles.metaText}>
-                  Chip apps: {scanMeta.probeResults.map(p => `${p.name}:${p.ok ? 'OK' : p.sw || p.error}`).join(', ')}
-                </span>
-              )}
-              {scanMeta?.selectedApp && (
-                <span style={{ ...styles.metaText, color: colors.green }}>Selected: {scanMeta.selectedApp}</span>
-              )}
-            </div>
-          </>
-        )}
-
-        {/* BAC Authentication Form — shown when chip requires it */}
-        {showBacForm && (
-          <>
-            <div style={styles.divider}>
-              <div style={styles.dividerLine} />
-              <span style={styles.dividerText}>chip authentication (BAC)</span>
-              <div style={styles.dividerLine} />
-            </div>
-            <div style={styles.infoBox}>
-              The chip requires MRZ data to unlock. Enter the document number,
-              date of birth, and card expiry from the back of the card, then tap again.
-            </div>
-            <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-              <div style={styles.fieldGroup}>
-                <span style={styles.fieldLabel}>Document Number (from MRZ)</span>
-                <input style={styles.smallInput}
-                  placeholder="e.g. 289012345"
-                  value={bacDocNumber}
-                  onChange={e => setBacDocNumber(e.target.value.toUpperCase().replace(/[^A-Z0-9<]/g, ''))}
-                  maxLength={9} />
-              </div>
-              <div style={styles.fieldRow}>
-                <div style={styles.fieldGroup}>
-                  <span style={styles.fieldLabel}>Date of Birth</span>
-                  <input style={styles.smallInput}
-                    type="date"
-                    value={bacDob}
-                    onChange={e => setBacDob(e.target.value)} />
-                </div>
-                <div style={styles.fieldGroup}>
-                  <span style={styles.fieldLabel}>Card Expiry</span>
-                  <input style={styles.smallInput}
-                    type="date"
-                    value={bacExpiry}
-                    onChange={e => setBacExpiry(e.target.value)} />
-                </div>
-              </div>
-              {bacError && <div style={styles.errorBox}>{bacError}</div>}
-              <button
-                style={{
-                  ...styles.btn,
-                  background: getMrzData() ? colors.blue : colors.bg2,
-                  color: getMrzData() ? '#fff' : colors.text3,
-                }}
-                onClick={handleBacScan}
-                disabled={!getMrzData() || scanning}>
-                {scanning ? 'Reading...' : 'Authenticate & Scan Again'}
-              </button>
-            </div>
-          </>
-        )}
-
-        {/* Divider */}
-        {nfcInfo.supported && !cardDetected && (
-          <div style={styles.divider}>
-            <div style={styles.dividerLine} />
-            <span style={styles.dividerText}>or enter manually</span>
-            <div style={styles.dividerLine} />
-          </div>
-        )}
-
-        {/* Manual Civil ID input */}
-        <div style={{ width: '100%', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <span style={{ fontSize: '13px', fontWeight: 600, color: colors.text0 }}>
-            {cardDetected && !showBacForm ? 'Enter Civil ID from card' : 'Civil ID Number'}
-          </span>
-          <input
-            style={{
-              ...styles.manualInput,
-              borderColor: cardDetected ? colors.green + '66' : colors.border,
-            }}
-            placeholder="281234567890"
-            value={civilId}
-            onChange={e => { setCivilId(e.target.value.replace(/\D/g, '').slice(0, 12)); setCivilIdError(''); }}
-            maxLength={12}
-            inputMode="numeric"
-          />
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span style={{ fontSize: '11px', color: colors.text3, fontFamily: fonts.mono }}>
-              {civilId.length}/12 digits
-            </span>
-            {civilId.length === 12 && !civilIdError && (
-              <span style={{ fontSize: '11px', color: colors.green, fontWeight: 600 }}>Ready</span>
-            )}
-          </div>
-          {civilIdError && <div style={styles.errorBox}>{civilIdError}</div>}
-          <button
-            style={{
-              ...styles.btn,
-              background: civilId.length === 12 ? colors.green : colors.bg2,
-              color: civilId.length === 12 ? '#fff' : colors.text3,
-            }}
-            onClick={handleValidate}
-            disabled={civilId.length !== 12}>
-            Validate & Add Patient
-          </button>
-
-          {/* Show BAC form toggle if chip was detected but no BAC form yet */}
-          {nfcInfo.supported && cardDetected && !showBacForm && scanMeta?.icaoDetected && (
-            <>
-              <button
-                style={{ ...styles.btnSmall, background: colors.amber, color: '#000' }}
-                onClick={() => setShowMRZ(true)}>
-                Scan MRZ with Camera (unlock chip)
-              </button>
-              <button
-                style={{ ...styles.btnSmall, background: colors.blue + '22', color: colors.blue }}
-                onClick={() => setShowBacForm(true)}>
-                Type MRZ Manually
-              </button>
-            </>
-          )}
-
-          {nfcInfo.supported && (
-            <button
-              style={{ ...styles.btnSmall, background: colors.bg2, color: colors.text0 }}
-              onClick={resetAll}>
-              {cardDetected ? 'Scan New Card' : 'Scan Again'}
-            </button>
-          )}
-        </div>
+        <button
+          style={{ ...s.btn, background: saving ? colors.text3 : colors.green, color: '#fff' }}
+          onClick={handleSave}
+          disabled={saving}>
+          {saving ? 'Saving...' : 'Add Patient'}
+        </button>
+        <button style={{ ...s.btnSmall, background: colors.bg2, color: colors.text0 }}
+          onClick={() => { setStep('front'); setCivilId(''); setBloodType(''); setNameEn(''); setNameAr(''); }}>
+          Re-scan
+        </button>
       </div>
     </Modal>
+  );
+}
+
+function Row({ label, value, mono, red, rtl, small }) {
+  return (
+    <div style={s.dataRow}>
+      <span style={s.dataLabel}>{label}</span>
+      <span style={{
+        ...s.dataValue,
+        ...(mono ? {} : { fontFamily: fonts.sans }),
+        ...(red ? { color: colors.red, fontWeight: 800, fontSize: '16px' } : {}),
+        ...(rtl ? { direction: 'rtl' } : {}),
+        ...(small ? { fontSize: '11px' } : {}),
+      }}>{value}</span>
+    </div>
   );
 }

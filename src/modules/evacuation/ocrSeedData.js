@@ -530,7 +530,6 @@ export const SEED_WORD_CORRECTIONS = {
   'moharnmed': { truth: 'Mohammed', entity: 'NAME' },
   'mohamrned': { truth: 'Mohammed', entity: 'NAME' },
   'ahrned': { truth: 'Ahmed', entity: 'NAME' },
-  'ahrned': { truth: 'Ahmed', entity: 'NAME' },
   'fatrna': { truth: 'Fatma', entity: 'NAME' },
   'fatirna': { truth: 'Fatima', entity: 'NAME' },
   'noura': { truth: 'Noura', entity: 'NAME' },

@@ -375,15 +375,24 @@ assert.equal(headerlessAlignedRows.patients.length, 3, 'expected three patients 
 
 const headerlessAli = headerlessAlignedRows.patients.find(patient => /ali hussain/i.test(patient.fullName || ''));
 assert.ok(headerlessAli, 'expected ali hussain to survive without headers');
+assert.match(headerlessAli.assignedDoctor || '', /saleh/i);
+assert.match(headerlessAli.sheetStatus || '', /NEW/i);
 assert.match(headerlessAli.dx || '', /CVA/i);
+assert.equal(headerlessAli.reviewLevel, 'READY');
 
 const headerlessAhmad = headerlessAlignedRows.patients.find(patient => /ahmad alessa/i.test(patient.fullName || ''));
 assert.ok(headerlessAhmad, 'expected ahmad alessa to survive without headers');
+assert.match(headerlessAhmad.assignedDoctor || '', /noura/i);
+assert.match(headerlessAhmad.sheetStatus || '', /NEW/i);
 assert.match(headerlessAhmad.dx || '', /Chest infection/i);
+assert.equal(headerlessAhmad.reviewLevel, 'READY');
 
 const headerlessJamal = headerlessAlignedRows.patients.find(patient => /^jamal$/i.test(patient.fullName || ''));
 assert.ok(headerlessJamal, 'expected jamal to survive without headers');
+assert.match(headerlessJamal.assignedDoctor || '', /zahra/i);
+assert.match(headerlessJamal.sheetStatus || '', /CHRONIC/i);
 assert.match(headerlessJamal.dx || '', /UTI/i);
+assert.equal(headerlessJamal.reviewLevel, 'READY');
 
 // Test 13: ALL CAPS names (PaddleOCR sometimes outputs in uppercase)
 const allCapsNames = analyzeOcrWords([
@@ -520,6 +529,40 @@ assert.match(titledAli.assignedDoctor || '', /saleh/i);
 const titledJamal = titledDoctorCells.patients.find(patient => /^jamal$/i.test(patient.fullName || ''));
 assert.ok(titledJamal, 'expected jamal with titled doctor cell');
 assert.match(titledJamal.assignedDoctor || '', /noura/i);
+
+// Test 18b: Numeric room roster rows should still become ready patient records
+const numericRoomRoster = analyzeOcrWords([
+  word('Room / Ward', 20, 10, 98, 95),
+  word('Patient name', 170, 10, 98, 110),
+  word('Diagnosis', 410, 10, 98, 90),
+  word('Assigned Doctor', 650, 10, 98, 135),
+  word('Status', 860, 10, 98, 60),
+  word('10', 40, 52, 92, 30),
+  word('ali hussain', 180, 52, 92, 120),
+  word('CVA left MCA occlusion', 390, 52, 92, 220),
+  word('Consultant saleh', 650, 52, 92, 160),
+  word('New', 870, 52, 92, 40),
+  word('11', 40, 90, 92, 30),
+  word('ahmad alessa', 180, 90, 92, 130),
+  word('Chest infection', 390, 90, 92, 140),
+  word('Team noura', 650, 90, 92, 120),
+  word('Chronic', 850, 90, 92, 70),
+], 980, 170);
+
+assert.equal(numericRoomRoster.patients.length, 2, 'expected two patients from numeric room roster rows');
+const roomAli = numericRoomRoster.patients.find(patient => /ali hussain/i.test(patient.fullName || ''));
+assert.ok(roomAli, 'expected ali hussain from numeric room roster rows');
+assert.equal(roomAli.bed, '10');
+assert.match(roomAli.assignedDoctor || '', /saleh/i);
+assert.equal(roomAli.sheetStatus, 'NEW');
+assert.equal(roomAli.reviewLevel, 'READY');
+
+const roomAhmad = numericRoomRoster.patients.find(patient => /ahmad alessa/i.test(patient.fullName || ''));
+assert.ok(roomAhmad, 'expected ahmad alessa from numeric room roster rows');
+assert.equal(roomAhmad.bed, '11');
+assert.match(roomAhmad.assignedDoctor || '', /noura/i);
+assert.equal(roomAhmad.sheetStatus, 'CHRONIC');
+assert.equal(roomAhmad.reviewLevel, 'READY');
 
 // Test 19: Screenshot-like roster sections should inherit active/chronic status from section titles
 const sectionContextRoster = analyzeOcrWords([

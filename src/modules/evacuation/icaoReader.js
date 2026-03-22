@@ -475,12 +475,23 @@ export async function attemptICAORead(nfcPlugin, mrzData, onProgress, options) {
       } catch {}
     }
 
+    // If MF selected, try to read Kuwait Civil ID files directly
+    if (selectedApp === 'Master File') {
+      onProgress?.('Reading Civil ID files...');
+      const civilIdData = await readKuwaitCivilIdFiles(transceive, onProgress);
+      return {
+        icaoDetected: false, needsBAC: false, bacAuthenticated: false,
+        availableGroups: [], mrz: null, photo: null, additionalDetails: null,
+        probeResults, selectedApp,
+        ...civilIdData,
+      };
+    }
+
     onProgress?.('Selecting MRTD applet...');
     console.log('[ICAO] Selecting MRTD applet...');
     const selectResult = await reader.selectMRTD();
     console.log('[ICAO] Select result:', JSON.stringify({ ok: selectResult.ok, sw: selectResult.sw?.toString(16) }));
     if (!selectResult.ok) {
-      // Return probe results so we know what's on the card
       return { icaoDetected: false, needsBAC: false, bacAuthenticated: false, availableGroups: [], mrz: null, photo: null, additionalDetails: null, probeResults, selectedApp };
     }
 
@@ -556,6 +567,193 @@ export async function attemptICAORead(nfcPlugin, mrzData, onProgress, options) {
   } catch {
     return null;
   }
+}
+
+// ═══ KUWAIT CIVIL ID — DIRECT FILE READ (no ICAO, no BAC) ═══
+// The Kuwait Civil ID chip uses a flat MF structure with EF files.
+// We enumerate common file IDs and read whatever is accessible.
+
+async function selectEF(transceive, fileId) {
+  const cmd = [0x00, 0xA4, 0x00, 0x00, 0x02, (fileId >> 8) & 0xFF, fileId & 0xFF];
+  const resp = await transceive(cmd);
+  const sw = resp.length >= 2 ? ((resp[resp.length - 2] << 8) | resp[resp.length - 1]) : 0;
+  return { ok: sw === 0x9000 || (sw >> 8) === 0x61, sw, data: resp.slice(0, -2) };
+}
+
+async function readBinaryFromEF(transceive, maxBytes) {
+  const data = [];
+  let offset = 0;
+  const chunkSize = 224;
+  while (offset < (maxBytes || 4096)) {
+    const cmd = [0x00, 0xB0, (offset >> 8) & 0x7F, offset & 0xFF, Math.min(chunkSize, maxBytes - offset)];
+    let resp;
+    try { resp = await transceive(cmd); } catch { break; }
+    if (!resp || resp.length < 2) break;
+    const sw = (resp[resp.length - 2] << 8) | resp[resp.length - 1];
+    if (sw !== 0x9000 && (sw >> 8) !== 0x62) break; // 62xx = warning but data returned
+    const chunk = resp.slice(0, -2);
+    if (chunk.length === 0) break;
+    data.push(...chunk);
+    offset += chunk.length;
+    if (chunk.length < chunkSize) break;
+  }
+  return data;
+}
+
+function tryDecodeText(bytes) {
+  if (!bytes || bytes.length === 0) return '';
+  try {
+    // Try UTF-8 first
+    const text = new TextDecoder('utf-8', { fatal: false }).decode(new Uint8Array(bytes));
+    // Filter out non-printable chars except Arabic
+    return text.replace(/[^\x20-\x7E\u0600-\u06FF\u0750-\u077F\uFB50-\uFDFF\uFE70-\uFEFF\n\r\t]/g, '').trim();
+  } catch {
+    return '';
+  }
+}
+
+async function readKuwaitCivilIdFiles(transceive, onProgress) {
+  const result = {
+    civilIdFromChip: true,
+    filesFound: [],
+    filesData: {},
+    civilId: '',
+    fullName: '',
+    fullNameArabic: '',
+    age: null,
+    gender: '',
+    nationality: '',
+  };
+
+  // Common file IDs to try on Kuwait Civil ID chips
+  // These are educated guesses based on common smart card structures
+  const filesToTry = [
+    // Standard DF/EF IDs
+    { id: 0x0001, name: 'EF01' },
+    { id: 0x0002, name: 'EF02' },
+    { id: 0x0003, name: 'EF03' },
+    { id: 0x0004, name: 'EF04' },
+    { id: 0x0005, name: 'EF05' },
+    { id: 0x0006, name: 'EF06' },
+    // PACI-specific file IDs
+    { id: 0x0100, name: 'EF0100' },
+    { id: 0x0101, name: 'EF0101' },
+    { id: 0x0102, name: 'EF0102' },
+    { id: 0x0103, name: 'EF0103' },
+    // Common ID card file IDs
+    { id: 0x2F00, name: 'EF.DIR' },
+    { id: 0x2F01, name: 'EF.ATR' },
+    { id: 0x5000, name: 'EF5000' },
+    { id: 0x5001, name: 'EF5001' },
+    { id: 0x5002, name: 'EF5002' },
+    { id: 0x5003, name: 'EF5003' },
+    { id: 0x6001, name: 'EF6001' },
+    { id: 0x6002, name: 'EF6002' },
+    { id: 0x6003, name: 'EF6003' },
+    // Some cards use short EF IDs
+    { id: 0x0011, name: 'PersonalData' },
+    { id: 0x0012, name: 'CardData' },
+    { id: 0x0013, name: 'Photo' },
+    { id: 0x0014, name: 'Fingerprint' },
+  ];
+
+  // First re-select MF
+  try {
+    await transceive([0x00, 0xA4, 0x00, 0x00, 0x02, 0x3F, 0x00]);
+  } catch {}
+
+  let filesProbed = 0;
+  for (const { id, name } of filesToTry) {
+    filesProbed++;
+    if (filesProbed % 5 === 0) {
+      onProgress?.(`Scanning files (${filesProbed}/${filesToTry.length})...`);
+    }
+
+    try {
+      const sel = await selectEF(transceive, id);
+      if (!sel.ok) continue;
+
+      // File exists! Try to read it
+      const data = await readBinaryFromEF(transceive, 512);
+      if (data.length === 0) continue;
+
+      const text = tryDecodeText(data);
+      const hex = data.slice(0, 32).map(b => b.toString(16).padStart(2, '0')).join(' ');
+
+      console.log(`[KWID] File ${name} (${id.toString(16)}): ${data.length} bytes, text="${text.substring(0, 100)}", hex=${hex}`);
+
+      result.filesFound.push({ id: id.toString(16), name, size: data.length, text: text.substring(0, 200), hex });
+      result.filesData[name] = { data, text };
+
+      // Try to extract Civil ID number (12 digits starting with 2 or 3)
+      const civilIdMatch = text.match(/[23]\d{11}/);
+      if (civilIdMatch && !result.civilId) {
+        result.civilId = civilIdMatch[0];
+        const parsed = parseCivilIdNumberLocal(civilIdMatch[0]);
+        if (parsed) result.age = parsed.age;
+      }
+
+      // Try to extract name (Arabic)
+      if (/[\u0600-\u06FF]{3,}/.test(text) && !result.fullNameArabic) {
+        const arabicParts = text.match(/[\u0600-\u06FF\s]{3,}/g);
+        if (arabicParts) result.fullNameArabic = arabicParts[0].trim();
+      }
+
+      // Try to extract English name
+      if (/[A-Z][a-z]+\s+[A-Z][a-z]+/.test(text) && !result.fullName) {
+        const nameMatch = text.match(/[A-Z][a-z]+(?:\s+[A-Z][a-z]+)+/);
+        if (nameMatch) result.fullName = nameMatch[0];
+      }
+
+      // Try to extract gender
+      if (/\b(MALE|FEMALE|M|F)\b/i.test(text) && !result.gender) {
+        result.gender = /FEMALE|F/i.test(text) ? 'F' : 'M';
+      }
+
+      // Re-select MF before trying next file
+      try { await transceive([0x00, 0xA4, 0x00, 0x00, 0x02, 0x3F, 0x00]); } catch {}
+
+    } catch {
+      // File doesn't exist or not accessible — skip
+      continue;
+    }
+  }
+
+  // Also try READ RECORD for record-based files
+  onProgress?.('Trying record-based reads...');
+  try {
+    for (let recNum = 1; recNum <= 5; recNum++) {
+      const cmd = [0x00, 0xB2, recNum, 0x04, 0x00]; // Read record
+      let resp;
+      try { resp = await transceive(cmd); } catch { break; }
+      if (!resp || resp.length < 2) break;
+      const sw = (resp[resp.length - 2] << 8) | resp[resp.length - 1];
+      if (sw !== 0x9000) break;
+      const data = resp.slice(0, -2);
+      const text = tryDecodeText(data);
+      if (text) {
+        console.log(`[KWID] Record ${recNum}: ${data.length} bytes, text="${text.substring(0, 100)}"`);
+        result.filesFound.push({ id: `rec${recNum}`, name: `Record${recNum}`, size: data.length, text: text.substring(0, 200) });
+      }
+    }
+  } catch {}
+
+  if (!result.fullName && result.fullNameArabic) result.fullName = result.fullNameArabic;
+
+  onProgress?.('Done');
+  console.log(`[KWID] Summary: ${result.filesFound.length} files, civilId=${result.civilId}, name=${result.fullName}`);
+  return result;
+}
+
+function parseCivilIdNumberLocal(civilId) {
+  const clean = `${civilId || ''}`.replace(/\D/g, '');
+  if (clean.length !== 12) return null;
+  const century = clean[0] === '2' ? 1900 : 2000;
+  const year = century + parseInt(clean.substring(1, 3), 10);
+  const month = parseInt(clean.substring(3, 5), 10);
+  const day = parseInt(clean.substring(5, 7), 10);
+  const age = Math.floor((Date.now() - new Date(year, month - 1, day).getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+  return { civilId: clean, age: age >= 0 && age < 130 ? age : null };
 }
 
 export { FILE_IDS, DG_TAGS, parseTLV, parseAllTLV, parseEfCom, parseDG1, parseDG2, parseDG11 };

@@ -1,12 +1,14 @@
-import React, { useState, useMemo, useCallback } from 'react';
+import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useApp } from '../../app.jsx';
 import { colors, fonts, triageColors, evacColors } from '../../design/tokens.js';
-import { PlusIcon, SearchIcon, SettingsIcon, CameraIcon, NfcIcon } from '../../design/icons.jsx';
+import { PlusIcon, SearchIcon, SettingsIcon, CameraIcon, NfcIcon, CheckIcon } from '../../design/icons.jsx';
 import PatientCard from './PatientCard.jsx';
 import QuickAdd from './QuickAdd.jsx';
 import CommandCenter from './CommandCenter.jsx';
 import OCRScanner from './OCRScanner.jsx';
 import NFCScanner from './NFCScanner.jsx';
+import Modal from '../../shared/Modal.jsx';
+import { scanNFC, getNfcPlatformInfo, findPatientByNfcUid } from './nfcReader.js';
 
 const TRIAGE_ORDER = { RED: 0, YELLOW: 1, GREEN: 2, GRAY: 3, BLACK: 4 };
 
@@ -60,6 +62,101 @@ export default function EvacModule() {
   const [showCommand, setShowCommand] = useState(false);
   const [showOCR, setShowOCR] = useState(false);
   const [showNFC, setShowNFC] = useState(false);
+  const [nfcFoundPatient, setNfcFoundPatient] = useState(null);
+  const [expandedPatientId, setExpandedPatientId] = useState(null);
+  const nfcAbortRef = useRef(null);
+  const nfcActiveRef = useRef(false);
+  const patientsRef = useRef(patients);
+  patientsRef.current = patients; // Always current
+
+  const showFoundPatient = useCallback((found) => {
+    setExpandedPatientId(found.id);
+    setSearch('');
+    setTriageFilter(null);
+    setNfcFoundPatient(found);
+    setTimeout(() => {
+      const el = document.getElementById('patient-' + found.id);
+      if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 200);
+  }, []);
+
+  // Always-on NFC listener — lightweight UID-only check
+  const startBackgroundNfc = useCallback(() => {
+    const isoDepPlugin = window.Capacitor?.Plugins?.IsoDep;
+    if (!isoDepPlugin || nfcActiveRef.current) return;
+
+    nfcActiveRef.current = true;
+    console.log('[BG-NFC] Starting, patients:', patientsRef.current.length,
+      'UIDs:', patientsRef.current.filter(p => p.nfcSerial).map(p => p.nfcSerial));
+
+    (async () => {
+      try {
+        const { supported } = await isoDepPlugin.isSupported();
+        if (!supported) { nfcActiveRef.current = false; return; }
+        const { status } = await isoDepPlugin.getStatus();
+        if (status !== 'NFC_OK') { nfcActiveRef.current = false; return; }
+
+        const listener = await isoDepPlugin.addListener('tagDiscovered', async (event) => {
+          const uid = event.id || '';
+          console.log('[BG-NFC] Tag UID:', uid);
+
+          // Clean up immediately
+          try { listener?.remove?.(); } catch {}
+          try { isoDepPlugin.stopScanning(); } catch {}
+          try { isoDepPlugin.disconnect(); } catch {}
+          nfcActiveRef.current = false;
+
+          // Check against current patients (via ref, not stale closure)
+          const currentPatients = patientsRef.current;
+          // Try UID match first
+          if (uid && currentPatients.length > 0) {
+            const found = findPatientByNfcUid(currentPatients, uid);
+            if (found) {
+              console.log('[BG-NFC] FOUND by UID:', found.fullName || found.civilId);
+              showFoundPatient(found);
+              return;
+            }
+          }
+
+          // UID didn't match — Type B cards can have random UIDs
+          // Open scanner which will use camera to check Civil ID
+          console.log('[BG-NFC] UID not recognized (may be random), opening scanner');
+          setTimeout(() => setShowNFC(true), 200);
+        });
+
+        nfcAbortRef.current = () => {
+          try { listener?.remove?.(); } catch {}
+          try { isoDepPlugin.stopScanning(); } catch {}
+          nfcActiveRef.current = false;
+        };
+
+        await isoDepPlugin.startScanning({});
+        console.log('[BG-NFC] Reader mode active');
+      } catch (e) {
+        console.log('[BG-NFC] Error:', e?.message);
+        nfcActiveRef.current = false;
+      }
+    })();
+  }, []); // No dependencies — uses ref for patients
+
+  // Start/stop background NFC based on modal state
+  useEffect(() => {
+    if (showNFC || nfcFoundPatient) {
+      if (nfcAbortRef.current) {
+        nfcAbortRef.current();
+        nfcAbortRef.current = null;
+      }
+      return;
+    }
+    const t = setTimeout(startBackgroundNfc, 1200);
+    return () => {
+      clearTimeout(t);
+      if (nfcAbortRef.current) {
+        nfcAbortRef.current();
+        nfcAbortRef.current = null;
+      }
+    };
+  }, [showNFC, nfcFoundPatient, startBackgroundNfc]);
 
   const triageCounts = useMemo(() => {
     const counts = { RED: 0, YELLOW: 0, GREEN: 0, GRAY: 0, BLACK: 0 };
@@ -158,7 +255,11 @@ export default function EvacModule() {
             </span>
           </div>
         ) : (
-          filtered.map(p => <PatientCard key={p.id} patient={p} />)
+          filtered.map(p => (
+            <div key={p.id} id={'patient-' + p.id}>
+              <PatientCard patient={p} forceExpand={expandedPatientId === p.id} onExpanded={() => setExpandedPatientId(null)} />
+            </div>
+          ))
         )}
       </div>
 
@@ -174,6 +275,77 @@ export default function EvacModule() {
       {showCommand && <CommandCenter onClose={() => setShowCommand(false)} />}
       {showOCR && <OCRScanner onClose={() => setShowOCR(false)} />}
       {showNFC && <NFCScanner onClose={() => setShowNFC(false)} />}
+
+      {/* NFC found patient popup — shown when a known card is tapped */}
+      {nfcFoundPatient && (
+        <Modal title="Patient Found" onClose={() => setNfcFoundPatient(null)}>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', padding: '4px 0' }}>
+            <div style={{
+              padding: '16px', borderRadius: '12px',
+              background: colors.blue + '11', border: `1px solid ${colors.blue}44`,
+              display: 'flex', flexDirection: 'column', gap: '8px',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+                <CheckIcon size={18} color={colors.blue} />
+                <span style={{ fontSize: '15px', fontWeight: 700, color: colors.blue }}>Known Patient</span>
+              </div>
+              {nfcFoundPatient.fullName && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: colors.text3 }}>NAME</span>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: colors.text0 }}>{nfcFoundPatient.fullName}</span>
+                </div>
+              )}
+              {nfcFoundPatient.fullNameArabic && nfcFoundPatient.fullNameArabic !== nfcFoundPatient.fullName && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: colors.text3 }}>ARABIC</span>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: colors.text0, direction: 'rtl' }}>{nfcFoundPatient.fullNameArabic}</span>
+                </div>
+              )}
+              {nfcFoundPatient.civilId && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: colors.text3 }}>CIVIL ID</span>
+                  <span style={{ fontSize: '14px', fontWeight: 700, color: colors.text0, fontFamily: fonts.mono }}>{nfcFoundPatient.civilId}</span>
+                </div>
+              )}
+              {nfcFoundPatient.age != null && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: colors.text3 }}>AGE</span>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: colors.text0 }}>{nfcFoundPatient.age} years</span>
+                </div>
+              )}
+              {nfcFoundPatient.gender && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: colors.text3 }}>GENDER</span>
+                  <span style={{ fontSize: '14px', fontWeight: 600, color: colors.text0 }}>{nfcFoundPatient.gender === 'F' ? 'Female' : 'Male'}</span>
+                </div>
+              )}
+              {nfcFoundPatient.bloodType && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ fontSize: '11px', fontWeight: 700, color: colors.text3 }}>BLOOD TYPE</span>
+                  <span style={{ fontSize: '16px', fontWeight: 800, color: colors.red, fontFamily: fonts.mono }}>{nfcFoundPatient.bloodType}</span>
+                </div>
+              )}
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: colors.text3 }}>TRIAGE</span>
+                <span style={{ fontSize: '14px', fontWeight: 700, color: triageColors[nfcFoundPatient.triage] || colors.text0 }}>{nfcFoundPatient.triage || 'GREEN'}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ fontSize: '11px', fontWeight: 700, color: colors.text3 }}>EVAC</span>
+                <span style={{ fontSize: '14px', fontWeight: 600, color: colors.text0 }}>{(nfcFoundPatient.evac || 'IN_WARD').replace('_', ' ')}</span>
+              </div>
+            </div>
+            <button
+              style={{
+                width: '100%', height: '48px', border: 'none', borderRadius: '10px',
+                background: colors.blue, color: '#fff', fontSize: '15px', fontWeight: 700,
+                cursor: 'pointer', fontFamily: fonts.sans,
+              }}
+              onClick={() => setNfcFoundPatient(null)}>
+              OK
+            </button>
+          </div>
+        </Modal>
+      )}
     </div>
   );
 }
