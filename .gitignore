@@ -26,3 +26,4 @@ __pycache__/
 *.pyc
 training/ocr/augmented/
 training/ocr/mega_training/
+training/ocr/ground-truth/images/*.png

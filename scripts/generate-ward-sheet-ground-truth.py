@@ -146,13 +146,16 @@ SHEET_STYLES = ['clean-table', 'lined-table', 'whiteboard', 'handwritten-list', 
 def render_ward_sheet(patients, style, fonts, sheet_meta):
     """Render a complete ward sheet image with patients in rows."""
     n = len(patients)
+    # 2x DPI rendering — PaddleOCR needs minimum ~20px font height for reliable recognition
+    scale = 2
     cols = ['Bed', 'Name', 'Age/Sex', 'Diagnosis', 'Meds', 'Triage']
-    col_widths = [90, 200, 70, 250, 250, 70]
-    total_w = sum(col_widths) + 40  # margins
-    row_h = random.randint(28, 38)
-    header_h = 50
-    title_h = 40
-    img_h = title_h + header_h + (n + 1) * row_h + 30
+    col_widths = [w * scale for w in [110, 240, 80, 280, 280, 80]]
+    margin = 30 * scale
+    total_w = sum(col_widths) + margin * 2
+    row_h = random.randint(44, 56) * scale // 2
+    header_h = 60 * scale // 2
+    title_h = 50 * scale // 2
+    img_h = title_h + header_h + (n + 1) * row_h + 40 * scale // 2
 
     # Background
     bg_color = (255, 255, 255)
@@ -164,43 +167,42 @@ def render_ward_sheet(patients, style, fonts, sheet_meta):
     img = Image.new('RGB', (total_w, img_h), bg_color)
     draw = ImageDraw.Draw(img)
 
-    title_font = load_font(fonts, random.randint(16, 20), bold=True)
-    header_font = load_font(fonts, random.randint(12, 14), bold=True)
-    body_font = load_font(fonts, random.randint(11, 13))
-    small_font = load_font(fonts, random.randint(9, 11))
+    # Larger fonts for OCR readability (min 20px rendered height)
+    title_font = load_font(fonts, random.randint(28, 36), bold=True)
+    header_font = load_font(fonts, random.randint(22, 26), bold=True)
+    body_font = load_font(fonts, random.randint(20, 24))
+    small_font = load_font(fonts, random.randint(18, 22))
 
     # Title
     title = sheet_meta.get('title', f"{random.choice(WARDS)} Ward Sheet")
-    draw.text((20, 10), title, fill=(0, 0, 0), font=title_font)
+    draw.text((margin, 14), title, fill=(0, 0, 0), font=title_font)
 
     # Date
     date_str = f"Date: 2026-03-{random.randint(1,28):02d}"
-    draw.text((total_w - 180, 12), date_str, fill=(80, 80, 80), font=small_font)
+    draw.text((total_w - 320, 16), date_str, fill=(80, 80, 80), font=small_font)
 
     raw_lines = [title, date_str]
 
     # Header row
     y = title_h
-    x = 20
+    x = margin
     header_bg = (220, 225, 235) if style in ['clean-table', 'lined-table'] else bg_color
     if style in ['clean-table', 'lined-table']:
-        draw.rectangle([18, y, total_w - 18, y + header_h - 5], fill=header_bg)
+        draw.rectangle([margin - 2, y, total_w - margin + 2, y + header_h - 5], fill=header_bg)
 
     header_texts = []
     for ci, col in enumerate(cols):
-        draw.text((x, y + 8), col, fill=(30, 30, 30), font=header_font)
+        draw.text((x, y + 10), col, fill=(30, 30, 30), font=header_font)
         header_texts.append(col)
         x += col_widths[ci]
     raw_lines.append('  '.join(header_texts))
 
     # Grid lines
     if style in ['clean-table', 'lined-table']:
-        # Horizontal lines
         for ri in range(n + 2):
             ly = title_h + header_h + ri * row_h - 5
-            draw.line([(18, ly), (total_w - 18, ly)], fill=(180, 180, 190), width=1)
-        # Vertical lines
-        vx = 20
+            draw.line([(margin - 2, ly), (total_w - margin + 2, ly)], fill=(180, 180, 190), width=1)
+        vx = margin
         for cw in col_widths:
             draw.line([(vx - 2, title_h), (vx - 2, title_h + header_h + n * row_h - 5)], fill=(180, 180, 190), width=1)
             vx += cw
@@ -208,7 +210,7 @@ def render_ward_sheet(patients, style, fonts, sheet_meta):
     # Patient rows
     y = title_h + header_h
     for pi, patient in enumerate(patients):
-        x = 20
+        x = margin
         row_color = (0, 0, 0)
         if style == 'whiteboard':
             row_color = random.choice([(0, 0, 0), (0, 0, 120), (120, 0, 0)])
@@ -217,7 +219,7 @@ def render_ward_sheet(patients, style, fonts, sheet_meta):
 
         # Alternating row background
         if style in ['clean-table', 'lined-table'] and pi % 2 == 1:
-            draw.rectangle([18, y - 2, total_w - 18, y + row_h - 7], fill=(245, 246, 250))
+            draw.rectangle([margin - 2, y - 2, total_w - margin + 2, y + row_h - 7], fill=(245, 246, 250))
 
         row_texts = []
 
@@ -243,8 +245,8 @@ def render_ward_sheet(patients, style, fonts, sheet_meta):
 
         # Diagnosis
         dx_text = patient['dx']
-        # Truncate to fit
-        max_dx_chars = col_widths[3] // 7
+        # Truncate to fit (wider chars at 2x DPI)
+        max_dx_chars = col_widths[3] // 12
         if len(dx_text) > max_dx_chars:
             dx_text = dx_text[:max_dx_chars - 2] + '..'
         draw.text((x, y), dx_text, fill=row_color, font=small_font)
@@ -253,7 +255,7 @@ def render_ward_sheet(patients, style, fonts, sheet_meta):
 
         # Meds
         meds_text = patient.get('meds', '')
-        max_med_chars = col_widths[4] // 7
+        max_med_chars = col_widths[4] // 12
         if len(meds_text) > max_med_chars:
             meds_text = meds_text[:max_med_chars - 2] + '..'
         draw.text((x, y), meds_text, fill=row_color, font=small_font)

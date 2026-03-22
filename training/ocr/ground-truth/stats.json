@@ -1,19 +1,19 @@
 {
   "totalSheets": 500,
-  "totalPatients": 3771,
-  "avgPatientsPerSheet": 7.5,
+  "totalPatients": 3790,
+  "avgPatientsPerSheet": 7.6,
   "byDifficulty": {
-    "photo": 94,
-    "clean": 92,
-    "scan": 123,
-    "hard": 70,
-    "medium": 121
+    "photo": 99,
+    "clean": 70,
+    "medium": 127,
+    "scan": 133,
+    "hard": 71
   },
   "byStyle": {
-    "lined-table": 96,
-    "whiteboard": 101,
-    "handwritten-list": 91,
-    "clean-table": 111,
-    "sparse-list": 101
+    "lined-table": 102,
+    "whiteboard": 96,
+    "clean-table": 95,
+    "handwritten-list": 98,
+    "sparse-list": 109
   }
 }
