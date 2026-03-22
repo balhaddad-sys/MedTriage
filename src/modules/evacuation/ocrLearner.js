@@ -21,10 +21,12 @@ import { loadSemanticSeedData, resolveConceptSynonym, translateColloquial, infer
 import { loadAnatomySeedData } from './ocrSeedAnatomy.js';
 import { loadOCRPatternSeedData } from './ocrSeedOCRPatterns.js';
 import { loadKuwaitSeedData } from './ocrSeedKuwait.js';
+import { loadPharmacologySeedData } from './ocrSeedPharmacology.js';
+import { loadRadiologySeedData } from './ocrSeedRadiology.js';
 
 const MODELS_KEY = 'ocr_learned_models';
 const TRAINING_KEY = 'ocr_training_data';
-const SEED_VERSION = 7; // bump to re-seed (v7: Kuwait hospital intelligence)
+const SEED_VERSION = 8; // bump to re-seed (v8: pharmacology + radiology)
 
 // ═══════════════════════════════════════════════════════════════════
 // LEARNED MODEL — the output of the learning cycle
@@ -44,6 +46,8 @@ function loadModels() {
       models = loadAnatomySeedData(models);
       models = loadOCRPatternSeedData(models);
       models = loadKuwaitSeedData(models);
+      models = loadPharmacologySeedData(models);
+      models = loadRadiologySeedData(models);
       models.seedVersion = SEED_VERSION;
       saveModels(models);
       console.log(`[LEARNER] Seeded: ${Object.keys(models.names).length} names, ${Object.keys(models.diagnoses).length} dx, ${Object.keys(models.medications).length} meds, ${Object.keys(models.abbreviations || {}).length} abbreviations, ${Object.keys(models.labTests || {}).length} lab tests`);
