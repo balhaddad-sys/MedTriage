@@ -3,6 +3,7 @@
 // Architecture: Image → OCR boxes → Entity Recognition → DBSCAN Clustering → Patient Assembly
 
 import { boostEntityScore, resolveUnknownEntity, lookupLearnedName, lookupLearnedDiagnosis, lookupLearnedMedication } from './ocrLearner.js';
+import { disambiguate, inferAcuity, extractStructuredData, predictMissingFields, normalizeText, validateAgeDiagnosis } from './ocrBrain.js';
 
 // ====== IMAGE PREPROCESSING ======
 const ImagePreprocessor = {
@@ -4729,12 +4730,20 @@ export async function processPatientListImage(imageSource, onProgress) {
   }
 
   const capturedAt = new Date().toISOString();
-  const patients = best.patients.map(p => ({
+  const patients = best.patients.map(p => {
+    // Run brain: infer acuity, predict missing fields, normalize text
+    const acuity = inferAcuity(p);
+    const predictions = predictMissingFields(p);
+    const finalDx = normalizeText(p.dx || predictions.inferredDx || '');
+
+    return {
     ...p,
-    triage: p.suggestedTriage || 'GREEN',
-    mobility: p.suggestedMobility || 'AMBULATORY',
-    o2: p.o2 || 'NONE',
-    iso: p.iso || 'NONE',
+    dx: finalDx || p.dx || '',
+    gender: p.gender || predictions.gender || 'M',
+    triage: p.suggestedTriage || acuity.suggestedTriage || 'GREEN',
+    mobility: p.suggestedMobility || acuity.suggestedMobility || 'AMBULATORY',
+    o2: p.o2 || acuity.suggestedO2 || 'NONE',
+    iso: p.iso || acuity.suggestedIso || 'NONE',
     code: p.code || 'FULL',
     allergies: p.allergies || 'NKDA',
     evac: 'IN_WARD',
@@ -4750,8 +4759,11 @@ export async function processPatientListImage(imageSource, onProgress) {
       wordConfidence: best.wordConfidence,
       capturedAt,
       reviewLevel: p.reviewLevel,
+      acuityScore: acuity.acuityScore,
+      acuitySignals: acuity.signals,
     },
-  }));
+  };
+  });
 
   return {
     patients,
@@ -4787,3 +4799,4 @@ export function preloadOcrModels() {
 }
 
 export { MedicalVocabulary, ClinicalValidator };
+export { disambiguate, inferAcuity, extractStructuredData, predictMissingFields, normalizeText, validateAgeDiagnosis } from './ocrBrain.js';
