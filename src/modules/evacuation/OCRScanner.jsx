@@ -5,6 +5,7 @@ import Modal from '../../shared/Modal.jsx';
 import { CameraIcon, CheckIcon, AlertTriangle } from '../../design/icons.jsx';
 import { processPatientListImage } from './ocrEngine.js';
 import { logAction } from '../../data/audit.js';
+import { saveTrainingSample, getTrainingStats, exportTrainingJSON, exportTrainingCSV } from './ocrDataCollector.js';
 
 const TRIAGE_LIST = ['RED', 'YELLOW', 'GREEN', 'GRAY', 'BLACK'];
 const REVIEW_STYLES = {
@@ -104,6 +105,7 @@ export default function OCRScanner({ onClose, onImport }) {
   const [selectedPatients, setSelectedPatients] = useState(new Set());
   const [showRaw, setShowRaw] = useState(false);
   const fileRef = useRef(null);
+  const imageFileRef = useRef(null); // original image for training data
 
   useEffect(() => {
     return () => {
@@ -194,6 +196,7 @@ export default function OCRScanner({ onClose, onImport }) {
     const file = e.target.files?.[0];
     if (!file) return;
 
+    imageFileRef.current = file; // save for training data
     const url = URL.createObjectURL(file);
     setImageUrl(url);
     setStage('processing');
@@ -286,6 +289,25 @@ export default function OCRScanner({ onClose, onImport }) {
         },
       });
     }
+    // Save training data — image + OCR output + what user actually imported
+    saveTrainingSample({
+      imageSource: imageFileRef.current || imageUrl,
+      rawText: result.rawText,
+      ocrPatients: result.patients,
+      importedPatients: toImport,
+      ocrMeta: {
+        engine: result.engine,
+        backend: result.backend,
+        strategy: result.strategy,
+        profile: result.profile,
+        qualityScore: result.qualityScore,
+        qualityBand: result.qualityBand,
+        wordConfidence: result.wordConfidence,
+        processingTime: result.processingTime,
+        reviewCount: result.reviewCount,
+      },
+    }).catch(e => console.warn('[OCR-DATA] Save failed:', e));
+
     onImport?.(toImport.length);
     onClose();
   }, [result, selectedPatients, addPatient, auth, onClose, onImport]);
@@ -335,6 +357,7 @@ export default function OCRScanner({ onClose, onImport }) {
             {error && (
               <div style={{ fontSize: '12px', color: colors.red, fontWeight: 600 }}>{error}</div>
             )}
+            <TrainingDataBar />
           </>
         )}
 
@@ -666,5 +689,34 @@ export default function OCRScanner({ onClose, onImport }) {
         )}
       </div>
     </Modal>
+  );
+}
+
+function TrainingDataBar() {
+  const stats = getTrainingStats();
+  if (stats.samples === 0) return null;
+
+  return (
+    <div style={{
+      display: 'flex', alignItems: 'center', gap: '6px',
+      padding: '6px 8px', borderRadius: '6px',
+      background: colors.bg2, border: `1px solid ${colors.border}`,
+      marginTop: '4px',
+    }}>
+      <span style={{ flex: 1, fontSize: '10px', color: colors.text3, fontFamily: fonts.mono }}>
+        Training: {stats.samples} scans, {stats.totalImported} patients
+        {stats.totalEdited > 0 && `, ${stats.totalEdited} corrected`}
+      </span>
+      <button onClick={exportTrainingJSON} style={{
+        padding: '3px 8px', borderRadius: '4px', border: 'none',
+        background: colors.blue + '22', color: colors.blue,
+        fontSize: '10px', fontWeight: 700, cursor: 'pointer',
+      }}>JSON</button>
+      <button onClick={exportTrainingCSV} style={{
+        padding: '3px 8px', borderRadius: '4px', border: 'none',
+        background: colors.blue + '22', color: colors.blue,
+        fontSize: '10px', fontWeight: 700, cursor: 'pointer',
+      }}>CSV</button>
+    </div>
   );
 }
