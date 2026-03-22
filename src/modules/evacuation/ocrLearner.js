@@ -26,10 +26,11 @@ import { loadRadiologySeedData } from './ocrSeedRadiology.js';
 import { loadNursingSeedData } from './ocrSeedNursing.js';
 import { loadEmergencySeedData } from './ocrSeedEmergency.js';
 import { loadLabSeedData } from './ocrSeedLab.js';
+import { loadClinicalReasoningSeedData } from './ocrSeedClinicalReasoning.js';
 
 const MODELS_KEY = 'ocr_learned_models';
 const TRAINING_KEY = 'ocr_training_data';
-const SEED_VERSION = 10; // bump to re-seed (v10: complete lab intelligence)
+const SEED_VERSION = 11; // bump to re-seed (v11: clinical reasoning, DDx, decision rules, order sets)
 
 // ═══════════════════════════════════════════════════════════════════
 // LEARNED MODEL — the output of the learning cycle
@@ -54,6 +55,7 @@ function loadModels() {
       models = loadNursingSeedData(models);
       models = loadEmergencySeedData(models);
       models = loadLabSeedData(models);
+      models = loadClinicalReasoningSeedData(models);
       models.seedVersion = SEED_VERSION;
       saveModels(models);
       console.log(`[LEARNER] Seeded: ${Object.keys(models.names).length} names, ${Object.keys(models.diagnoses).length} dx, ${Object.keys(models.medications).length} meds, ${Object.keys(models.abbreviations || {}).length} abbreviations, ${Object.keys(models.labTests || {}).length} lab tests`);
