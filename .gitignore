@@ -18,3 +18,7 @@ med_ocr/seed_bank/
 med_ocr/raw_scans/
 med_ocr/shielded/
 med_ocr/logs/
+med_ocr/training_data/
+med_ocr/pretrained/
+med_ocr/trained_model/
+med_ocr/PaddleOCR/
