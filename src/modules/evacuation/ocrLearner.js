@@ -15,10 +15,11 @@
 
 import { loadSeedData } from './ocrSeedData.js';
 import { loadProgressNoteSeedData } from './ocrSeedProgressNotes.js';
+import { loadDeepSeedData } from './ocrSeedDeep.js';
 
 const MODELS_KEY = 'ocr_learned_models';
 const TRAINING_KEY = 'ocr_training_data';
-const SEED_VERSION = 2; // bump to re-seed (v2: added progress notes)
+const SEED_VERSION = 3; // bump to re-seed (v3: deep subspecialties, Arabic, scoring, toxicology)
 
 // ═══════════════════════════════════════════════════════════════════
 // LEARNED MODEL — the output of the learning cycle
@@ -32,6 +33,7 @@ function loadModels() {
       console.log('[LEARNER] Loading seed data...');
       models = loadSeedData(models);
       models = loadProgressNoteSeedData(models);
+      models = loadDeepSeedData(models);
       models.seedVersion = SEED_VERSION;
       saveModels(models);
       console.log(`[LEARNER] Seeded: ${Object.keys(models.names).length} names, ${Object.keys(models.diagnoses).length} dx, ${Object.keys(models.medications).length} meds, ${Object.keys(models.abbreviations || {}).length} abbreviations, ${Object.keys(models.labTests || {}).length} lab tests`);
@@ -400,6 +402,22 @@ export function lookupLearnedName(text) {
   return bestConf > 0 ? { confidence: bestConf, preferred: bestPreferred } : null;
 }
 
+function pickSafeLearnedNameCorrection(originalText, preferredText) {
+  const original = `${originalText || ''}`.trim();
+  const preferred = `${preferredText || ''}`.trim();
+  if (!preferred) return original;
+
+  const originalWords = original.split(/\s+/).filter(Boolean);
+  const preferredWords = preferred.split(/\s+/).filter(Boolean);
+  if (originalWords.length <= 1) return preferred;
+
+  const originalCompact = original.replace(/\s+/g, '');
+  const preferredCompact = preferred.replace(/\s+/g, '');
+  if (preferredWords.length < originalWords.length) return original;
+  if (preferredCompact.length < Math.max(4, Math.floor(originalCompact.length * 0.75))) return original;
+  return preferred;
+}
+
 // Look up a diagnosis in learned vocabulary
 export function lookupLearnedDiagnosis(text) {
   const models = getModels();
@@ -572,7 +590,7 @@ export function boostEntityScore(text, entity, currentConfidence) {
       if (nameMatch) {
         return {
           boostedConfidence: Math.max(currentConfidence, nameMatch.confidence),
-          correctedText: nameMatch.preferred || text,
+          correctedText: pickSafeLearnedNameCorrection(text, nameMatch.preferred || text),
           entity: 'NAME',
           reason: `learned name`,
         };
@@ -639,7 +657,7 @@ export function resolveUnknownEntity(text) {
     return {
       entity: 'NAME',
       confidence: nameMatch.confidence,
-      correctedText: nameMatch.preferred || text,
+      correctedText: pickSafeLearnedNameCorrection(text, nameMatch.preferred || text),
       reason: 'learned name',
     };
   }
