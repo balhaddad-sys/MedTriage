@@ -16,6 +16,7 @@ import { isVlmAvailable, processWithVlm } from './ocrVlmBridge.js';
 import { logOcrTransaction, computeImageHash } from './ocrAuditLog.js';
 import { calibratePatient } from './ocrCalibration.js';
 import { suggestClinicalParameters } from './ocrTriageSuggestor.js';
+import { validatePatient } from './ocrPatientSchema.js';
 
 // ====== IMAGE PREPROCESSING ======
 const ImagePreprocessor = {
@@ -1753,9 +1754,10 @@ const MedicalVocabulary = {
     const variants = [...new Set([normalized, normalizeLatinOcrToken(rawText)])].filter(Boolean);
     if (variants.length === 0) return null;
     // Safety: scale max edit distance by word length to prevent dangerous short-name cross-matches
-    // e.g., "Xanax"(5) → maxDist 1, "Metformin"(9) → maxDist 2, "Acetaminophen"(13) → maxDist 3
+    // e.g., "Xanax"(5) → exact only, "Losartan"(8) → maxDist 2, "Acetaminophen"(13) → maxDist 3
+    // Drug names <=6 chars are too short for safe fuzzy matching (Taxol/Taxil, Cefox/Celox)
     const inputLen = normalized.length;
-    const safeMaxDistance = inputLen <= 4 ? 0 : inputLen <= 6 ? 1 : inputLen <= 9 ? 2 : maxDistance;
+    const safeMaxDistance = inputLen <= 6 ? 0 : inputLen <= 9 ? 1 : inputLen <= 12 ? 2 : maxDistance;
     let bestMatch = null, bestDistance = Infinity;
     for (const med of this.MEDICATIONS) {
       const medKey = stripForLexicon(med);
@@ -4976,54 +4978,145 @@ export async function processPatientListImage(imageSource, onProgress) {
   }
 
   const capturedAt = new Date().toISOString();
-  const patients = best.patients.map(p => {
+
+  // Compute image hash for audit chain-of-custody
+  let imageHash = 'unavailable';
+  try { imageHash = await computeImageHash(imageSource); } catch {}
+
+  const patients = await Promise.all(best.patients.map(async (p) => {
     // Run brain: infer acuity, predict missing fields, normalize text
     const acuity = inferAcuity(p);
     const predictions = predictMissingFields(p);
     const finalDx = normalizeText(p.dx || predictions.inferredDx || '');
 
+    // Decoupled triage suggestion (UNVALIDATED — requires clinician confirmation)
+    const clinicalSuggestions = suggestClinicalParameters({ ...p, dx: finalDx || p.dx || '' });
+
+    // Track which fields were auto-inferred (safety flags)
+    const safetyFlags = [];
+    const autoInferred = {};
+    if (!p.gender && predictions.gender) {
+      safetyFlags.push({ field: 'gender', reason: 'Auto-inferred from name', value: predictions.gender, status: 'UNVALIDATED' });
+      autoInferred.gender = true;
+    }
+    if (clinicalSuggestions.triage.triage && !p.suggestedTriage) {
+      safetyFlags.push({ field: 'triage', reason: clinicalSuggestions.triage.reasoning, value: clinicalSuggestions.triage.triage, status: 'UNVALIDATED' });
+      autoInferred.triage = true;
+    }
+    if (clinicalSuggestions.mobility.mobility !== 'AMBULATORY') {
+      safetyFlags.push({ field: 'mobility', reason: clinicalSuggestions.mobility.reasoning, value: clinicalSuggestions.mobility.mobility, status: 'UNVALIDATED' });
+      autoInferred.mobility = true;
+    }
+    if (clinicalSuggestions.o2.o2 !== 'NONE') {
+      safetyFlags.push({ field: 'o2', reason: clinicalSuggestions.o2.reasoning, value: clinicalSuggestions.o2.o2, status: 'UNVALIDATED' });
+      autoInferred.o2 = true;
+    }
+    if (clinicalSuggestions.isolation.iso !== 'NONE') {
+      safetyFlags.push({ field: 'isolation', reason: clinicalSuggestions.isolation.reasoning, value: clinicalSuggestions.isolation.iso, status: 'UNVALIDATED' });
+      autoInferred.isolation = true;
+    }
+
+    // If any field was auto-inferred, escalate review level
+    let reviewLevel = p.reviewLevel;
+    if (safetyFlags.length > 0 && reviewLevel === 'READY') {
+      reviewLevel = 'REVIEW';
+    }
+
+    // Calibrate confidence (async — uses learned calibration if available)
+    let calibratedConfidence = p.confidence;
+    try {
+      const calibrated = await calibratePatient(p);
+      calibratedConfidence = calibrated.calibratedConfidence;
+    } catch {}
+
     return {
-    ...p,
-    dx: finalDx || p.dx || '',
-    gender: p.gender || predictions.gender || '',
-    triage: p.suggestedTriage || acuity.suggestedTriage || 'GREEN',
-    mobility: p.suggestedMobility || acuity.suggestedMobility || 'AMBULATORY',
-    o2: p.o2 || acuity.suggestedO2 || 'NONE',
-    iso: p.iso || acuity.suggestedIso || 'NONE',
-    code: p.code || '',
-    allergies: p.allergies || '',
-    evac: 'IN_WARD',
-    ocrImported: true,
-    ocrConfidence: {
-      allFieldsPresent: Boolean(p.fullName && p.bed && p.gender && p.allergies && p.code),
-      defaultsApplied: [
-        ...(!p.gender && !predictions.gender ? ['gender'] : []),
-        ...(!p.allergies ? ['allergies'] : []),
-        ...(!p.code ? ['code'] : []),
-      ],
-    },
-    ocrMeta: {
+      ...p,
+      dx: finalDx || p.dx || '',
+      gender: p.gender || predictions.gender || '',
+      triage: clinicalSuggestions.triage.triage || p.suggestedTriage || acuity.suggestedTriage || 'GREEN',
+      mobility: clinicalSuggestions.mobility.mobility || p.suggestedMobility || acuity.suggestedMobility || 'AMBULATORY',
+      o2: p.o2 || clinicalSuggestions.o2.o2 || acuity.suggestedO2 || 'NONE',
+      iso: p.iso || clinicalSuggestions.isolation.iso || acuity.suggestedIso || 'NONE',
+      code: p.code || '',
+      allergies: p.allergies || '',
+      evac: 'IN_WARD',
+      ocrImported: true,
+      calibratedConfidence,
+      safetyFlags,
+      autoInferred,
+      clinicalSuggestions,
+      reviewLevel,
+      ocrMeta: {
+        engine: 'medtriage-context-ocr-v5',
+        backend: best.backend,
+        profile: best.profileId,
+        strategy: best.strategy,
+        consensusPasses: best.consensusPasses,
+        qualityScore: best.qualityScore,
+        qualityBand: best.qualityBand,
+        wordConfidence: best.wordConfidence,
+        capturedAt,
+        reviewLevel,
+        acuityScore: acuity.acuityScore,
+        acuitySignals: acuity.signals,
+        imageHash,
+        safetyNotice: safetyFlags.length > 0
+          ? `${safetyFlags.length} field(s) auto-inferred — clinician confirmation required`
+          : null,
+      },
+    };
+  }));
+
+  // Schema validation — catch malformed data before it reaches the UI
+  for (const patient of patients) {
+    const validation = validatePatient(patient);
+    patient.schemaValid = validation.valid;
+    patient.schemaErrors = validation.errors;
+    patient.safetyFlags = [...(patient.safetyFlags || []), ...validation.safetyFlags.map(flag => ({
+      field: flag.replace(/_/g, ' ').toLowerCase(),
+      reason: `Schema: ${flag}`,
+      value: '',
+      status: 'UNVALIDATED',
+    }))];
+    // Escalate review level if schema validation found errors
+    if (!validation.valid && patient.reviewLevel === 'READY') {
+      patient.reviewLevel = 'VERIFY';
+    } else if (validation.warnings.length > 0 && patient.reviewLevel === 'READY') {
+      patient.reviewLevel = 'REVIEW';
+    }
+  }
+
+  const processingTime = performance.now() - startTime;
+
+  // Log to immutable audit trail (fire-and-forget, never blocks OCR result)
+  logOcrTransaction({
+    imageHash,
+    rawOcrOutput: best.rawText,
+    wordConfidences: best.wordConfidences,
+    entities: best.entities,
+    patients,
+    engineMeta: {
       engine: 'medtriage-context-ocr-v5',
       backend: best.backend,
       profile: best.profileId,
       strategy: best.strategy,
       consensusPasses: best.consensusPasses,
-      qualityScore: best.qualityScore,
+      processingTime,
+      vlmAvailable: !!vlmResult,
+      vlmUsed: !!vlmResult,
+    },
+    qualityMetrics: {
+      rawScore: best.qualityScore,
       qualityBand: best.qualityBand,
       wordConfidence: best.wordConfidence,
-      capturedAt,
-      reviewLevel: p.reviewLevel,
-      acuityScore: acuity.acuityScore,
-      acuitySignals: acuity.signals,
     },
-  };
-  });
+  }).catch(e => console.warn('[AUDIT] Background log failed:', e));
 
   return {
     patients,
     rawText: best.rawText,
-    processingTime: performance.now() - startTime,
-    engine: 'medtriage-context-ocr-v4',
+    processingTime,
+    engine: 'medtriage-context-ocr-v5',
     backend: best.backend,
     entityCount: best.entityCount,
     clusterCount: best.clusterCount,
@@ -5035,6 +5128,12 @@ export async function processPatientListImage(imageSource, onProgress) {
     consensusPasses: best.consensusPasses,
     strategy: best.strategy,
     hypotheses: best.hypotheses,
+    imageHash,
+    auditTrail: {
+      imageHash,
+      transactionLogged: true,
+      safetyFlagsTotal: patients.reduce((sum, p) => sum + (p.safetyFlags?.length || 0), 0),
+    },
     vlm: vlmResult ? {
       available: true,
       backend: vlmResult.backend,
@@ -5062,3 +5161,9 @@ export function preloadOcrModels() {
 
 export { MedicalVocabulary, ClinicalValidator };
 export { disambiguate, inferAcuity, extractStructuredData, predictMissingFields, normalizeText, validateAgeDiagnosis } from './ocrBrain.js';
+
+// Medical-grade module re-exports
+export { logOcrTransaction, logCorrection, getAuditStats, exportAuditJSON, exportAuditCSV } from './ocrAuditLog.js';
+export { calibrateConfidence, calibratePatient, getCalibrationDiagnostics, getReliabilityDiagram, recordCalibrationCorrection } from './ocrCalibration.js';
+export { suggestTriage, suggestMobility, suggestO2, suggestIsolation, suggestClinicalParameters, recordTriageDecision } from './ocrTriageSuggestor.js';
+export { computeCER, computeWER, computeFieldAccuracy, runValidation, createGroundTruthTemplate, exportValidationReport } from './ocrValidation.js';

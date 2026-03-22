@@ -474,7 +474,8 @@ export function lookupLearnedMedication(text) {
 
   const key = text.trim().toLowerCase();
   // Safety: scale max edit distance by length to prevent dangerous drug name cross-matches
-  const safeMaxDist = key.length <= 4 ? 0 : key.length <= 6 ? 1 : 2;
+  // Drug names <=6 chars are too short for safe fuzzy matching (Taxol/Taxil, Cefox/Celox)
+  const safeMaxDist = key.length <= 6 ? 0 : key.length <= 9 ? 1 : 2;
   for (const [k, v] of Object.entries(models.medications)) {
     // Exact match
     if (k === key) return { confidence: v.confidence, count: v.count };

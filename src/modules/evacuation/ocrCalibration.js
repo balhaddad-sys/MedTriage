@@ -103,8 +103,11 @@ function fitIsotonicRegression(predictions, labels) {
   const blocks = pairs.map(p => ({ sum: p.label, count: 1, pred: p.pred }));
 
   let merged = true;
-  while (merged) {
+  let iterations = 0;
+  const maxIterations = n * 2; // O(n) worst case, capped for safety
+  while (merged && iterations < maxIterations) {
     merged = false;
+    iterations++;
     for (let i = 0; i < blocks.length - 1; i++) {
       if (blocks[i].sum / blocks[i].count > blocks[i + 1].sum / blocks[i + 1].count) {
         blocks[i].sum += blocks[i + 1].sum;

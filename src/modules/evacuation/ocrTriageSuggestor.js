@@ -157,7 +157,7 @@ const TRIAGE_RULES = [
   },
   {
     id: 'YELLOW_PE',
-    pattern: /\bPE\b(?![A-Z])|PULMONARY EMBOLISM/i,
+    pattern: /(?<![A-Za-z0-9])\bPE\b(?![A-Za-z0-9])|PULMONARY EMBOLISM/i,
     field: 'dx',
     triage: 'YELLOW',
     confidence: 0.88,
@@ -255,7 +255,7 @@ const TRIAGE_RULES = [
     category: 'gi',
   },
   {
-    id: 'YELLOW_CHOLANGITIS',
+    id: 'RED_CHOLANGITIS',
     pattern: /CHOLANGITIS/i,
     field: 'dx',
     triage: 'RED',

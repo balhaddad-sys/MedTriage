@@ -29,7 +29,7 @@ function openAuditDB() {
   if (dbPromise) return dbPromise;
   dbPromise = new Promise((resolve, reject) => {
     const req = indexedDB.open(DB_NAME, DB_VERSION);
-    req.onupgradeneeded = (event) => {
+    req.onupgradeneeded = () => {
       const db = req.result;
       if (!db.objectStoreNames.contains(STORE_TRANSACTIONS)) {
         const txStore = db.createObjectStore(STORE_TRANSACTIONS, { keyPath: 'id' });
@@ -47,7 +47,10 @@ function openAuditDB() {
       }
     };
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error);
+    req.onerror = () => {
+      dbPromise = null; // Reset on failure so next call retries
+      reject(req.error);
+    };
   });
   return dbPromise;
 }
@@ -115,8 +118,10 @@ export async function logOcrTransaction({
     sessionId: SESSION_ID,
     imageHash: hash,
 
-    // Raw OCR output
+    // Raw OCR output (truncated to 10KB with flag if exceeded)
     rawText: (rawOcrOutput || '').substring(0, 10000),
+    rawTextTruncated: (rawOcrOutput || '').length > 10000,
+    rawTextOriginalLength: (rawOcrOutput || '').length,
     wordCount: wordConfidences?.length || 0,
     wordConfidenceDistribution: wordConfidences ? summarizeDistribution(wordConfidences.map(w => w.confidence)) : null,
 
