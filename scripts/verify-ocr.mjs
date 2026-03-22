@@ -527,4 +527,88 @@ const titledJamal = titledDoctorCells.patients.find(patient => /^jamal$/i.test(p
 assert.ok(titledJamal, 'expected jamal with titled doctor cell');
 assert.equal(titledJamal.assignedDoctor, 'noura');
 
+// Test 19: Screenshot-like roster sections should inherit active/chronic status from section titles
+const sectionContextRoster = analyzeOcrWords([
+  word('Male list (active)', 40, 10, 98, 180),
+  word('Room / Ward', 20, 52, 98, 95),
+  word('Patient name', 170, 52, 98, 110),
+  word('Diagnosis', 410, 52, 98, 90),
+  word('Assigned Doctor', 650, 52, 98, 135),
+  word('Status', 860, 52, 98, 60),
+  word('Ward 19', 470, 84, 97, 80),
+  word('Bader', 200, 120, 92, 80),
+  word('Chest infection and UTI', 360, 120, 92, 200),
+  word('Ali hussain', 180, 156, 92, 110),
+  word('?CVA', 430, 156, 92, 60),
+  word('Ahmad alessa', 170, 192, 92, 130),
+  word('CVA left MCA occlusion', 380, 192, 92, 200),
+  word('ICU discharge', 840, 192, 92, 120),
+  word('(Chronic list)', 30, 250, 98, 160),
+  word('Room / Ward', 20, 288, 98, 95),
+  word('Patient name', 170, 288, 98, 110),
+  word('Diagnosis', 410, 288, 98, 90),
+  word('Assigned Doctor', 650, 288, 98, 135),
+  word('Status', 860, 288, 98, 60),
+  word('Ward 20', 470, 320, 97, 80),
+  word('Mohammad', 190, 356, 92, 110),
+  word('UTI, weight loss', 390, 356, 92, 170),
+  word('noura', 700, 356, 92, 60),
+], 1000, 460);
+
+assert.ok(['table-grid', 'schema-columns', 'row-bands'].includes(sectionContextRoster.strategy), 'expected screenshot-like section roster to stay structural');
+assert.equal(sectionContextRoster.patients.length, 4, 'expected four patients from section-context roster');
+
+const sectionBader = sectionContextRoster.patients.find(patient => /^bader$/i.test(patient.fullName || ''));
+assert.ok(sectionBader, 'expected Bader row from active section');
+assert.equal(sectionBader.ward, 'Ward 19');
+assert.equal(sectionBader.sheetStatus, 'ACTIVE');
+assert.match(sectionBader.dx || '', /Chest infection/i);
+assert.match(sectionBader.dx || '', /UTI/i);
+
+const sectionAli = sectionContextRoster.patients.find(patient => /ali hussain/i.test(patient.fullName || ''));
+assert.ok(sectionAli, 'expected ali hussain row from active section');
+assert.equal(sectionAli.ward, 'Ward 19');
+assert.equal(sectionAli.sheetStatus, 'ACTIVE');
+assert.match(sectionAli.dx || '', /CVA/i);
+
+const sectionAhmad = sectionContextRoster.patients.find(patient => /ahmad alessa/i.test(patient.fullName || ''));
+assert.ok(sectionAhmad, 'expected ahmad alessa row with explicit status');
+assert.equal(sectionAhmad.ward, 'Ward 19');
+assert.equal(sectionAhmad.sheetStatus, 'ICU DISCHARGE');
+assert.match(sectionAhmad.dx || '', /CVA left MCA occlusion/i);
+
+const sectionMohammad = sectionContextRoster.patients.find(patient => /mohammad/i.test(patient.fullName || ''));
+assert.ok(sectionMohammad, 'expected chronic-section Mohammad row');
+assert.equal(sectionMohammad.ward, 'Ward 20');
+assert.equal(sectionMohammad.sheetStatus, 'CHRONIC');
+assert.equal(sectionMohammad.assignedDoctor, 'noura');
+assert.match(sectionMohammad.dx || '', /UTI/i);
+assert.match(sectionMohammad.dx || '', /weight loss/i);
+
+// Test 20: Detail-heavy diagnoses should stay diagnoses instead of being absorbed into names
+const detailHeavyDiagnoses = analyzeOcrWords([
+  word('Patient name', 180, 10, 98, 110),
+  word('Diagnosis', 420, 10, 98, 90),
+  word('Assigned Doctor', 650, 10, 98, 135),
+  word('Status', 860, 10, 98, 60),
+  word('Abdullah', 180, 52, 92, 90),
+  word('biliary cholecystitis', 390, 52, 92, 180),
+  word('Bazzah', 700, 52, 92, 80),
+  word('New', 870, 52, 92, 40),
+  word('Raju', 180, 90, 92, 70),
+  word('Ischemic stroke', 390, 90, 92, 150),
+  word('Zahra', 700, 90, 92, 70),
+  word('Chronic', 850, 90, 92, 70),
+], 980, 170);
+
+assert.equal(detailHeavyDiagnoses.patients.length, 2, 'expected two patients with detail-heavy diagnoses');
+const abdullahDx = detailHeavyDiagnoses.patients.find(patient => /abdullah/i.test(patient.fullName || ''));
+assert.ok(abdullahDx, 'expected Abdullah to remain a patient name');
+assert.match(abdullahDx.dx || '', /chole/i);
+assert.equal(abdullahDx.assignedDoctor, 'Bazzah');
+const rajuDx = detailHeavyDiagnoses.patients.find(patient => /raju/i.test(patient.fullName || ''));
+assert.ok(rajuDx, 'expected Raju to remain a patient name');
+assert.match(rajuDx.dx || '', /stroke/i);
+assert.equal(rajuDx.assignedDoctor, 'Zahra');
+
 console.log('OCR verification passed');

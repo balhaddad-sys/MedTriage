@@ -2,6 +2,8 @@
 // Handles: printed tables, handwritten lists, whiteboards, chaotic mixed layouts
 // Architecture: Image → OCR boxes → Entity Recognition → DBSCAN Clustering → Patient Assembly
 
+import { boostEntityScore, resolveUnknownEntity } from './ocrLearner.js';
+
 // ====== IMAGE PREPROCESSING ======
 const ImagePreprocessor = {
   async prepareVariants(imageSource) {
@@ -177,7 +179,7 @@ const OCR_CONFUSION_CANONICAL = Object.fromEntries(
 );
 const HEADER_PATTERNS = [
   /^(name|patient|pt|bed|room|rm|age|sex|gender|dob|diagnosis|diag|dx|meds?|medications?|allerg(?:y|ies)|code|status|ward|location|notes?|id|mrn|mobil(?:ity)?|transport|blood\s*(?:type|group)|bt|bg|rh|consultant|doctor|attending|nurse|rn|diet|activity|iv|plan|tasks?|jobs?|adm\s*date|d\/?c\s*date|edd|day\s*#?|hosp\s*no|file\s*no|nationality|acuity|chief\s*complaint|cc|disposition|dispo|los|labs?|vitals?|i\s*&?\s*o)$/i,
-  /^(اسم|المريض|سرير|غرفة|العمر|الجنس|التشخيص|أدوية|ادوية|حساسية|الحالة|الرقم|ملاحظات)$/i,
+  /^(اسم|المريض|سرير|غرفة|العمر|الجنس|التشخيص|أدوية|ادوية|حساسية|الحالة|الرقم|ملاحظات|الطبيب|المعالج|الاستشاري|التمريض|الممرضة|النظام الغذائي|الخطة|الحركة|فصيلة الدم|العلامات الحيوية|تاريخ الدخول|تاريخ الخروج|الجنسية|رقم الملف)$/i,
 ];
 
 const HEADER_ROLE_PATTERNS = [
@@ -792,6 +794,9 @@ const MedicalVocabulary = {
     'TYPE 2 RF': { category: 'resp', severity: 'RED' },
     // Neurological
     'CVA': { category: 'neuro', severity: 'RED' }, 'TIA': { category: 'neuro', severity: 'YELLOW' },
+    'STROKE': { category: 'neuro', severity: 'RED' },
+    'ISCHEMIC STROKE': { category: 'neuro', severity: 'RED' },
+    'HEMORRHAGIC STROKE': { category: 'neuro', severity: 'RED' },
     'SAH': { category: 'neuro', severity: 'RED' }, 'ICH': { category: 'neuro', severity: 'RED' },
     'SDH': { category: 'neuro', severity: 'RED' }, 'EDH': { category: 'neuro', severity: 'RED' },
     'SE': { category: 'neuro', severity: 'RED' }, 'GBS': { category: 'neuro', severity: 'RED' },
@@ -799,6 +804,9 @@ const MedicalVocabulary = {
     'MENINGITIS': { category: 'neuro', severity: 'RED' }, 'ENCEPHALITIS': { category: 'neuro', severity: 'RED' },
     'EPILEPSY': { category: 'neuro', severity: 'GREEN' }, 'SEIZURE': { category: 'neuro', severity: 'YELLOW' },
     'MCA': { category: 'neuro', severity: 'RED' }, 'ACA': { category: 'neuro', severity: 'RED' },
+    'MCA OCCLUSION': { category: 'neuro', severity: 'RED' },
+    'LEFT MCA OCCLUSION': { category: 'neuro', severity: 'RED' },
+    'RIGHT MCA OCCLUSION': { category: 'neuro', severity: 'RED' },
     'PCA': { category: 'neuro', severity: 'RED' },
     'PARKINSON': { category: 'neuro', severity: 'GREEN' }, 'DEMENTIA': { category: 'neuro', severity: 'GREEN' },
     // GI
@@ -809,6 +817,8 @@ const MedicalVocabulary = {
     'HE': { category: 'gi', severity: 'YELLOW' }, 'GORD': { category: 'gi', severity: 'GREEN' },
     'PUD': { category: 'gi', severity: 'GREEN' }, 'GIB': { category: 'gi', severity: 'YELLOW' },
     'CHOLECYSTITIS': { category: 'gi', severity: 'YELLOW' }, 'CHOLANGITIS': { category: 'gi', severity: 'RED' },
+    'BILIARY CHOLECYSTITIS': { category: 'gi', severity: 'YELLOW' },
+    'BILIARY COLIC': { category: 'gi', severity: 'YELLOW' },
     'PANCREATITIS': { category: 'gi', severity: 'YELLOW' },
     'CIRRHOSIS': { category: 'gi', severity: 'YELLOW' }, 'ASCITES': { category: 'gi', severity: 'YELLOW' },
     'VARICES': { category: 'gi', severity: 'RED' },
@@ -916,6 +926,7 @@ const MedicalVocabulary = {
     'HEPATORENAL': { category: 'gi', severity: 'RED' },
     'FAILURE TO THRIVE': { category: 'status', severity: 'GREEN' },
     'FTT': { category: 'status', severity: 'GREEN' },
+    'WEIGHT LOSS': { category: 'status', severity: 'GREEN' },
     'SOCIAL ADMISSION': { category: 'status', severity: 'GREEN' },
     // Missing common diagnoses found by audit
     'FEVER': { category: 'infect', severity: 'YELLOW' },
@@ -961,8 +972,6 @@ const MedicalVocabulary = {
     'NEPHROLITHIASIS': { category: 'renal', severity: 'YELLOW' },
     'PYELONEPHRITIS': { category: 'infect', severity: 'YELLOW' },
     'PERITONITIS': { category: 'gi', severity: 'RED' },
-    'APPENDICITIS': { category: 'surg', severity: 'YELLOW' },
-    'CHOLECYSTITIS': { category: 'gi', severity: 'YELLOW' },
     'ANAPHYLAXIS': { category: 'infect', severity: 'RED' },
     'ANGIOEDEMA': { category: 'infect', severity: 'RED' },
     'BURNS': { category: 'surg', severity: 'YELLOW' },
@@ -975,8 +984,18 @@ const MedicalVocabulary = {
     'GOUT': { category: 'ortho', severity: 'GREEN' },
     'RHABDOMYOLYSIS': { category: 'renal', severity: 'RED' },
     'POLYTRAUMA': { category: 'surg', severity: 'RED' },
-    'RTA': { category: 'surg', severity: 'YELLOW' },
     'BLAST INJURY': { category: 'surg', severity: 'RED' },
+    // Clinical shorthand (prevent misclassification as names)
+    'SOB': { category: 'resp', severity: 'YELLOW' }, 'DOE': { category: 'resp', severity: 'YELLOW' },
+    'CP': { category: 'cardio', severity: 'YELLOW' },
+    'URI': { category: 'resp', severity: 'GREEN' }, 'URTI': { category: 'resp', severity: 'GREEN' },
+    'LOC': { category: 'neuro', severity: 'RED' },
+    'GCS': { category: 'neuro' },
+    'PMH': { category: 'status' }, 'PSH': { category: 'status' },
+    'ROS': { category: 'status' }, 'HPI': { category: 'status' },
+    'WNL': { category: 'status' }, 'NAD': { category: 'status' },
+    'VSS': { category: 'status' }, 'AVSS': { category: 'status' },
+    'DDX': { category: 'status' },
     // Ward round abbreviations (from research — prevent these from being classified as names)
     'CXR': { category: 'invest' }, 'ABG': { category: 'invest' }, 'VBG': { category: 'invest' },
     'ECG': { category: 'invest' }, 'EKG': { category: 'invest' },
@@ -1079,6 +1098,25 @@ const MedicalVocabulary = {
     'Hartmann', 'Gelofusine', 'Voluven', 'Plasmalyte',
     'TPN', 'PPN', 'KCl', 'NaCl', 'MgSO4', 'CaCl2',
     'Neulasta', 'Aranesp', 'Venofer', 'Ferinject',
+    // Top 200 drugs not already covered (from ClinCalc 2023)
+    'Levothyroxine', 'Albuterol', 'Bupropion', 'Buspirone', 'Cyclobenzaprine',
+    'Ergocalciferol', 'Methylphenidate', 'Latanoprost', 'Cholecalciferol',
+    'Topiramate', 'Lisdexamfetamine', 'Tizanidine', 'Baclofen', 'Aripiprazole',
+    'Valacyclovir', 'Sumatriptan', 'Triamcinolone', 'Celecoxib', 'Alendronate',
+    'Oxybutynin', 'Triamterene', 'Progesterone', 'Testosterone', 'Methocarbamol',
+    'Benzonatate', 'Chlorthalidone', 'Donepezil', 'Clobetasol', 'Lovastatin',
+    'Hydroxychloroquine', 'Meclizine', 'Azelastine', 'Nitrofurantoin',
+    'Memantine', 'Atomoxetine', 'Melatonin', 'Cefdinir', 'Doxepin', 'Phentermine',
+    'Mupirocin', 'Benazepril', 'Timolol', 'Linaclotide', 'Nebivolol', 'Dicyclomine',
+    'Anastrozole', 'Evolocumab', 'Desvenlafaxine', 'Dorzolamide', 'Tretinoin',
+    'Ferrous-Sulfate', 'Folic-Acid', 'Polyethylene-Glycol',
+    // Additional trade names from top 200
+    'Synthroid', 'Prilosec', 'Proair', 'Prinivil', 'Zestril', 'Toprol',
+    'Wellbutrin', 'Abilify', 'Entresto', 'Ozempic', 'Mounjaro', 'Trulicity',
+    'Victoza', 'Farxiga', 'Invokana', 'Bydureon', 'Rybelsus',
+    'Coumadin', 'Humulin', 'Novolin', 'Toradol', 'Ofirmev',
+    'Lyrica', 'Neurontin', 'Flexeril', 'Soma', 'Robaxin',
+    'Ativan', 'Versed', 'Precedex', 'Narcan', 'Suboxone',
   ]),
 
   // Kuwait name database — 500+ first names, 200+ family names for fuzzy OCR correction
@@ -1395,6 +1433,122 @@ const MedicalVocabulary = {
   },
 };
 
+const DIAGNOSIS_DETAIL_HINTS = new Set([
+  'ACUTE', 'CHRONIC', 'LEFT', 'RIGHT', 'BILATERAL', 'UPPER', 'LOWER', 'MID', 'LATE', 'POST',
+  'SEVERE', 'MILD', 'MODERATE', 'EXACERBATION', 'EXACERBATED', 'EXAC', 'OCCLUSION', 'STROKE',
+  'INFARCT', 'INFARCTION', 'ISCHEMIC', 'ISCHAEMIC', 'HEMORRHAGIC', 'HAEMORRHAGIC', 'SHOCK',
+  'INFECTION', 'SEPSIS', 'FAILURE', 'DECOMPENSATION', 'OBSTRUCTION', 'OVERDOSE', 'WITH',
+  'WITHOUT', 'LOSS', 'PAIN', 'RETENTION', 'ULCER', 'GANGRENE', 'COLITIS', 'HEPATITIS',
+  'CHOLESTITIS', 'CHOLECYSTITIS', 'CHOLESTASIS',
+]);
+const DIAGNOSIS_CONNECTOR_HINTS = new Set([
+  'AND', 'WITH', 'W', 'SEC', 'SECONDARY', 'DUE', 'TO', 'PLUS', 'ON',
+]);
+
+function tokenizeClinicalPhrase(text) {
+  return `${text || ''}`
+    .replace(/[?]+/g, ' ')
+    .replace(/[()]+/g, ' ')
+    .split(/[\s,;/|]+/)
+    .map(token => token
+      .trim()
+      .replace(/^[`"'~.,:;!?()[\]{}<>+-]+|[`"'~.,:;!?()[\]{}<>+-]+$/g, '')
+    )
+    .filter(Boolean);
+}
+
+function collectDiagnosisEvidence(rawText) {
+  const tokens = tokenizeClinicalPhrase(rawText);
+  if (tokens.length === 0) {
+    return {
+      tokens: [],
+      termMatches: [],
+      detailHits: 0,
+      connectorHits: 0,
+      startsWithClinicalTerm: false,
+      slashLike: /[\/|]/.test(`${rawText || ''}`),
+      corrected: `${rawText || ''}`.trim(),
+    };
+  }
+
+  const tokenInfos = tokens.map((token, index) => ({
+    index,
+    raw: token,
+    upper: token.toUpperCase(),
+    key: stripForLexicon(token),
+  }));
+  const candidates = [];
+
+  for (let start = 0; start < tokenInfos.length; start++) {
+    for (let len = Math.min(4, tokenInfos.length - start); len >= 1; len--) {
+      const slice = tokenInfos.slice(start, start + len);
+      const phrase = slice.map(token => token.raw).join(' ');
+      const match = MedicalVocabulary.correctTerm(phrase.toUpperCase(), len >= 2 ? 2 : 1);
+      if (!match) continue;
+      if (len === 1 && (match.distance || 0) > 0 && stripForLexicon(phrase).length <= 3) continue;
+      if (len >= 2 && (match.distance || 0) > 1) continue;
+      candidates.push({
+        start,
+        end: start + len - 1,
+        len,
+        match,
+      });
+    }
+  }
+
+  candidates.sort((a, b) =>
+    b.len - a.len ||
+    (b.match.confidence || 0) - (a.match.confidence || 0) ||
+    a.start - b.start
+  );
+
+  const occupied = new Set();
+  const selected = [];
+  for (const candidate of candidates) {
+    let overlaps = false;
+    for (let i = candidate.start; i <= candidate.end; i++) {
+      if (occupied.has(i)) {
+        overlaps = true;
+        break;
+      }
+    }
+    if (overlaps) continue;
+    selected.push(candidate);
+    for (let i = candidate.start; i <= candidate.end; i++) occupied.add(i);
+  }
+
+  selected.sort((a, b) => a.start - b.start);
+
+  const correctedTokens = [];
+  for (let index = 0; index < tokenInfos.length;) {
+    const match = selected.find(entry => entry.start === index);
+    if (match) {
+      correctedTokens.push(match.match.term);
+      index = match.end + 1;
+      continue;
+    }
+    correctedTokens.push(tokenInfos[index].raw);
+    index++;
+  }
+
+  const detailHits = tokenInfos.filter(token =>
+    !occupied.has(token.index) && DIAGNOSIS_DETAIL_HINTS.has(token.key)
+  ).length;
+  const connectorHits = tokenInfos.filter(token =>
+    !occupied.has(token.index) && DIAGNOSIS_CONNECTOR_HINTS.has(token.key)
+  ).length;
+
+  return {
+    tokens: tokenInfos,
+    termMatches: selected,
+    detailHits,
+    connectorHits,
+    startsWithClinicalTerm: selected.some(match => match.start === 0),
+    slashLike: /[\/|]/.test(`${rawText || ''}`),
+    corrected: correctedTokens.join(' ').replace(/\s+/g, ' ').trim(),
+  };
+}
+
 // ====== STEP 1: ENTITY RECOGNIZER ======
 // Each OCR detection gets classified as an entity type with confidence
 const EntityRecognizer = {
@@ -1444,6 +1598,15 @@ const EntityRecognizer = {
     ].filter(c => c.confidence > 0.3);
 
     if (candidates.length === 0) {
+      // Try learned model to resolve unknown entities
+      const learned = resolveUnknownEntity(t);
+      if (learned && learned.confidence >= 0.6) {
+        result.entity = learned.entity;
+        result.confidence = clamp((learned.confidence * 0.8) + (sourceConfidence * 0.2));
+        result.corrected = learned.correctedText || t;
+        result.meta = { learnedReason: learned.reason };
+        return result;
+      }
       result.entity = 'UNKNOWN';
       result.confidence = 0.2 + (sourceConfidence * 0.15);
       return result;
@@ -1455,6 +1618,18 @@ const EntityRecognizer = {
     result.confidence = clamp((best.confidence * 0.8) + (sourceConfidence * 0.2));
     result.corrected = best.corrected || t;
     result.meta = best.meta || {};
+
+    // Boost with learned data — can increase confidence or correct text
+    const boost = boostEntityScore(t, best.entity, result.confidence);
+    if (boost) {
+      result.confidence = clamp(Math.max(result.confidence, boost.boostedConfidence));
+      if (boost.correctedText && boost.correctedText !== t) {
+        result.corrected = boost.correctedText;
+        result.meta.learnedCorrection = true;
+      }
+      result.meta.learnedReason = boost.reason;
+    }
+
     return result;
   },
 
@@ -1708,6 +1883,15 @@ const EntityRecognizer = {
       }
     }
 
+    const diagnosisEvidence = collectDiagnosisEvidence(t);
+    const stronglyClinicalPhrase = diagnosisEvidence.termMatches.length >= 2 ||
+      diagnosisEvidence.termMatches.some(match => match.len >= 2) ||
+      (diagnosisEvidence.startsWithClinicalTerm && diagnosisEvidence.detailHits > 0) ||
+      (diagnosisEvidence.slashLike && diagnosisEvidence.termMatches.length >= 1);
+    if (stronglyClinicalPhrase) conf *= 0.12;
+    else if (diagnosisEvidence.termMatches.length >= 1 && diagnosisEvidence.detailHits > 0) conf *= 0.28;
+    else if (diagnosisEvidence.termMatches.length >= 1) conf *= 0.55;
+
     // === Penalize if it's a medical term ===
     const medMatch = MedicalVocabulary.correctTerm(t, 0);
     if (medMatch) conf *= 0.25;
@@ -1724,8 +1908,33 @@ const EntityRecognizer = {
     if (/^[A-Z][a-z]{2,}$/.test(rawText) && !MedicalVocabulary.MEDICAL_TERMS[upper]) {
       return { entity: 'DIAGNOSIS', confidence: 0 };
     }
+
+    const evidence = collectDiagnosisEvidence(rawText);
     const match = MedicalVocabulary.correctTerm(upper, 1);
     if (!match) {
+      if (evidence.termMatches.length > 0) {
+        const confidence = clamp(
+          0.48 +
+          (average(evidence.termMatches.map(entry => entry.match.confidence), 0.55) * 0.22) +
+          (Math.min(evidence.termMatches.length, 3) * 0.09) +
+          (Math.min(evidence.detailHits, 3) * 0.06) +
+          (Math.min(evidence.connectorHits, 2) * 0.02) +
+          (evidence.startsWithClinicalTerm ? 0.08 : 0) +
+          (evidence.slashLike ? 0.07 : 0) +
+          (evidence.termMatches.some(entry => entry.len >= 2) ? 0.08 : 0)
+        );
+        return {
+          entity: 'DIAGNOSIS',
+          confidence: evidence.termMatches.length >= 2 && (evidence.detailHits > 0 || evidence.slashLike)
+            ? Math.max(confidence, 0.82)
+            : (evidence.startsWithClinicalTerm && evidence.detailHits > 0)
+              ? Math.max(confidence, 0.76)
+              : confidence,
+          corrected: evidence.corrected || rawText,
+          meta: evidence.termMatches[0]?.match?.info || {},
+        };
+      }
+
       const tokens = `${rawText || ''}`
         .split(/[\s,;/]+/)
         .map(token => token.trim())
@@ -1747,6 +1956,14 @@ const EntityRecognizer = {
         confidence,
         corrected,
         meta: tokenMatches[0]?.info || {},
+      };
+    }
+    if (evidence.termMatches.length > 0 && evidence.corrected && evidence.corrected.length > match.term.length) {
+      return {
+        entity: 'DIAGNOSIS',
+        confidence: clamp((0.62 + match.confidence * 0.28) + (Math.min(evidence.detailHits, 2) * 0.05) + (evidence.termMatches.length >= 2 ? 0.08 : 0)),
+        corrected: evidence.corrected,
+        meta: match.info,
       };
     }
     return {
@@ -2341,11 +2558,17 @@ function splitDetections(detections) {
       !/\d/.test(fullText) &&
       !/[\\/|,;]+/.test(fullText)
     );
+    const preserveClinicalPhraseCell = (
+      simpleTokens.length >= 2 &&
+      simpleTokens.length <= 6 &&
+      EntityRecognizer.scoreDiagnosis(fullText).confidence >= 0.76
+    );
     if (
       isHeaderLike(fullText) ||
       EntityRecognizer.scoreWard(fullText).confidence >= 0.72 ||
       EntityRecognizer.scoreSheetStatus(fullText).confidence >= 0.76 ||
-      preservePhraseCell
+      preservePhraseCell ||
+      preserveClinicalPhraseCell
     ) {
       result.push(det);
       continue;
@@ -2487,6 +2710,7 @@ function scoreLikelyNameText(text) {
   const fullMatch = MedicalVocabulary.lookupName(raw)?.confidence || 0;
   const tokenMatch = Math.max(...normalizedWords.map(word => MedicalVocabulary.lookupName(word)?.confidence || 0), 0);
   const lexiconConfidence = Math.max(fullMatch, tokenMatch);
+  const diagnosisEvidence = collectDiagnosisEvidence(raw);
 
   const clinicalHits = normalizedWords.filter(word =>
     MedicalVocabulary.correctTerm(word, 1) ||
@@ -2495,6 +2719,11 @@ function scoreLikelyNameText(text) {
     EntityRecognizer.scoreSheetStatus(word).confidence > 0.76
   ).length;
   if (clinicalHits >= Math.max(1, Math.ceil(normalizedWords.length / 2)) && lexiconConfidence < 0.7) return 0;
+  if (
+    diagnosisEvidence.termMatches.length >= 2 ||
+    diagnosisEvidence.termMatches.some(match => match.len >= 2) ||
+    (diagnosisEvidence.startsWithClinicalTerm && diagnosisEvidence.detailHits > 0)
+  ) return 0;
 
   if (lexiconConfidence >= 0.9) return normalizedWords.length >= 2 ? 0.95 : 0.84;
   if (lexiconConfidence >= 0.78) return normalizedWords.length >= 2 ? 0.88 : 0.78;
@@ -3001,7 +3230,7 @@ function isProjectedSectionRow(profile) {
   if (profile.strongHeaderRow || profile.strongWardBanner) return true;
   if (profile.hasHardAnchor || profile.hasSoftAnchor || profile.hasClinical) return false;
   if (profile.headerCellCount >= Math.max(1, Math.ceil(profile.entityCount / 2))) return true;
-  return profile.roleCount > 0 && profile.roles.every(role => ['WARD', 'STATUS', 'O2', 'ISOLATION'].includes(role));
+  return profile.roleCount > 0 && profile.roles.every(role => ['WARD', 'STATUS', 'SHEET_STATUS', 'O2', 'ISOLATION'].includes(role));
 }
 
 function shouldMergeProjectedContinuation(previousProfile, currentProfile, firstColumnX, avgHeight) {
@@ -3049,6 +3278,24 @@ function extractWardContext(row) {
   return bestWard?.ward || null;
 }
 
+function extractSheetStatusContext(row) {
+  const rowText = buildRowText(row);
+  const normalized = normalizeSheetLabel(rowText);
+  if (!normalized) return null;
+
+  const explicitStatus = EntityRecognizer.scoreSheetStatus(normalized);
+  if (explicitStatus.confidence >= 0.72) {
+    return `${explicitStatus.corrected || normalized}`.trim().toUpperCase();
+  }
+
+  const contextualMatch = normalized.match(/\b(active|inactive|chronic|new|pending|follow\s*up|stable|unstable|critical|improving|deteriorating|worsening|resolved|deceased|expired|palliative)\b/i);
+  if (contextualMatch?.[1]) {
+    return contextualMatch[1].replace(/\s+/g, ' ').trim().toUpperCase();
+  }
+
+  return null;
+}
+
 function createWardContextEntity(ward, row) {
   const anchor = row[0]?.box || { x: 0, y: 0, w: 1, h: 1, cx: 0, cy: 0 };
   return {
@@ -3069,22 +3316,54 @@ function createWardContextEntity(ward, row) {
   };
 }
 
-function mergeProjectedRows(rows) {
+function createSheetStatusContextEntity(status, row) {
+  const anchor = row[row.length - 1]?.box || row[0]?.box || { x: 0, y: 0, w: 1, h: 1, cx: 0, cy: 0 };
+  const normalized = `${status || ''}`.trim().toUpperCase();
+  return {
+    text: normalized,
+    corrected: normalized,
+    entity: 'SHEET_STATUS',
+    confidence: 0.8,
+    sourceConfidence: 0.8,
+    box: {
+      x: anchor.x,
+      y: anchor.y,
+      w: Math.max(anchor.w, 1),
+      h: Math.max(anchor.h, 1),
+      cx: anchor.cx,
+      cy: anchor.cy,
+    },
+    meta: { sheetStatus: normalized, sheetContext: true },
+  };
+}
+
+function mergeProjectedRows(rows, initialContext = {}) {
   if (rows.length === 0) return [];
 
   const avgHeight = average(rows.flat().map(entity => entity.box.h), 20);
   const firstColumnX = rows.flat().reduce((minX, entity) => Math.min(minX, entity.box.x), Infinity);
   const merged = [];
   let previousProfile = null;
-  let currentWardContext = null;
+  let currentWardContext = initialContext?.ward || null;
+  let currentSheetStatusContext = initialContext?.sheetStatus || null;
 
   for (const row of rows) {
     const explicitWardContext = extractWardContext(row);
     if (explicitWardContext) currentWardContext = explicitWardContext;
+    const explicitSheetStatusContext = extractSheetStatusContext(row);
+    if (explicitSheetStatusContext) currentSheetStatusContext = explicitSheetStatusContext;
 
-    const contextualRow = currentWardContext && !explicitWardContext && !row.some(entity => resolveAssemblyEntityType(entity) === 'WARD')
-      ? [...row, createWardContextEntity(currentWardContext, row)]
-      : row;
+    const contextualRow = [...row];
+    if (currentWardContext && !explicitWardContext && !row.some(entity => resolveAssemblyEntityType(entity) === 'WARD')) {
+      contextualRow.push(createWardContextEntity(currentWardContext, row));
+    }
+    if (
+      currentSheetStatusContext &&
+      !explicitSheetStatusContext &&
+      !row.some(entity => resolveAssemblyEntityType(entity) === 'SHEET_STATUS')
+    ) {
+      contextualRow.push(createSheetStatusContextEntity(currentSheetStatusContext, row));
+    }
     const profile = describeProjectedRow(contextualRow);
     if (isProjectedSectionRow(profile)) continue;
 
@@ -3160,7 +3439,19 @@ const TableHypothesisBuilder = {
     if (columns.length < 2) return null;
 
     const projectedRows = projectRowsToColumns(rows.slice(headerIndex + 1), columns);
-    const clusters = mergeProjectedRows(projectedRows);
+    const preHeaderRows = rows.slice(0, headerIndex);
+    const initialWardContext = [...preHeaderRows]
+      .reverse()
+      .map(row => extractWardContext(row))
+      .find(Boolean) || null;
+    const initialSheetStatusContext = [...preHeaderRows]
+      .reverse()
+      .map(row => extractSheetStatusContext(row))
+      .find(Boolean) || null;
+    const clusters = mergeProjectedRows(projectedRows, {
+      ward: initialWardContext,
+      sheetStatus: initialSheetStatusContext,
+    });
 
     if (clusters.length === 0) return null;
 
