@@ -140,7 +140,8 @@ export async function logOcrTransaction({
       total: patients.length,
       byReviewLevel: countByKey(patients, 'reviewLevel'),
       byTriage: countByKey(patients, 'triage'),
-      avgConfidence: avg(patients.map(p => p.confidence)),
+      avgConfidence: avg(patients.map(p => p.calibratedConfidence ?? p.confidence)),
+      avgRawConfidence: avg(patients.map(p => p.confidence)),
       withWarnings: patients.filter(p => p.warnings?.length > 0).length,
       withClinicalAlerts: patients.filter(p => p.warnings?.some(w => w.severity === 'CLINICAL_ALERT')).length,
       fields: {

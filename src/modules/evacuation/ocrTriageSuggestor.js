@@ -487,11 +487,11 @@ export function suggestMobility(patient) {
 
   if (matchedRules.length === 0) {
     return {
-      mobility: 'AMBULATORY',
-      confidence: 0.5,
+      mobility: null,  // null = not assessed, NOT "ambulatory"
+      confidence: 0,
       status: 'UNVALIDATED',
       rules: [],
-      reasoning: 'Default ambulatory — no mobility-limiting conditions detected',
+      reasoning: 'No mobility assessment possible — no matching conditions',
       requiresClinicianConfirmation: true,
     };
   }
@@ -521,7 +521,7 @@ export function suggestO2(patient) {
   }
 
   if (matchedRules.length === 0) {
-    return { o2: 'NONE', confidence: 0.7, status: 'UNVALIDATED', rules: [], reasoning: 'No oxygen support indicators', requiresClinicianConfirmation: true };
+    return { o2: null, confidence: 0, status: 'UNVALIDATED', rules: [], reasoning: 'No O2 assessment possible — no matching conditions', requiresClinicianConfirmation: true };
   }
 
   const PRIORITY = { VENTILATOR: 4, BIPAP: 3, NON_REBREATHER: 2, FACE_MASK: 1, NASAL_CANNULA: 0 };
@@ -549,7 +549,7 @@ export function suggestIsolation(patient) {
   }
 
   if (matchedRules.length === 0) {
-    return { iso: 'NONE', confidence: 0.8, status: 'UNVALIDATED', rules: [], reasoning: 'No isolation precautions indicated', requiresClinicianConfirmation: true };
+    return { iso: null, confidence: 0, status: 'UNVALIDATED', rules: [], reasoning: 'No isolation assessment possible — no matching conditions', requiresClinicianConfirmation: true };
   }
 
   const PRIORITY = { AIRBORNE: 3, DROPLET: 2, CONTACT: 1 };

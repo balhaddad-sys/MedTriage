@@ -5029,21 +5029,38 @@ export async function processPatientListImage(imageSource, onProgress) {
       calibratedConfidence = calibrated.calibratedConfidence;
     } catch {}
 
+    // Only write fields the OCR actually extracted. Auto-inferred clinical
+    // fields go into `suggested.*` — never into the real field.
+    // The UI must show suggested values separately and require confirmation.
     return {
       ...p,
       dx: finalDx || p.dx || '',
-      gender: p.gender || predictions.gender || '',
-      triage: clinicalSuggestions.triage.triage || p.suggestedTriage || acuity.suggestedTriage || 'GREEN',
-      mobility: clinicalSuggestions.mobility.mobility || p.suggestedMobility || acuity.suggestedMobility || 'AMBULATORY',
-      o2: p.o2 || clinicalSuggestions.o2.o2 || acuity.suggestedO2 || 'NONE',
-      iso: p.iso || clinicalSuggestions.isolation.iso || acuity.suggestedIso || 'NONE',
-      code: p.code || '',
-      allergies: p.allergies || '',
+      gender: p.gender || '',  // empty if OCR didn't extract it
+      triage: '',              // never auto-assign — clinician must confirm
+      mobility: '',            // never auto-assign
+      o2: p.o2 || '',          // only if OCR actually read it
+      iso: p.iso || '',        // only if OCR actually read it
+      code: p.code || '',      // only if OCR actually read it
+      allergies: p.allergies || '',  // empty = unknown, NOT "NKDA"
       evac: 'IN_WARD',
       ocrImported: true,
       calibratedConfidence,
       safetyFlags,
       autoInferred,
+      // Suggestions stored separately — UI shows these as proposals, not facts.
+      // null = "not assessed" (no rules matched). Never default to safe-looking values.
+      suggested: {
+        triage: clinicalSuggestions.triage.triage || null,
+        triageConfidence: clinicalSuggestions.triage.confidence || 0,
+        triageReasoning: clinicalSuggestions.triage.reasoning || '',
+        mobility: clinicalSuggestions.mobility.mobility || null,
+        mobilityReasoning: clinicalSuggestions.mobility.reasoning || '',
+        o2: clinicalSuggestions.o2.o2 || null,
+        o2Reasoning: clinicalSuggestions.o2.reasoning || '',
+        iso: clinicalSuggestions.isolation.iso || null,
+        isoReasoning: clinicalSuggestions.isolation.reasoning || '',
+        gender: predictions.gender || null,
+      },
       clinicalSuggestions,
       reviewLevel,
       ocrMeta: {
@@ -5078,14 +5095,24 @@ export async function processPatientListImage(imageSource, onProgress) {
       value: '',
       status: 'UNVALIDATED',
     }))];
-    // Escalate review level if schema validation found errors
-    if (!validation.valid && patient.reviewLevel === 'READY') {
+    // Merge schema warnings into reviewReasons so UI can explain the badge
+    if (validation.warnings.length > 0 || !validation.valid) {
+      const schemaReasons = [
+        ...validation.errors.map(e => `Schema error: ${e}`),
+        ...validation.warnings.map(w => `Schema warning: ${w}`),
+      ];
+      patient.reviewReasons = [...(patient.reviewReasons || []), ...schemaReasons];
+    }
+    // Escalate review level if schema validation found issues
+    if (!validation.valid) {
       patient.reviewLevel = 'VERIFY';
     } else if (validation.warnings.length > 0 && patient.reviewLevel === 'READY') {
       patient.reviewLevel = 'REVIEW';
     }
   }
 
+  // Recompute reviewCount AFTER schema validation escalations
+  const reviewCount = patients.filter(p => p.reviewLevel !== 'READY').length;
   const processingTime = performance.now() - startTime;
 
   // Log to immutable audit trail (fire-and-forget, never blocks OCR result)
@@ -5124,7 +5151,7 @@ export async function processPatientListImage(imageSource, onProgress) {
     qualityBand: best.qualityBand,
     wordConfidence: best.wordConfidence,
     profile: best.profileId,
-    reviewCount: best.reviewCount,
+    reviewCount,  // post-validation count (includes schema escalations)
     consensusPasses: best.consensusPasses,
     strategy: best.strategy,
     hypotheses: best.hypotheses,

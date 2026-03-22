@@ -214,7 +214,12 @@ export default function OCRScanner({ onClose, onImport }) {
 
       setProgressPct(100);
       setResult(ocrResult);
-      setSelectedPatients(new Set(ocrResult.patients.map((_, i) => i)));
+      // Only auto-select READY and REVIEW patients — VERIFY must be explicitly opted in
+      setSelectedPatients(new Set(
+        ocrResult.patients
+          .map((p, i) => p.reviewLevel !== 'VERIFY' ? i : null)
+          .filter(i => i !== null)
+      ));
       setStage('review');
     } catch (err) {
       setError(err.message || 'OCR processing failed');
@@ -250,7 +255,8 @@ export default function OCRScanner({ onClose, onImport }) {
           : value,
       };
       next.ocrMeta = { ...(current.ocrMeta || {}), manuallyReviewed: true };
-      if (current.reviewLevel === 'VERIFY') next.reviewLevel = 'REVIEW';
+      // VERIFY stays VERIFY — editing a field doesn't make bad data trustworthy.
+      // Only explicit clinician confirmation (checkbox) can clear VERIFY.
       patients[idx] = next;
       return { ...prev, patients };
     });
@@ -259,6 +265,14 @@ export default function OCRScanner({ onClose, onImport }) {
   const handleImport = useCallback(async () => {
     if (!result) return;
     const toImport = result.patients.filter((_, i) => selectedPatients.has(i));
+
+    // Hard stop: block VERIFY patients that haven't been explicitly confirmed
+    const unconfirmedVerify = toImport.filter(p => p.reviewLevel === 'VERIFY' && !p.ocrMeta?.manuallyReviewed);
+    if (unconfirmedVerify.length > 0) {
+      setError(`${unconfirmedVerify.length} patient(s) marked VERIFY — review and edit all fields before importing.`);
+      return;
+    }
+
     for (const p of toImport) {
       const patient = {
         ...p,
@@ -269,16 +283,20 @@ export default function OCRScanner({ onClose, onImport }) {
         meds: (p.meds || '').trim(),
         assignedDoctor: (p.assignedDoctor || '').trim(),
         sheetStatus: (p.sheetStatus || '').trim(),
-        allergies: (p.allergies || 'NKDA').trim(),
+        // NEVER mask unknowns: empty = "not captured", clinician fills in
+        allergies: (p.allergies || '').trim(),        // empty, not "NKDA"
         bloodType: (p.bloodType || '').trim(),
-        mobility: p.mobility || 'AMBULATORY',
-        o2: p.o2 || 'NONE',
-        iso: p.iso || 'NONE',
+        mobility: p.mobility || '',                    // empty, not "AMBULATORY"
+        o2: p.o2 || '',                                // empty, not "NONE"
+        iso: p.iso || '',                              // empty, not "NONE"
+        code: p.code || '',                            // empty, not "FULL"
         ocrMeta: {
           ...(p.ocrMeta || {}),
           importedAt: new Date().toISOString(),
           qualityScore: p.ocrMeta?.qualityScore ?? result.qualityScore,
           reviewLevel: p.reviewLevel,
+          // Preserve suggested values in metadata for audit trail
+          suggested: p.suggested || {},
         },
       };
       const saved = await addPatient(patient);
@@ -396,7 +414,10 @@ export default function OCRScanner({ onClose, onImport }) {
                 {Number.isFinite(result.wordConfidence) && (
                   <span style={styles.metaPill}>OCR {Math.round(result.wordConfidence * 100)}%</span>
                 )}
-                {result.reviewCount > 0 && <span style={styles.metaPill}>{result.reviewCount} need review</span>}
+                {(() => {
+                  const needReview = result.patients.filter(p => p.reviewLevel !== 'READY').length;
+                  return needReview > 0 ? <span style={{ ...styles.metaPill, background: colors.amber + '22', color: colors.amber, borderColor: colors.amber + '44' }}>{needReview} need review</span> : null;
+                })()}
               </div>
               {result.passes?.length > 1 && (
                 <div style={styles.metaRow}>
@@ -465,7 +486,7 @@ export default function OCRScanner({ onClose, onImport }) {
                           }}>
                             {REVIEW_STYLES[p.reviewLevel || 'REVIEW'].label}
                           </span>
-                          <span style={styles.metaPill}>Confidence {Math.round((p.confidence || 0) * 100)}%</span>
+                          <span style={styles.metaPill}>Confidence {Math.round((p.calibratedConfidence ?? p.confidence ?? 0) * 100)}%</span>
                         </div>
                       </div>
                       <div style={{
@@ -497,6 +518,41 @@ export default function OCRScanner({ onClose, onImport }) {
                     {p.reviewReasons?.length > 0 && p.reviewReasons.map((reason, ri) => (
                       <div key={ri} style={styles.reviewReason}>{reason}</div>
                     ))}
+
+                    {/* Safety flags — auto-inferred fields that need clinician confirmation */}
+                    {p.safetyFlags?.length > 0 && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px',
+                        padding: '6px 8px', borderRadius: '6px', background: colors.amber + '12',
+                        border: `1px solid ${colors.amber}33` }}>
+                        <span style={{ fontSize: '10px', fontWeight: 800, color: colors.amber, fontFamily: fonts.mono }}>
+                          UNVALIDATED FIELDS — confirm or correct:
+                        </span>
+                        {p.safetyFlags.map((flag, fi) => (
+                          <span key={fi} style={{ fontSize: '10px', color: colors.text2, fontFamily: fonts.mono }}>
+                            {flag.field}: {flag.reason}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Suggested clinical values — clearly separated from OCR-extracted data */}
+                    {p.suggested && (p.suggested.triage || p.suggested.mobility || p.suggested.o2 || p.suggested.iso) && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '3px',
+                        padding: '6px 8px', borderRadius: '6px', background: colors.blue + '10',
+                        border: `1px dashed ${colors.blue}44` }}>
+                        <span style={{ fontSize: '10px', fontWeight: 800, color: colors.blue, fontFamily: fonts.mono }}>
+                          SUGGESTIONS (not confirmed):
+                        </span>
+                        {p.suggested.triage && <span style={{ fontSize: '10px', color: colors.text2, fontFamily: fonts.mono }}>
+                          Triage: {p.suggested.triage} — {p.suggested.triageReasoning}</span>}
+                        {p.suggested.mobility && p.suggested.mobility !== 'AMBULATORY' && <span style={{ fontSize: '10px', color: colors.text2, fontFamily: fonts.mono }}>
+                          Mobility: {p.suggested.mobility} — {p.suggested.mobilityReasoning}</span>}
+                        {p.suggested.o2 && p.suggested.o2 !== 'NONE' && <span style={{ fontSize: '10px', color: colors.text2, fontFamily: fonts.mono }}>
+                          O2: {p.suggested.o2} — {p.suggested.o2Reasoning}</span>}
+                        {p.suggested.iso && p.suggested.iso !== 'NONE' && <span style={{ fontSize: '10px', color: colors.text2, fontFamily: fonts.mono }}>
+                          Isolation: {p.suggested.iso} — {p.suggested.isoReasoning}</span>}
+                      </div>
+                    )}
 
                     <div style={styles.editGrid} onClick={e => e.stopPropagation()}>
                       <label style={styles.fieldGroup}>
@@ -589,9 +645,10 @@ export default function OCRScanner({ onClose, onImport }) {
                       </label>
                       <label style={styles.fieldGroup}>
                         <span style={styles.fieldLabel}>MOBILITY</span>
-                        <select style={styles.input}
-                          value={p.mobility || 'AMBULATORY'}
+                        <select style={{ ...styles.input, ...(p.mobility ? {} : { borderColor: colors.amber, color: colors.amber }) }}
+                          value={p.mobility || ''}
                           onChange={e => updatePatientField(i, 'mobility', e.target.value)}>
+                          <option value="">— select —</option>
                           <option value="AMBULATORY">AMBULATORY</option>
                           <option value="WHEELCHAIR">WHEELCHAIR</option>
                           <option value="STRETCHER">STRETCHER</option>
@@ -600,9 +657,10 @@ export default function OCRScanner({ onClose, onImport }) {
                       </label>
                       <label style={styles.fieldGroup}>
                         <span style={styles.fieldLabel}>O2</span>
-                        <select style={styles.input}
-                          value={p.o2 || 'NONE'}
+                        <select style={{ ...styles.input, ...(p.o2 ? {} : { borderColor: colors.amber, color: colors.amber }) }}
+                          value={p.o2 || ''}
                           onChange={e => updatePatientField(i, 'o2', e.target.value)}>
+                          <option value="">— select —</option>
                           <option value="NONE">NONE</option>
                           <option value="NASAL_CANNULA">NASAL CANNULA</option>
                           <option value="FACE_MASK">FACE MASK</option>
@@ -613,9 +671,10 @@ export default function OCRScanner({ onClose, onImport }) {
                       </label>
                       <label style={styles.fieldGroup}>
                         <span style={styles.fieldLabel}>ISOLATION</span>
-                        <select style={styles.input}
-                          value={p.iso || 'NONE'}
+                        <select style={{ ...styles.input, ...(p.iso ? {} : { borderColor: colors.amber, color: colors.amber }) }}
+                          value={p.iso || ''}
                           onChange={e => updatePatientField(i, 'iso', e.target.value)}>
+                          <option value="">— select —</option>
                           <option value="NONE">NONE</option>
                           <option value="CONTACT">CONTACT</option>
                           <option value="DROPLET">DROPLET</option>
@@ -633,10 +692,11 @@ export default function OCRScanner({ onClose, onImport }) {
                       <label style={styles.fieldGroup}>
                         <span style={styles.fieldLabel}>CODE</span>
                         <select
-                          style={styles.input}
-                          value={p.code || 'FULL'}
+                          style={{ ...styles.input, ...(p.code ? {} : { borderColor: colors.amber, color: colors.amber }) }}
+                          value={p.code || ''}
                           onChange={e => updatePatientField(i, 'code', e.target.value)}
                         >
+                          <option value="">— select —</option>
                           <option value="FULL">FULL</option>
                           <option value="DNR">DNR</option>
                           <option value="COMFORT">COMFORT</option>

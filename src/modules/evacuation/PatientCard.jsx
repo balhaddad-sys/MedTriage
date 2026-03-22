@@ -161,23 +161,23 @@ export default function PatientCard({ patient, forceExpand, onExpanded }) {
             </div>
             <div style={styles.field}>
               <span style={styles.fieldLabel}>Code Status</span>
-              <span style={styles.fieldValue}>{p.code || 'FULL'}</span>
+              <span style={{ ...styles.fieldValue, ...(p.code ? {} : { color: colors.amber }) }}>{p.code || '—'}</span>
             </div>
             <div style={styles.field}>
               <span style={styles.fieldLabel}>Mobility</span>
-              <span style={styles.fieldValue}>{p.mobility || 'AMBULATORY'}</span>
+              <span style={{ ...styles.fieldValue, ...(p.mobility ? {} : { color: colors.amber }) }}>{p.mobility || '—'}</span>
             </div>
             <div style={styles.field}>
               <span style={styles.fieldLabel}>O2 Requirement</span>
-              <span style={styles.fieldValue}>{p.o2 || 'NONE'}</span>
+              <span style={{ ...styles.fieldValue, ...(p.o2 ? {} : { color: colors.amber }) }}>{p.o2 || '—'}</span>
             </div>
             <div style={styles.field}>
               <span style={styles.fieldLabel}>Isolation</span>
-              <span style={styles.fieldValue}>{p.iso || 'NONE'}</span>
+              <span style={{ ...styles.fieldValue, ...(p.iso ? {} : { color: colors.amber }) }}>{p.iso || '—'}</span>
             </div>
             <div style={styles.field}>
               <span style={styles.fieldLabel}>Allergies</span>
-              <span style={styles.fieldValue}>{p.allergies || 'NKDA'}</span>
+              <span style={{ ...styles.fieldValue, ...(p.allergies ? {} : { color: colors.amber }) }}>{p.allergies || '—'}</span>
             </div>
             <div style={{ ...styles.field, gridColumn: '1 / -1' }}>
               <span style={styles.fieldLabel}>Medications</span>
