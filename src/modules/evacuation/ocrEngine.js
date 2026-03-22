@@ -2,7 +2,7 @@
 // Handles: printed tables, handwritten lists, whiteboards, chaotic mixed layouts
 // Architecture: Image → OCR boxes → Entity Recognition → DBSCAN Clustering → Patient Assembly
 
-import { boostEntityScore, resolveUnknownEntity } from './ocrLearner.js';
+import { boostEntityScore, resolveUnknownEntity, lookupLearnedName, lookupLearnedDiagnosis, lookupLearnedMedication } from './ocrLearner.js';
 
 // ====== IMAGE PREPROCESSING ======
 const ImagePreprocessor = {
@@ -296,7 +296,9 @@ const HEADER_ROLE_PATTERNS = [
 const GENERIC_SHEET_HEADER_PATTERNS = [
   /^(?:patient|ward|bed|room)\s+(?:list|sheet|board|census)$/i,
   /^(?:evac(?:uation)?|transfer|handover|admission|discharge)\s+(?:list|sheet)$/i,
+  /^(?:ward\s+transfer|ward\s+round|transfer)\s+(?:sheet|list|board|census)$/i,
   /^(?:daily|morning|evening)\s+(?:sheet|board|list)$/i,
+  /^(?:morning|afternoon|evening)\s+census$/i,
   /^(?:male|female)\s+list(?:\s+(?:active|inactive|chronic|new|pending))?$/i,
   /^(?:male|female|active|chronic)\s+list(?:\s*\([^)]*\))?$/i,
   /^(?:\u0642\u0627\u0626\u0645\u0629|\u0646\u0645\u0648\u0630\u062C|\u0643\u0634\u0641)\s+(?:\u0627\u0644\u0645\u0631\u0636\u0649|\u0627\u0644\u0627\u062E\u0644\u0627\u0621|\u0627\u0644\u062C\u0646\u0627\u062D)$/i,
@@ -1387,6 +1389,13 @@ const MedicalVocabulary = {
 
     // Multi-word bonus — if any word matches a name, the whole thing is likely a name
     if (bestConf > 0 && words.length >= 2) bestConf = Math.min(1.0, bestConf + 0.1);
+
+    // Check learned names (self-expanding from training data)
+    const learned = lookupLearnedName(text);
+    if (learned && learned.confidence > bestConf) {
+      bestConf = learned.confidence;
+    }
+
     return bestConf > 0 ? { confidence: bestConf } : null;
   },
 
@@ -3296,6 +3305,16 @@ function extractSheetStatusContext(row) {
   return null;
 }
 
+function extractGenderContext(row) {
+  const rowText = buildRowText(row);
+  const normalized = normalizeSheetLabel(rowText);
+  if (!normalized) return null;
+
+  if (/\bmale\b/i.test(normalized) || /\b(?:\u0630\u0643\u0631|\u0631\u062C\u0644)\b/i.test(normalized)) return 'M';
+  if (/\bfemale\b/i.test(normalized) || /\b(?:\u0623\u0646\u062B\u0649|\u0627\u0646\u062B\u0649|\u0627\u0645\u0631\u0623\u0629)\b/i.test(normalized)) return 'F';
+  return null;
+}
+
 function createWardContextEntity(ward, row) {
   const anchor = row[0]?.box || { x: 0, y: 0, w: 1, h: 1, cx: 0, cy: 0 };
   return {
@@ -3337,6 +3356,28 @@ function createSheetStatusContextEntity(status, row) {
   };
 }
 
+function createGenderContextEntity(gender, row) {
+  const nameAnchor = row.find(entity => resolveAssemblyEntityType(entity) === 'NAME');
+  const anchor = nameAnchor?.box || row[0]?.box || { x: 0, y: 0, w: 1, h: 1, cx: 0, cy: 0 };
+  const normalized = `${gender || ''}`.trim().toUpperCase();
+  return {
+    text: normalized,
+    corrected: normalized,
+    entity: 'GENDER',
+    confidence: 0.78,
+    sourceConfidence: 0.78,
+    box: {
+      x: anchor.x,
+      y: anchor.y,
+      w: Math.max(anchor.w, 1),
+      h: Math.max(anchor.h, 1),
+      cx: anchor.cx,
+      cy: anchor.cy,
+    },
+    meta: { gender: normalized, sheetContext: true },
+  };
+}
+
 function mergeProjectedRows(rows, initialContext = {}) {
   if (rows.length === 0) return [];
 
@@ -3346,12 +3387,15 @@ function mergeProjectedRows(rows, initialContext = {}) {
   let previousProfile = null;
   let currentWardContext = initialContext?.ward || null;
   let currentSheetStatusContext = initialContext?.sheetStatus || null;
+  let currentGenderContext = initialContext?.gender || null;
 
   for (const row of rows) {
     const explicitWardContext = extractWardContext(row);
     if (explicitWardContext) currentWardContext = explicitWardContext;
     const explicitSheetStatusContext = extractSheetStatusContext(row);
     if (explicitSheetStatusContext) currentSheetStatusContext = explicitSheetStatusContext;
+    const explicitGenderContext = extractGenderContext(row);
+    if (explicitGenderContext) currentGenderContext = explicitGenderContext;
 
     const contextualRow = [...row];
     if (currentWardContext && !explicitWardContext && !row.some(entity => resolveAssemblyEntityType(entity) === 'WARD')) {
@@ -3363,6 +3407,13 @@ function mergeProjectedRows(rows, initialContext = {}) {
       !row.some(entity => resolveAssemblyEntityType(entity) === 'SHEET_STATUS')
     ) {
       contextualRow.push(createSheetStatusContextEntity(currentSheetStatusContext, row));
+    }
+    if (
+      currentGenderContext &&
+      !explicitGenderContext &&
+      !row.some(entity => ['GENDER', 'AGE_GENDER'].includes(resolveAssemblyEntityType(entity)))
+    ) {
+      contextualRow.push(createGenderContextEntity(currentGenderContext, row));
     }
     const profile = describeProjectedRow(contextualRow);
     if (isProjectedSectionRow(profile)) continue;
@@ -3448,9 +3499,14 @@ const TableHypothesisBuilder = {
       .reverse()
       .map(row => extractSheetStatusContext(row))
       .find(Boolean) || null;
+    const initialGenderContext = [...preHeaderRows]
+      .reverse()
+      .map(row => extractGenderContext(row))
+      .find(Boolean) || null;
     const clusters = mergeProjectedRows(projectedRows, {
       ward: initialWardContext,
       sheetStatus: initialSheetStatusContext,
+      gender: initialGenderContext,
     });
 
     if (clusters.length === 0) return null;

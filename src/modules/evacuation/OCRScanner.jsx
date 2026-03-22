@@ -6,6 +6,7 @@ import { CameraIcon, CheckIcon, AlertTriangle } from '../../design/icons.jsx';
 import { processPatientListImage } from './ocrEngine.js';
 import { logAction } from '../../data/audit.js';
 import { saveTrainingSample, getTrainingStats, exportTrainingJSON, exportTrainingCSV } from './ocrDataCollector.js';
+import { runLearningCycle, getLearningStats } from './ocrLearner.js';
 
 const TRIAGE_LIST = ['RED', 'YELLOW', 'GREEN', 'GRAY', 'BLACK'];
 const REVIEW_STYLES = {
@@ -306,6 +307,9 @@ export default function OCRScanner({ onClose, onImport }) {
         processingTime: result.processingTime,
         reviewCount: result.reviewCount,
       },
+    }).then(() => {
+      // Run learning cycle after saving — models update for next scan
+      runLearningCycle();
     }).catch(e => console.warn('[OCR-DATA] Save failed:', e));
 
     onImport?.(toImport.length);
@@ -694,29 +698,37 @@ export default function OCRScanner({ onClose, onImport }) {
 
 function TrainingDataBar() {
   const stats = getTrainingStats();
-  if (stats.samples === 0) return null;
+  const learned = getLearningStats();
+  if (stats.samples === 0 && learned.trainingSamples === 0) return null;
 
   return (
     <div style={{
-      display: 'flex', alignItems: 'center', gap: '6px',
+      display: 'flex', flexDirection: 'column', gap: '4px',
       padding: '6px 8px', borderRadius: '6px',
       background: colors.bg2, border: `1px solid ${colors.border}`,
       marginTop: '4px',
     }}>
-      <span style={{ flex: 1, fontSize: '10px', color: colors.text3, fontFamily: fonts.mono }}>
-        Training: {stats.samples} scans, {stats.totalImported} patients
-        {stats.totalEdited > 0 && `, ${stats.totalEdited} corrected`}
-      </span>
-      <button onClick={exportTrainingJSON} style={{
-        padding: '3px 8px', borderRadius: '4px', border: 'none',
-        background: colors.blue + '22', color: colors.blue,
-        fontSize: '10px', fontWeight: 700, cursor: 'pointer',
-      }}>JSON</button>
-      <button onClick={exportTrainingCSV} style={{
-        padding: '3px 8px', borderRadius: '4px', border: 'none',
-        background: colors.blue + '22', color: colors.blue,
-        fontSize: '10px', fontWeight: 700, cursor: 'pointer',
-      }}>CSV</button>
+      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+        <span style={{ flex: 1, fontSize: '10px', color: colors.text3, fontFamily: fonts.mono }}>
+          Data: {stats.samples} scans, {stats.totalImported} patients
+          {stats.totalEdited > 0 && `, ${stats.totalEdited} corrected`}
+        </span>
+        <button onClick={exportTrainingJSON} style={{
+          padding: '3px 8px', borderRadius: '4px', border: 'none',
+          background: colors.blue + '22', color: colors.blue,
+          fontSize: '10px', fontWeight: 700, cursor: 'pointer',
+        }}>JSON</button>
+        <button onClick={exportTrainingCSV} style={{
+          padding: '3px 8px', borderRadius: '4px', border: 'none',
+          background: colors.blue + '22', color: colors.blue,
+          fontSize: '10px', fontWeight: 700, cursor: 'pointer',
+        }}>CSV</button>
+      </div>
+      {learned.names > 0 && (
+        <span style={{ fontSize: '9px', color: colors.green, fontFamily: fonts.mono }}>
+          Learned: {learned.names} names, {learned.diagnoses} dx, {learned.medications} meds, {learned.corrections} corrections
+        </span>
+      )}
     </div>
   );
 }
