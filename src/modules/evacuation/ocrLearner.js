@@ -17,10 +17,11 @@ import { loadSeedData } from './ocrSeedData.js';
 import { loadProgressNoteSeedData } from './ocrSeedProgressNotes.js';
 import { loadDeepSeedData } from './ocrSeedDeep.js';
 import { loadMegaSeedData } from './ocrSeedMega.js';
+import { loadSemanticSeedData, resolveConceptSynonym, translateColloquial, inferFromText, areSynonyms } from './ocrSeedSemantic.js';
 
 const MODELS_KEY = 'ocr_learned_models';
 const TRAINING_KEY = 'ocr_training_data';
-const SEED_VERSION = 4; // bump to re-seed (v4: mega — surgery, micro, path, peds, psych, devices, rehab)
+const SEED_VERSION = 5; // bump to re-seed (v5: semantic — synonyms, inference, colloquial)
 
 // ═══════════════════════════════════════════════════════════════════
 // LEARNED MODEL — the output of the learning cycle
@@ -36,6 +37,7 @@ function loadModels() {
       models = loadProgressNoteSeedData(models);
       models = loadDeepSeedData(models);
       models = loadMegaSeedData(models);
+      models = loadSemanticSeedData(models);
       models.seedVersion = SEED_VERSION;
       saveModels(models);
       console.log(`[LEARNER] Seeded: ${Object.keys(models.names).length} names, ${Object.keys(models.diagnoses).length} dx, ${Object.keys(models.medications).length} meds, ${Object.keys(models.abbreviations || {}).length} abbreviations, ${Object.keys(models.labTests || {}).length} lab tests`);
@@ -560,10 +562,16 @@ export function getLearningStats() {
     labTests: Object.keys(models.labTests || {}).length,
     structureMarkers: Object.keys(models.structureMarkers || {}).length,
     units: Object.keys(models.units || {}).length,
+    synonymConcepts: Object.keys(models.synonymIndex || {}).length,
+    colloquialTerms: Object.keys(models.colloquialIndex || {}).length,
+    inferenceRules: (models.inferencePatterns || []).length,
     trainingSamples: models.trainingSamplesUsed || 0,
     updatedAt: models.updatedAt,
   };
 }
+
+// Re-export semantic functions so they're accessible through the learner
+export { resolveConceptSynonym, translateColloquial, inferFromText, areSynonyms };
 
 // ═══════════════════════════════════════════════════════════════════
 // BOOST ENTITY SCORING — the main integration point with ocrEngine
@@ -690,6 +698,28 @@ export function resolveUnknownEntity(text) {
 
   if (isKnownWard(text)) {
     return { entity: 'WARD', confidence: 0.85, correctedText: text.trim(), reason: 'learned ward' };
+  }
+
+  // Semantic: try synonym resolution — "high pressure" → hypertension
+  const synonym = resolveConceptSynonym(text);
+  if (synonym) {
+    return {
+      entity: 'DIAGNOSIS',
+      confidence: 0.78,
+      correctedText: synonym.canonical || text,
+      reason: `synonym of ${synonym.concept}`,
+    };
+  }
+
+  // Semantic: try colloquial translation — "sugar" → diabetes
+  const colloquial = translateColloquial(text);
+  if (colloquial) {
+    return {
+      entity: 'DIAGNOSIS',
+      confidence: 0.72,
+      correctedText: colloquial,
+      reason: `colloquial for ${colloquial}`,
+    };
   }
 
   return null;
