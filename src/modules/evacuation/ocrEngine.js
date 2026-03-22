@@ -676,6 +676,9 @@ function consolidatePatientGroup(patients) {
     warnings: dedupeWarnings(patients.flatMap(patient => patient.warnings || [])),
     fieldConfidence,
     rawEntityCount: patients.reduce((sum, patient) => sum + (patient.rawEntityCount || 0), 0),
+    structuredConfidence: average(patients.map(patient => patient.structuredConfidence), 0),
+    structureRoles: [...new Set(patients.flatMap(patient => patient.structureRoles || []))],
+    sheetContextCount: Math.max(...patients.map(patient => patient.sheetContextCount || 0), 0),
     supportVotes: patients.length,
     reviewReasons: [...new Set(patients.flatMap(patient => patient.reviewReasons || []))],
   };
@@ -700,6 +703,7 @@ function consolidatePatientGroup(patients) {
       { value: fieldConfidence.sheetStatus, weight: 0.25 },
       { value: fieldConfidence.o2, weight: 0.5 },
       { value: fieldConfidence.iso, weight: 0.5 },
+      { value: merged.structuredConfidence, weight: 1.2 },
   ], baseConfidence) + ((Math.min(patients.length, 4) - 1) * 0.02));
 
   const reviewLevel = patients.reduce((current, patient) => (
@@ -722,21 +726,32 @@ function scoreTextDensity(rawText) {
 
 function enrichPatientForReview(patient) {
   const identifierCount = (patient.fullName ? 1 : 0) + (patient.bed ? 1 : 0) + ((patient.age != null || patient.gender) ? 1 : 0) + (patient.civilId ? 1 : 0);
+  const structuredIdentity = Boolean(
+    patient.fullName &&
+    patient.dx &&
+    (
+      (patient.structuredConfidence || 0) >= 0.72 ||
+      patient.assignedDoctor ||
+      patient.sheetStatus ||
+      patient.ward
+    )
+  );
+  const effectiveIdentifierCount = structuredIdentity && identifierCount < 2 ? identifierCount + 1 : identifierCount;
   const severeWarning = (patient.warnings || []).some(w => ['ERROR', 'CLINICAL_ALERT'].includes(w.severity));
   const reasons = [];
 
-  if (identifierCount < 2) reasons.push('Partial identifiers captured');
+  if (effectiveIdentifierCount < 2) reasons.push('Partial identifiers captured');
   if (patient.fullName && (patient.fieldConfidence?.fullName || 0) < 0.6) reasons.push('Name needs confirmation');
   if (patient.bed && (patient.fieldConfidence?.bed || 0) < 0.65) reasons.push('Bed needs confirmation');
-  if ((patient.rawEntityCount || 0) <= 2) reasons.push('Sparse OCR evidence');
-  if ((patient.confidence || 0) < 0.62) reasons.push('Low OCR confidence');
+  if ((patient.rawEntityCount || 0) <= 2 && (patient.structuredConfidence || 0) < 0.72) reasons.push('Sparse OCR evidence');
+  if ((patient.confidence || 0) < 0.62 && (patient.structuredConfidence || 0) < 0.72) reasons.push('Low OCR confidence');
   if (severeWarning) reasons.push('Clinical cross-check flagged this record');
 
   let reviewLevel = 'READY';
-  if (severeWarning || (patient.confidence || 0) < 0.52 || identifierCount === 0) reviewLevel = 'VERIFY';
-  else if (reasons.length > 0 || (patient.warnings || []).length > 0 || (patient.confidence || 0) < 0.8) reviewLevel = 'REVIEW';
+  if (severeWarning || ((patient.confidence || 0) < 0.52 && (patient.structuredConfidence || 0) < 0.72) || effectiveIdentifierCount === 0) reviewLevel = 'VERIFY';
+  else if (reasons.length > 0 || (patient.warnings || []).length > 0 || (patient.confidence || 0) < (structuredIdentity ? 0.74 : 0.8)) reviewLevel = 'REVIEW';
 
-  patient.identifierCount = identifierCount;
+  patient.identifierCount = effectiveIdentifierCount;
   patient.reviewLevel = reviewLevel;
   patient.reviewReasons = [...new Set(reasons)];
   return patient;
@@ -991,6 +1006,86 @@ const MedicalVocabulary = {
     'RHABDOMYOLYSIS': { category: 'renal', severity: 'RED' },
     'POLYTRAUMA': { category: 'surg', severity: 'RED' },
     'BLAST INJURY': { category: 'surg', severity: 'RED' },
+    // Surgical procedures (common on ward lists as post-op diagnoses)
+    'ORIF': { category: 'surg', severity: 'YELLOW' },
+    'LAP CHOLE': { category: 'surg', severity: 'GREEN' }, 'CHOLECYSTECTOMY': { category: 'surg', severity: 'GREEN' },
+    'LAPAROTOMY': { category: 'surg', severity: 'YELLOW' },
+    'COLECTOMY': { category: 'surg', severity: 'YELLOW' }, 'HEMICOLECTOMY': { category: 'surg', severity: 'YELLOW' },
+    'TURP': { category: 'surg', severity: 'GREEN' }, 'TURBT': { category: 'surg', severity: 'GREEN' },
+    'TAH': { category: 'surg', severity: 'YELLOW' }, 'HYSTERECTOMY': { category: 'surg', severity: 'YELLOW' },
+    'MASTECTOMY': { category: 'surg', severity: 'YELLOW' }, 'LUMPECTOMY': { category: 'surg', severity: 'GREEN' },
+    'CRANIOTOMY': { category: 'surg', severity: 'RED' }, 'CRANIECTOMY': { category: 'surg', severity: 'RED' },
+    'TRACHEOSTOMY': { category: 'surg', severity: 'YELLOW' },
+    'FASCIOTOMY': { category: 'surg', severity: 'YELLOW' }, 'DEBRIDEMENT': { category: 'surg', severity: 'YELLOW' },
+    'SKIN GRAFT': { category: 'surg', severity: 'GREEN' }, 'AMPUTATION': { category: 'surg', severity: 'RED' },
+    'NEPHRECTOMY': { category: 'surg', severity: 'YELLOW' }, 'CYSTECTOMY': { category: 'surg', severity: 'YELLOW' },
+    'GASTRECTOMY': { category: 'surg', severity: 'YELLOW' }, 'WHIPPLE': { category: 'surg', severity: 'RED' },
+    'SPLENECTOMY': { category: 'surg', severity: 'YELLOW' },
+    'THYROIDECTOMY': { category: 'surg', severity: 'GREEN' }, 'PARATHYROIDECTOMY': { category: 'surg', severity: 'GREEN' },
+    'LAMINECTOMY': { category: 'surg', severity: 'YELLOW' }, 'DISCECTOMY': { category: 'surg', severity: 'YELLOW' },
+    'FUSION': { category: 'surg', severity: 'YELLOW' }, 'SPINAL FUSION': { category: 'surg', severity: 'YELLOW' },
+    'EGD': { category: 'surg', severity: 'GREEN' }, 'COLONOSCOPY': { category: 'surg', severity: 'GREEN' },
+    'BRONCHOSCOPY': { category: 'surg', severity: 'GREEN' }, 'CYSTOSCOPY': { category: 'surg', severity: 'GREEN' },
+    // Neonatal / Pediatric
+    'NEC': { category: 'peds', severity: 'RED' }, 'RDS': { category: 'peds', severity: 'RED' },
+    'BPD': { category: 'peds', severity: 'YELLOW' }, 'PDA': { category: 'peds', severity: 'YELLOW' },
+    'IUGR': { category: 'peds', severity: 'YELLOW' }, 'SGA': { category: 'peds', severity: 'GREEN' },
+    'LGA': { category: 'peds', severity: 'GREEN' }, 'AGA': { category: 'peds', severity: 'GREEN' },
+    'HIE': { category: 'peds', severity: 'RED' }, 'IVH': { category: 'peds', severity: 'RED' },
+    'ROP': { category: 'peds', severity: 'YELLOW' }, 'NEONATAL SEPSIS': { category: 'peds', severity: 'RED' },
+    'PHOTOTHERAPY': { category: 'peds', severity: 'GREEN' },
+    'APNEA': { category: 'peds', severity: 'YELLOW' }, 'BRADYCARDIA': { category: 'peds', severity: 'YELLOW' },
+    'TACHYCARDIA': { category: 'cardio', severity: 'YELLOW' },
+    'CROUP': { category: 'peds', severity: 'YELLOW' }, 'BRONCHIOLITIS': { category: 'peds', severity: 'YELLOW' },
+    'KAWASAKI': { category: 'peds', severity: 'YELLOW' }, 'INTUSSUSCEPTION': { category: 'peds', severity: 'RED' },
+    'PYLORIC STENOSIS': { category: 'peds', severity: 'YELLOW' },
+    'FEBRILE SEIZURE': { category: 'peds', severity: 'YELLOW' },
+    // Dermatology / Skin
+    'BCC': { category: 'derm', severity: 'YELLOW' }, 'SCC': { category: 'derm', severity: 'YELLOW' },
+    'MELANOMA': { category: 'derm', severity: 'RED' }, 'PSORIASIS': { category: 'derm', severity: 'GREEN' },
+    'ECZEMA': { category: 'derm', severity: 'GREEN' }, 'DERMATITIS': { category: 'derm', severity: 'GREEN' },
+    'URTICARIA': { category: 'derm', severity: 'GREEN' }, 'PEMPHIGUS': { category: 'derm', severity: 'YELLOW' },
+    'ERYSIPELAS': { category: 'derm', severity: 'YELLOW' }, 'NECROTIZING FASCIITIS': { category: 'derm', severity: 'RED' },
+    'STEVENS JOHNSON': { category: 'derm', severity: 'RED' }, 'SJS': { category: 'derm', severity: 'RED' },
+    'TEN': { category: 'derm', severity: 'RED' }, 'TOXIC EPIDERMAL NECROLYSIS': { category: 'derm', severity: 'RED' },
+    // Ophthalmology
+    'GLAUCOMA': { category: 'eye', severity: 'YELLOW' }, 'CATARACT': { category: 'eye', severity: 'GREEN' },
+    'RETINAL DETACHMENT': { category: 'eye', severity: 'RED' },
+    'ORBITAL CELLULITIS': { category: 'eye', severity: 'RED' },
+    'ENDOPHTHALMITIS': { category: 'eye', severity: 'RED' },
+    // ENT
+    'TONSILLITIS': { category: 'ent', severity: 'GREEN' }, 'PERITONSILLAR ABSCESS': { category: 'ent', severity: 'YELLOW' },
+    'EPISTAXIS': { category: 'ent', severity: 'YELLOW' }, 'SINUSITIS': { category: 'ent', severity: 'GREEN' },
+    'MASTOIDITIS': { category: 'ent', severity: 'YELLOW' }, 'OTITIS MEDIA': { category: 'ent', severity: 'GREEN' },
+    'OTITIS EXTERNA': { category: 'ent', severity: 'GREEN' },
+    'LUDWIG ANGINA': { category: 'ent', severity: 'RED' },
+    // Urology
+    'URINARY RETENTION': { category: 'urol', severity: 'YELLOW' },
+    'BPH': { category: 'urol', severity: 'GREEN' }, 'PROSTATITIS': { category: 'urol', severity: 'YELLOW' },
+    'TESTICULAR TORSION': { category: 'urol', severity: 'RED' },
+    'HYDRONEPHROSIS': { category: 'urol', severity: 'YELLOW' },
+    'RENAL CALCULUS': { category: 'urol', severity: 'YELLOW' },
+    // Gynecology / Obstetrics
+    'PLACENTA PREVIA': { category: 'obs', severity: 'RED' }, 'PLACENTAL ABRUPTION': { category: 'obs', severity: 'RED' },
+    'OVARIAN TORSION': { category: 'obs', severity: 'RED' }, 'PID': { category: 'obs', severity: 'YELLOW' },
+    'MISCARRIAGE': { category: 'obs', severity: 'YELLOW' }, 'ABORTION': { category: 'obs', severity: 'YELLOW' },
+    'HYPEREMESIS': { category: 'obs', severity: 'YELLOW' }, 'GDM': { category: 'obs', severity: 'GREEN' },
+    // Radiology / Imaging orders (prevent name false positives)
+    'CTPA': { category: 'invest' }, 'CTAB': { category: 'invest' }, 'CTA': { category: 'invest' },
+    'MRCP': { category: 'invest' }, 'MRA': { category: 'invest' }, 'MRV': { category: 'invest' },
+    'AXR': { category: 'invest' }, 'KUB': { category: 'invest' }, 'IVP': { category: 'invest' },
+    'ECHO': { category: 'invest' }, 'TEE': { category: 'invest' }, 'TTE': { category: 'invest' },
+    'PET': { category: 'invest' }, 'DEXA': { category: 'invest' }, 'V/Q': { category: 'invest' },
+    'PIGTAIL': { category: 'invest' }, 'ANGIO': { category: 'invest' },
+    // Additional lab tests
+    'D-DIMER': { category: 'invest' }, 'PROCALCITONIN': { category: 'invest' }, 'PCT': { category: 'invest' },
+    'LACTATE': { category: 'invest' }, 'AMMONIA': { category: 'invest' },
+    'FERRITIN': { category: 'invest' }, 'FIBRINOGEN': { category: 'invest' },
+    'LDH': { category: 'invest' }, 'LIPASE': { category: 'invest' }, 'AMYLASE': { category: 'invest' },
+    'URINE CS': { category: 'invest' }, 'BLOOD CS': { category: 'invest' },
+    'SPUTUM CS': { category: 'invest' }, 'WOUND CS': { category: 'invest' },
+    'HCG': { category: 'invest' }, 'AFP': { category: 'invest' }, 'CEA': { category: 'invest' },
+    'CA125': { category: 'invest' }, 'CA199': { category: 'invest' },
     // Clinical shorthand (prevent misclassification as names)
     'SOB': { category: 'resp', severity: 'YELLOW' }, 'DOE': { category: 'resp', severity: 'YELLOW' },
     'CP': { category: 'cardio', severity: 'YELLOW' },
@@ -1856,6 +1951,8 @@ const EntityRecognizer = {
     // Reject: has digits (except MRN-like which is handled by CIVIL_ID), or is a header
     if (/\d/.test(t) || isHeaderLike(t)) return { entity: 'NAME', confidence: 0 };
     if (/^(?:dr\.?|doctor|consultant|team)\b/i.test(t.trim())) return { entity: 'NAME', confidence: 0 };
+    if (this.scoreSheetStatus(t).confidence >= 0.76) return { entity: 'NAME', confidence: 0 };
+    if (this.scoreWard(t).confidence >= 0.88) return { entity: 'NAME', confidence: 0 };
 
     // Reject: all uppercase short tokens that are known medical terms (not names)
     // Don't blanket-reject uppercase — PaddleOCR outputs "ALI", "OMAR", "DANA" in caps
@@ -1948,7 +2045,15 @@ const EntityRecognizer = {
   },
 
   scoreDiagnosis(rawText) {
-    const upper = rawText.toUpperCase();
+    const normalized = `${rawText || ''}`.trim();
+    const upper = normalized.toUpperCase();
+    const tokenCount = tokenizeClinicalPhrase(normalized).length;
+    if (this.scoreSheetStatus(normalized).confidence >= 0.74 && tokenCount <= 3 && !/[\/,;+]/.test(normalized)) {
+      return { entity: 'DIAGNOSIS', confidence: 0 };
+    }
+    if (this.scoreWard(normalized).confidence >= 0.88 && tokenCount <= 3 && !/[\/,;+]/.test(normalized)) {
+      return { entity: 'DIAGNOSIS', confidence: 0 };
+    }
     if (/^[A-Z][a-z]{2,}$/.test(rawText) && !MedicalVocabulary.MEDICAL_TERMS[upper]) {
       return { entity: 'DIAGNOSIS', confidence: 0 };
     }
@@ -1991,7 +2096,7 @@ const EntityRecognizer = {
       const corrected = tokens.map(token => {
         const tokenMatch = MedicalVocabulary.correctTerm(token.toUpperCase(), 1);
         if (!tokenMatch) return token;
-        if ((tokenMatch.distance || 0) > 0 && stripForLexicon(token).length <= 4) return token;
+        if ((tokenMatch.distance || 0) > 0 && stripForLexicon(token).length <= 5) return token;
         return tokenMatch.term || token;
       }).join(' ');
       const confidence = clamp(0.52 + (average(tokenMatches.map(tokenMatch => tokenMatch.confidence), 0.55) * 0.28) + (Math.min(tokenMatches.length, 3) * 0.05));
@@ -2240,6 +2345,9 @@ const PatientAssembler = {
       confidence: 0, warnings: [], flags: [],
       fieldConfidence: {}, rawEntityCount: cluster.length,
     };
+    const structureRoles = [...new Set(cluster.map(entity => resolveEntityColumnRole(entity)).filter(Boolean))];
+    const sheetContextCount = cluster.filter(entity => entity.meta?.sheetContext).length;
+    const projectedColumnCount = cluster.filter(entity => entity.meta?.columnRole).length;
 
     const names = [];
     const diagnoses = [];
@@ -2426,7 +2534,33 @@ const PatientAssembler = {
       patient.fieldConfidence.sheetStatus = average(sheetStatuses.map(e => e.confidence), 0.45);
     }
 
+    const structuredCore = structureRoles.includes('NAME') && structureRoles.includes('DIAGNOSIS');
+    const structuredSupportCount = ['ASSIGNED_DOCTOR', 'SHEET_STATUS', 'WARD', 'BED', 'GENDER', 'AGE_GENDER']
+      .filter(role => structureRoles.includes(role)).length;
+    const structuredRosterTriplet = structuredCore && projectedColumnCount >= 3 && (patient.assignedDoctor || patient.sheetStatus);
+    const sparseStructuredRoster = structuredRosterTriplet && !patient.bed && patient.age == null && !patient.gender && !patient.civilId;
+    patient.structureRoles = structureRoles;
+    patient.sheetContextCount = sheetContextCount;
+    patient.structuredConfidence = clamp(
+      (structuredCore ? 0.48 : 0) +
+      (Math.min(structuredSupportCount, 4) * 0.08) +
+      (Math.min(projectedColumnCount, 6) * 0.035) +
+      (Math.min(sheetContextCount, 3) * 0.05) +
+      (structuredRosterTriplet ? 0.07 : 0) +
+      (sparseStructuredRoster ? 0.04 : 0)
+    );
+
     const baseConfidence = entityCount > 0 ? totalConf / entityCount : 0;
+    let structureBonus = 0;
+    if (patient.fullName && patient.dx && structuredCore) structureBonus += 0.12;
+    if (patient.assignedDoctor && structureRoles.includes('ASSIGNED_DOCTOR')) structureBonus += 0.05;
+    if (patient.sheetStatus && structureRoles.includes('SHEET_STATUS')) structureBonus += 0.04;
+    if (patient.ward && structureRoles.includes('WARD')) structureBonus += 0.04;
+    if (sheetContextCount > 0) structureBonus += Math.min(sheetContextCount, 2) * 0.03;
+    if (projectedColumnCount >= 3) structureBonus += 0.05;
+    if (structuredRosterTriplet) structureBonus += 0.06;
+    if (sparseStructuredRoster) structureBonus += 0.04;
+
     patient.confidence = clamp(weightedAverage([
       { value: patient.fieldConfidence.fullName, weight: 3 },
       { value: patient.fieldConfidence.bed, weight: 2.5 },
@@ -2439,7 +2573,8 @@ const PatientAssembler = {
       { value: patient.fieldConfidence.code, weight: 0.6 },
       { value: patient.fieldConfidence.assignedDoctor, weight: 0.35 },
       { value: patient.fieldConfidence.sheetStatus, weight: 0.3 },
-    ], baseConfidence) + (Math.min(cluster.length, 6) / 6 * 0.08));
+      { value: patient.structuredConfidence, weight: 1.3 },
+    ], baseConfidence) + (Math.min(cluster.length, 6) / 6 * 0.08) + structureBonus);
 
     // Only drop if truly empty — keep patients with civilId, age, or gender
     if (!patient.fullName && !patient.bed && diagnoses.length === 0 && !patient.civilId && patient.age == null) return null;
@@ -3472,7 +3607,16 @@ function patientHasStrongIdentity(patient) {
     (patient?.bed && patient?.fullName) ||
     (patient?.civilId && patient?.fullName) ||
     (patient?.fullName && (patient?.age != null || patient?.gender)) ||
-    (patient?.fullName && patient?.ward && (patient?.assignedDoctor || patient?.sheetStatus || patient?.dx))
+    (patient?.fullName && patient?.ward && (patient?.assignedDoctor || patient?.sheetStatus || patient?.dx)) ||
+    (
+      patient?.fullName &&
+      patient?.dx &&
+      (
+        patient?.assignedDoctor ||
+        patient?.sheetStatus ||
+        (patient?.structuredConfidence || 0) >= 0.72
+      )
+    )
   );
 }
 
