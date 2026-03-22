@@ -13,3 +13,8 @@ public/models/
 data/seed_raw/*.json
 data/seed_raw/*.txt
 data/seed_raw/hf_*/
+med_ocr/vault/
+med_ocr/seed_bank/
+med_ocr/raw_scans/
+med_ocr/shielded/
+med_ocr/logs/
