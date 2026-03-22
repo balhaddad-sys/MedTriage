@@ -1,4 +1,4 @@
-// OCR Audit Log — Immutable, persistent audit trail for every OCR transaction
+// OCR Audit Log — Tamper-evident, persistent audit trail for every OCR transaction
 //
 // Medical-grade requirement: Every OCR decision must be traceable.
 // Each record is append-only (no updates/deletes) and includes:
@@ -10,9 +10,19 @@
 //   - Review level assignments and reasons
 //   - User corrections (ground truth)
 //   - Engine metadata (backend, profile, strategy, timing)
+//   - Hash chain: each record's SHA-256 includes previous record's hash
 //
 // Storage: IndexedDB 'ocrAuditLog' store (survives app restarts, not clearable via UI)
+// Integrity: SHA-256 hash chain — verifyAuditChain() detects any tampering
 // Export: JSON + CSV for external audit / regulatory review
+//
+// LIMITATION: This is device-local storage (IndexedDB + emergency localStorage fallback).
+// For regulatory-grade retention, audit records MUST be synced to a central server with:
+//   - Write-once storage (S3 Object Lock, WORM tape, etc.)
+//   - Access controls and retention policies
+//   - Independent hash chain verification
+// The localStorage fallback is EMERGENCY ONLY — used when IndexedDB transaction fails.
+// It is NOT tamper-evident and should be synced to IndexedDB or server ASAP.
 
 const DB_NAME = 'medevac-ocr-audit';
 const DB_VERSION = 2;

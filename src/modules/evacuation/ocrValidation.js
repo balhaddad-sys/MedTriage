@@ -191,10 +191,13 @@ export function computeFieldAccuracy(predictedPatients, referencePatients) {
 }
 
 // Run validation against a ground truth dataset
-export function runValidation(ocrResults, groundTruth) {
+// dataSource: 'synthetic' | 'real-world' — MUST be 'real-world' for medical-grade claim
+export function runValidation(ocrResults, groundTruth, dataSource = 'synthetic') {
   const report = {
     timestamp: new Date().toISOString(),
     engineVersion: ocrResults.engine || 'unknown',
+    dataSource, // 'synthetic' or 'real-world'
+    syntheticOnly: dataSource === 'synthetic',
     samples: [],
     aggregate: {
       cer: { values: [], mean: 0, median: 0, p95: 0 },
@@ -245,7 +248,8 @@ export function runValidation(ocrResults, groundTruth) {
 }
 
 // Assess whether metrics meet medical-grade thresholds
-function assessMedicalGrade(aggregate) {
+// syntheticOnly: if true, MEDICAL_GRADE cannot be granted regardless of scores
+function assessMedicalGrade(aggregate, syntheticOnly = false) {
   const thresholds = {
     cer: { printed: 0.01, handwritten: 0.05, label: 'Character Error Rate' },
     wer: { printed: 0.03, handwritten: 0.10, label: 'Word Error Rate' },
@@ -310,8 +314,9 @@ function assessMedicalGrade(aggregate) {
   const hasFieldData = results.nameAccuracy.value !== null && results.bedAccuracy.value !== null;
   const fieldGrade = !hasFieldData ? 'FIELD_UNTESTED' : (results.nameAccuracy.passes && results.bedAccuracy.passes && results.dxAccuracy.passes) ? 'PASS' : 'FAIL';
 
-  // MEDICAL_GRADE requires ALL checks pass INCLUDING field-level accuracy
+  // MEDICAL_GRADE requires ALL checks pass INCLUDING field-level accuracy AND real-world data
   const grade = !anyData ? 'UNTESTED'
+    : syntheticOnly ? 'SYNTHETIC_ONLY'
     : fieldGrade === 'FIELD_UNTESTED' ? 'FIELD_VALIDATION_REQUIRED'
     : (allPass && fieldGrade === 'PASS') ? 'MEDICAL_GRADE'
     : 'CLINICAL_HELPER';
@@ -320,12 +325,15 @@ function assessMedicalGrade(aggregate) {
     grade,
     results,
     fieldGrade,
+    syntheticOnly,
     recommendation: !anyData
       ? 'No validation data available. Run against ground truth dataset to assess.'
+      : syntheticOnly
+        ? 'Validation used synthetic data only. Real-world clinical validation with actual ward sheet photographs is REQUIRED before medical-grade claim. See docs/ocr-compliance/VALIDATION_REPORT_TEMPLATE.md.'
       : fieldGrade === 'FIELD_UNTESTED'
         ? 'Field-level accuracy (name, bed, diagnosis) has not been validated. Run field-level validation before claiming medical-grade.'
       : (allPass && fieldGrade === 'PASS')
-        ? 'All metrics including field-level thresholds meet medical-grade requirements. Continue monitoring.'
+        ? 'All metrics including field-level thresholds meet medical-grade requirements on real-world data. Continue monitoring.'
         : 'Some metrics below threshold. Review error patterns and improve.',
   };
 }
