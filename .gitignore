@@ -10,3 +10,6 @@ Thumbs.db
 android/
 *.apk
 public/models/
+data/seed_raw/*.json
+data/seed_raw/*.txt
+data/seed_raw/hf_*/
