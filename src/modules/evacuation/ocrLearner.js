@@ -16,10 +16,11 @@
 import { loadSeedData } from './ocrSeedData.js';
 import { loadProgressNoteSeedData } from './ocrSeedProgressNotes.js';
 import { loadDeepSeedData } from './ocrSeedDeep.js';
+import { loadMegaSeedData } from './ocrSeedMega.js';
 
 const MODELS_KEY = 'ocr_learned_models';
 const TRAINING_KEY = 'ocr_training_data';
-const SEED_VERSION = 3; // bump to re-seed (v3: deep subspecialties, Arabic, scoring, toxicology)
+const SEED_VERSION = 4; // bump to re-seed (v4: mega — surgery, micro, path, peds, psych, devices, rehab)
 
 // ═══════════════════════════════════════════════════════════════════
 // LEARNED MODEL — the output of the learning cycle
@@ -34,6 +35,7 @@ function loadModels() {
       models = loadSeedData(models);
       models = loadProgressNoteSeedData(models);
       models = loadDeepSeedData(models);
+      models = loadMegaSeedData(models);
       models.seedVersion = SEED_VERSION;
       saveModels(models);
       console.log(`[LEARNER] Seeded: ${Object.keys(models.names).length} names, ${Object.keys(models.diagnoses).length} dx, ${Object.keys(models.medications).length} meds, ${Object.keys(models.abbreviations || {}).length} abbreviations, ${Object.keys(models.labTests || {}).length} lab tests`);
