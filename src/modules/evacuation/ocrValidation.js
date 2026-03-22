@@ -281,16 +281,51 @@ function assessMedicalGrade(aggregate) {
     label: thresholds.patientDetectionRate.label,
   };
 
+  // ═══ FIELD-LEVEL THRESHOLDS (previously declared but never enforced) ═══
+  results.nameAccuracy = {
+    value: aggregate.fieldAccuracy?.name ?? null,
+    threshold: thresholds.nameAccuracy.minimum,
+    passes: aggregate.fieldAccuracy?.name != null && aggregate.fieldAccuracy.name >= thresholds.nameAccuracy.minimum,
+    label: thresholds.nameAccuracy.label,
+  };
+
+  results.bedAccuracy = {
+    value: aggregate.fieldAccuracy?.bed ?? null,
+    threshold: thresholds.bedAccuracy.minimum,
+    passes: aggregate.fieldAccuracy?.bed != null && aggregate.fieldAccuracy.bed >= thresholds.bedAccuracy.minimum,
+    label: thresholds.bedAccuracy.label,
+  };
+
+  results.dxAccuracy = {
+    value: aggregate.fieldAccuracy?.dx ?? null,
+    threshold: thresholds.dxAccuracy.minimum,
+    passes: aggregate.fieldAccuracy?.dx != null && aggregate.fieldAccuracy.dx >= thresholds.dxAccuracy.minimum,
+    label: thresholds.dxAccuracy.label,
+  };
+
+  // ALL checks must pass — including field-level thresholds
   const allPass = Object.values(results).every(r => r.passes || r.value === null);
   const anyData = Object.values(results).some(r => r.value !== null);
+  // Field-level checks are mandatory for MEDICAL_GRADE — null field data = UNTESTED
+  const hasFieldData = results.nameAccuracy.value !== null && results.bedAccuracy.value !== null;
+  const fieldGrade = !hasFieldData ? 'FIELD_UNTESTED' : (results.nameAccuracy.passes && results.bedAccuracy.passes && results.dxAccuracy.passes) ? 'PASS' : 'FAIL';
+
+  // MEDICAL_GRADE requires ALL checks pass INCLUDING field-level accuracy
+  const grade = !anyData ? 'UNTESTED'
+    : fieldGrade === 'FIELD_UNTESTED' ? 'FIELD_VALIDATION_REQUIRED'
+    : (allPass && fieldGrade === 'PASS') ? 'MEDICAL_GRADE'
+    : 'CLINICAL_HELPER';
 
   return {
-    grade: !anyData ? 'UNTESTED' : allPass ? 'MEDICAL_GRADE' : 'CLINICAL_HELPER',
+    grade,
     results,
+    fieldGrade,
     recommendation: !anyData
       ? 'No validation data available. Run against ground truth dataset to assess.'
-      : allPass
-        ? 'All metrics meet medical-grade thresholds. Continue monitoring.'
+      : fieldGrade === 'FIELD_UNTESTED'
+        ? 'Field-level accuracy (name, bed, diagnosis) has not been validated. Run field-level validation before claiming medical-grade.'
+      : (allPass && fieldGrade === 'PASS')
+        ? 'All metrics including field-level thresholds meet medical-grade requirements. Continue monitoring.'
         : 'Some metrics below threshold. Review error patterns and improve.',
   };
 }

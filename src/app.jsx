@@ -125,6 +125,11 @@ export default function App() {
   }, [auth]);
 
   const addPatient = useCallback(async (patient) => {
+    // Persistence validation gate — reject records that cannot identify a patient
+    // (Civil ID scanner bypasses this since it has civilId; OCR must have name or bed)
+    if (!patient.civilId && !patient.fullName && !patient.bed) {
+      throw new Error('Cannot persist patient without at least a Civil ID, name, or bed number');
+    }
     patient.id = patient.id || crypto.randomUUID();
     patient.createdAt = new Date().toISOString();
     patient.modifiedAt = new Date().toISOString();

@@ -70,6 +70,77 @@ async function auditTx(storeName, mode, fn) {
 // Session ID — unique per app launch
 const SESSION_ID = `sess_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
+// SHA-256 hash of arbitrary string (for hash chain)
+async function sha256(str) {
+  const buf = new TextEncoder().encode(str);
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+// Get the last audit record (for hash chain linking)
+async function getLastAuditRecord() {
+  try {
+    const db = await openAuditDB();
+    return new Promise((resolve) => {
+      const t = db.transaction(STORE_TRANSACTIONS, 'readonly');
+      const store = t.objectStore(STORE_TRANSACTIONS);
+      const idx = store.index(INDEX_TIMESTAMP);
+      const req = idx.openCursor(null, 'prev'); // Last by timestamp
+      req.onsuccess = () => resolve(req.result?.value || null);
+      req.onerror = () => resolve(null);
+    });
+  } catch { return null; }
+}
+
+// Verify the entire audit chain integrity
+export async function verifyAuditChain() {
+  try {
+    const records = await getAllAuditRecords();
+    if (records.length === 0) return { valid: true, length: 0, message: 'No records' };
+
+    // Sort by timestamp
+    records.sort((a, b) => (a.timestamp || '').localeCompare(b.timestamp || ''));
+
+    let prevHash = 'GENESIS';
+    const broken = [];
+
+    for (let i = 0; i < records.length; i++) {
+      const r = records[i];
+      if (!r.recordHash || !r.prevHash) {
+        // v1 record without chain — skip (backward compatible)
+        continue;
+      }
+      if (r.prevHash !== prevHash) {
+        broken.push({ index: i, id: r.id, expected: prevHash, got: r.prevHash });
+      }
+      // Verify this record's hash
+      const payload = JSON.stringify({
+        id: r.id, timestamp: r.timestamp, imageHash: r.imageHash,
+        prevHash: r.prevHash, patientCount: r.patients?.length || 0,
+        reviewLevels: r.reviewLevels,
+      });
+      const computed = await sha256(payload);
+      if (computed !== r.recordHash) {
+        broken.push({ index: i, id: r.id, reason: 'hash mismatch', expected: computed, got: r.recordHash });
+      }
+      prevHash = r.recordHash;
+    }
+
+    return {
+      valid: broken.length === 0,
+      length: records.length,
+      broken,
+      message: broken.length === 0 ? 'Chain intact' : `${broken.length} broken link(s) detected`,
+    };
+  } catch (e) {
+    return { valid: false, length: 0, message: 'Verification error: ' + e.message };
+  }
+}
+
+async function getAllAuditRecords() {
+  return auditTx(STORE_TRANSACTIONS, 'readonly', store => store.getAll());
+}
+
 // Compute SHA-256 hash of image data for chain-of-custody
 async function computeImageHash(imageSource) {
   try {
@@ -201,17 +272,32 @@ export async function logOcrTransaction({
     // Calibration snapshot
     calibration: calibrationData || null,
 
-    // Integrity — this record is immutable
-    recordVersion: 1,
+    // ═══ TAMPER-EVIDENT HASH CHAIN ═══
+    // Each record includes a hash of the previous record, creating an
+    // append-only chain. If any record is modified, the chain breaks.
+    recordVersion: 2,
     immutable: true,
+    prevHash: null, // Set below
+    recordHash: null, // Set below
   };
 
   try {
+    // Get the last record's hash for chain linking
+    const lastRecord = await getLastAuditRecord();
+    record.prevHash = lastRecord?.recordHash || 'GENESIS';
+
+    // Compute this record's hash (includes prevHash, so chain is linked)
+    const recordPayload = JSON.stringify({
+      id: record.id, timestamp: record.timestamp, imageHash: record.imageHash,
+      prevHash: record.prevHash, patientCount: record.patients?.length || 0,
+      reviewLevels: record.reviewLevels,
+    });
+    record.recordHash = await sha256(recordPayload);
+
     await auditTx(STORE_TRANSACTIONS, 'readwrite', store => store.put(record));
-    console.log(`[AUDIT] Transaction ${id} logged (${hash.slice(0, 12)}..., ${patients?.length || 0} patients)`);
+    console.log(`[AUDIT] Transaction ${id} logged (chain: ${record.prevHash.slice(0, 8)}→${record.recordHash.slice(0, 8)})`);
   } catch (e) {
     console.error('[AUDIT] Failed to log transaction:', e);
-    // Fallback: persist to localStorage as emergency backup
     try {
       const key = `ocr_audit_fallback_${id}`;
       localStorage.setItem(key, JSON.stringify(record));

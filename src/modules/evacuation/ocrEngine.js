@@ -5109,6 +5109,21 @@ export async function processPatientListImage(imageSource, onProgress) {
     } else if (validation.warnings.length > 0 && patient.reviewLevel === 'READY') {
       patient.reviewLevel = 'REVIEW';
     }
+
+    // ═══ SAFETY-CRITICAL FIELD ESCALATION ═══
+    // Missing name or bed ALWAYS escalates to VERIFY — these are patient-safety fields
+    const safetyFlags = validation.safetyFlags || [];
+    const hasCriticalMissing = safetyFlags.some(f => f === 'NAME_MISSING' || f === 'BED_MISSING');
+    if (hasCriticalMissing && patient.reviewLevel !== 'VERIFY') {
+      patient.reviewLevel = 'VERIFY';
+      patient.reviewReasons = [
+        ...(patient.reviewReasons || []),
+        'Safety escalation: missing name or bed requires manual verification',
+      ];
+    }
+    // Attach safety flags to patient metadata for the signoff gate
+    patient.safetyFlags = safetyFlags;
+    patient.ocrMeta = { ...(patient.ocrMeta || {}), safetyFlags };
   }
 
   // Recompute reviewCount AFTER schema validation escalations

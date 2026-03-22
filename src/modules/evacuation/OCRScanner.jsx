@@ -266,10 +266,34 @@ export default function OCRScanner({ onClose, onImport }) {
     if (!result) return;
     const toImport = result.patients.filter((_, i) => selectedPatients.has(i));
 
-    // Hard stop: block VERIFY patients that haven't been explicitly confirmed
+    // ═══ CLINICAL SIGNOFF GATE ═══
+    // Block VERIFY patients that haven't been explicitly confirmed
     const unconfirmedVerify = toImport.filter(p => p.reviewLevel === 'VERIFY' && !p.ocrMeta?.manuallyReviewed);
     if (unconfirmedVerify.length > 0) {
       setError(`${unconfirmedVerify.length} patient(s) marked VERIFY — review and edit all fields before importing.`);
+      return;
+    }
+
+    // Block REVIEW patients with unresolved safety issues
+    const unsafeReview = toImport.filter(p => {
+      if (p.reviewLevel !== 'REVIEW') return false;
+      if (p.ocrMeta?.manuallyReviewed) return false; // Clinician explicitly cleared it
+      const flags = p.ocrMeta?.safetyFlags || p.safetyFlags || [];
+      const critical = flags.filter(f =>
+        f === 'NAME_MISSING' || f === 'BED_MISSING' || f === 'AMBIGUOUS_TRIAGE' ||
+        f === 'DUPLICATE_SUSPECT' || f === 'CRITICAL_FIELD_LOW_CONFIDENCE'
+      );
+      return critical.length > 0;
+    });
+    if (unsafeReview.length > 0) {
+      setError(`${unsafeReview.length} patient(s) have unresolved safety flags (missing name/bed, ambiguous triage). Review and confirm each before importing.`);
+      return;
+    }
+
+    // Final validation: every patient must have at least a name OR bed to be persisted
+    const unidentifiable = toImport.filter(p => !p.fullName && !p.bed);
+    if (unidentifiable.length > 0) {
+      setError(`${unidentifiable.length} patient(s) have no name AND no bed — cannot persist unidentifiable records.`);
       return;
     }
 
