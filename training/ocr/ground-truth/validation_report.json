@@ -1,0 +1,74 @@
+{
+  "timestamp": "2026-03-22T18:03:16.509Z",
+  "samplesEvaluated": 3,
+  "overall": {
+    "cer": {
+      "mean": 0.8771712081622495,
+      "median": 0.874113475177305,
+      "p95": 0.887719298245614
+    },
+    "wer": {
+      "mean": 1,
+      "median": 1,
+      "p95": 1
+    },
+    "patientDetection": {
+      "mean": 0
+    }
+  },
+  "byDifficulty": {
+    "photo": {
+      "cer": 0.8696808510638298,
+      "wer": 1,
+      "detection": 0,
+      "n": 1
+    },
+    "clean": {
+      "cer": 0.887719298245614,
+      "wer": 1,
+      "detection": 0,
+      "n": 1
+    },
+    "scan": {
+      "cer": 0.874113475177305,
+      "wer": 1,
+      "detection": 0,
+      "n": 1
+    }
+  },
+  "byStyle": {
+    "lined-table": {
+      "cer": 0.8696808510638298,
+      "wer": 1,
+      "detection": 0,
+      "n": 1
+    },
+    "whiteboard": {
+      "cer": 0.887719298245614,
+      "wer": 1,
+      "detection": 0,
+      "n": 1
+    },
+    "handwritten-list": {
+      "cer": 0.874113475177305,
+      "wer": 1,
+      "detection": 0,
+      "n": 1
+    }
+  },
+  "medicalGrade": false,
+  "thresholds": {
+    "cer": {
+      "printed": 0.01,
+      "handwritten": 0.05
+    },
+    "wer": {
+      "printed": 0.03,
+      "handwritten": 0.1
+    },
+    "patientDetection": 0.95,
+    "nameAccuracy": 0.98,
+    "bedAccuracy": 0.99,
+    "dxAccuracy": 0.95
+  }
+}

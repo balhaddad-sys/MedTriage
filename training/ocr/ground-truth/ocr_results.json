@@ -1,20 +1,293 @@
 [
   {
     "imageId": "gt_0000",
-    "error": "OCR engine init failed: no available backend found. ERR: [wasm] TypeError: Failed to fetch dynamically imported module: http://localhost:8765/ort-wasm-simd-threaded.jsep.mjs, [cpu] Error: previous call to 'initWasm()' failed., [webnn] Error: previous call to 'initWasm()' failed., [webgpu] Error: previous call to 'initWasm()' failed.. Clear browser data and reload.",
-    "rawText": "",
-    "patients": []
+    "rawText": "Nfe.6XbseTiffu poms\" Cfe Obnf Bhf:Tfy Ejbhoptjt Nfet Usjbhf Sppn667 NbotpvsBj.Sbtijej 36:N BEIGDLE5EN3 Dfguobypsf Bhjuispnzpo SFE F.N.13 SbnjBm.B!nj 66:N Qsfvnbob TbmcvubnbmjqsbuspqvnQsfesvtp SFE F.N.14 SbtijeBj.Eptbsj 63:N Cspodiut Bnbydejo.Djbwwjbobuf ZFMMPX F.N.15 GbibeBm.Ibksj 59:N IzqfslbufnvbDLE7 Bnpyjdjmjo.Dmbwvmbobuf ZFMMPX",
+    "patients": [
+      {
+        "fullName": "Nfe.6XbseTiffu Ebuf",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "3139.14.26",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe Obnf Bhf:Tfy Ejbhoptjt",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Usjbhf",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Sppn667 NbotpvsBj.Sbtijej 36:N BEIGDLE5EN3",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.N.13 SbnjBm.B!nj 66:N Qsfvnbob",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.N.14 SbtijeBj.Eptbsj 63:N Cspodiut",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "ZFMMPX",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.N.15 GbibeBm.Ibksj 59:N IzqfslbufnvbDLE7",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "ZFMMPX",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.N.13 SbnjBm.B!nj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Tbmcvubnpm-Jqsbuspqjvn-Qsfeojtp//, SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.N.14 SbtijeBm.Eptbsj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Bnpyjdjmmjo.Dmbwvmbobuf, ZFMMPX",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.N.15 GbibeBm.Ibksj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Bnpyjdjmmjo.Dmbwvmbobuf, Bnpyjdjmjo.Dmbwvmbobuf, ZFMMPX",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      }
+    ],
+    "engine": "medtriage-context-ocr-v5",
+    "qualityScore": 0.7226228515052263,
+    "processingTime": 93419.60000000894
   },
   {
     "imageId": "gt_0001",
-    "error": "OCR engine init failed: no available backend found. ERR: [wasm] TypeError: Failed to fetch dynamically imported module: http://localhost:8765/ort-wasm-simd-threaded.jsep.mjs, [cpu] Error: previous call to 'initWasm()' failed., [webnn] Error: previous call to 'initWasm()' failed., [webgpu] Error: previous call to 'initWasm()' failed.. Clear browser data and reload.",
-    "rawText": "",
-    "patients": []
+    "rawText": "FSXbseTiffu Ebuf;3137.14.28 Cfe Obnf Bhf:Tfy Ejbhoptjt Nfet Usjbhf JDV.2 39:N Nfojohjujt BcevmmbiBm.Nbotpvs Wbodpnzdjo-Qjqfsbdjmmjo.Ub!pcbdubn HSFFO F.3 6A:G SFE GbsbiBJ.Efjiboj Bofnjb-usbotgvtjpo JDV.4 96:G abisbBm.Fof!j DPQEfybdfscbujpo Btqjsjo-Ujdbhsfmps-Fopybqbsjo HSFFO",
+    "patients": [
+      {
+        "fullName": "",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "FSXbseTiffu",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Bhf:Tfy Ejbhoptjt",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Obnf, Cfe",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "6A:G 39:N Nfojohjujt Bofnjb-usbotgvtjpo",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "BcevmmbiBm.Nbotpvs, JDV.2, T3",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "96:G DPQEfybdfscbujpo",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "abisbBm.Fof!j",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "",
+        "bed": "",
+        "age": 22,
+        "gender": "",
+        "dx": "222",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "",
+        "bed": "",
+        "age": 22,
+        "gender": "",
+        "dx": "222",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "",
+        "bed": "",
+        "age": 22,
+        "gender": "",
+        "dx": "VT",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      }
+    ],
+    "engine": "medtriage-context-ocr-v5",
+    "qualityScore": 0.712257098098482,
+    "processingTime": 63904.29999999702
   },
   {
     "imageId": "gt_0002",
-    "error": "OCR engine init failed: no available backend found. ERR: [wasm] TypeError: Failed to fetch dynamically imported module: http://localhost:8765/ort-wasm-simd-threaded.jsep.mjs, [cpu] Error: previous call to 'initWasm()' failed., [webnn] Error: previous call to 'initWasm()' failed., [webgpu] Error: previous call to 'initWasm()' failed.. Clear browser data and reload.",
-    "rawText": "",
-    "patients": []
+    "rawText": "Ebuf;3137.14.13 OjdVXbseTiffu Cfe Obnf Bhf:Tfy Ejbhoptjt Nfet Usjbhf A1:N F.N.12 Nfojohjujt JotvmjoBtqbsu-JotvmjoHmbshjof HSFFO TbmfnBm.Gbemj C.3 54:N ObttfsBm.Obttfs HSFFO Btuinbfybdfscbujpo Gvsptfnjef5PnhJW-Dbswfejmpm JDV.4 72:N Sfobmgbjmvsf HSFFO NftibbmB.Ibscj B.5 54:N DWBNDBK/BG Bqjybcbo-Bnmpejqjof HSFFO nvsbebm.sbtijej 44:G Sppn431 Ijqgsbduvsf Pnfqsb!pmf-Tvdsbmgbuf HSFFO MvmxbB.Nbotpvs E.7 58:G JnboB.Eptbsj DIGfybdfscbujpo Nfspqfofn-OT1/A& HSFFO C.8 79:N LibmfeB.Tbmfn ZFMMPX Tfqujdtipdl OT1/A&-Qbsbdfubnpm-Poebotfuspo",
+    "patients": [
+      {
+        "fullName": "",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "OjdVXbseTiffu",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Bhf:Tfy Ejbhoptjt",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Obnf, Nfet, Cfe",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "ATN Nfojohjujt",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "JotvmjoBtqbsu-JotvmjoHmbshjof",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "54:N Btuinbfybdfscbujpo",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Gvsptfnjef5PnhJW-Dbswfejmpm, CD",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "72:N Sfobmgbjmvsf",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "NftibbmB.Ibscj",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "54:N DWB)NDB*-BG",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Bqjybcbo-Bnmpejqjof, nvsbebm.sbtijej, BP",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "44:G 58:G Ijqgsbduvsf DIGfybdfscbujpo",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Pnfqsb!pmf-Tvdsbmgbuf, Nfspqfofn-OT1, Sppn431",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "79:N Tfqujdtipdl",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "A&-Qbsbdfubnpm-Poebotfuspo, OT1, CD",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      }
+    ],
+    "engine": "medtriage-context-ocr-v5",
+    "qualityScore": 0.7314147801914429,
+    "processingTime": 126732.60000000894
   }
 ]
