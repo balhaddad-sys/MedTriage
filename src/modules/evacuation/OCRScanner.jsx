@@ -289,13 +289,16 @@ export default function OCRScanner({ onClose, onImport }) {
     setProgressPct(20);
 
     try {
+      console.log('[OCR] Starting scan, file:', file.name, file.size, 'bytes');
       const ocrResult = await processPatientListImage(file, (msg) => {
+        console.log('[OCR] Progress:', msg);
         setProgress(msg);
         if (msg.includes('Loading')) setProgressPct(30);
         else if (msg.includes('Recognizing')) setProgressPct(55);
         else if (msg.includes('Analyzing')) setProgressPct(82);
       });
 
+      console.log('[OCR] Result:', ocrResult.patients?.length, 'patients,', ocrResult.engine, 'quality:', ocrResult.qualityScore);
       setProgressPct(100);
       setResult(ocrResult);
       // Only auto-select READY and REVIEW patients — VERIFY must be explicitly opted in
@@ -306,7 +309,8 @@ export default function OCRScanner({ onClose, onImport }) {
       ));
       setStage('review');
     } catch (err) {
-      setError(err.message || 'OCR processing failed');
+      console.error('[OCR] FATAL:', err);
+      setError(`OCR failed: ${err.message || err}. Check console for details.`);
       setStage('capture');
     }
   }, []);

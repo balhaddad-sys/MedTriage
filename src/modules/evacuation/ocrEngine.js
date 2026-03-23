@@ -13,6 +13,7 @@
 import { boostEntityScore, resolveUnknownEntity, lookupLearnedName, lookupLearnedDiagnosis, lookupLearnedMedication } from './ocrLearner.js';
 import { disambiguate, inferAcuity, extractStructuredData, predictMissingFields, normalizeText, validateAgeDiagnosis } from './ocrBrain.js';
 import { isVlmAvailable, processWithVlm } from './ocrVlmBridge.js';
+import { correctMedicalText, correctPatientFields } from './ocrMedCorrector.js';
 import { logOcrTransaction, computeImageHash } from './ocrAuditLog.js';
 import { calibratePatient } from './ocrCalibration.js';
 import { suggestClinicalParameters } from './ocrTriageSuggestor.js';
@@ -3356,6 +3357,336 @@ function mergePatients(a, b) {
   return consolidatePatientGroup([a, b]) || a || b;
 }
 
+function mergeSuggestedValues(patients) {
+  const ranked = [...patients].sort((a, b) =>
+    (b.calibratedConfidence || b.confidence || 0) - (a.calibratedConfidence || a.confidence || 0)
+  );
+  const merged = {
+    triage: null,
+    triageConfidence: 0,
+    triageReasoning: '',
+    mobility: null,
+    mobilityReasoning: '',
+    o2: null,
+    o2Reasoning: '',
+    iso: null,
+    isoReasoning: '',
+    gender: null,
+  };
+
+  for (const patient of ranked) {
+    const suggested = patient.suggested || {};
+    if (merged.triage == null && suggested.triage != null) merged.triage = suggested.triage;
+    if (!merged.triageConfidence && suggested.triageConfidence) merged.triageConfidence = suggested.triageConfidence;
+    if (!merged.triageReasoning && suggested.triageReasoning) merged.triageReasoning = suggested.triageReasoning;
+    if (merged.mobility == null && suggested.mobility != null) merged.mobility = suggested.mobility;
+    if (!merged.mobilityReasoning && suggested.mobilityReasoning) merged.mobilityReasoning = suggested.mobilityReasoning;
+    if (merged.o2 == null && suggested.o2 != null) merged.o2 = suggested.o2;
+    if (!merged.o2Reasoning && suggested.o2Reasoning) merged.o2Reasoning = suggested.o2Reasoning;
+    if (merged.iso == null && suggested.iso != null) merged.iso = suggested.iso;
+    if (!merged.isoReasoning && suggested.isoReasoning) merged.isoReasoning = suggested.isoReasoning;
+    if (merged.gender == null && suggested.gender != null) merged.gender = suggested.gender;
+  }
+
+  return merged;
+}
+
+function deduplicateRichPatients(patients) {
+  const merged = [];
+  const used = new Set();
+
+  for (let i = 0; i < patients.length; i++) {
+    if (used.has(i)) continue;
+    const group = [patients[i]];
+    used.add(i);
+
+    let expanded = true;
+    while (expanded) {
+      expanded = false;
+      for (let j = i + 1; j < patients.length; j++) {
+        if (used.has(j)) continue;
+        if (group.some(existing => shouldMerge(existing, patients[j]))) {
+          group.push(patients[j]);
+          used.add(j);
+          expanded = true;
+        }
+      }
+    }
+
+    const strongest = [...group].sort((a, b) =>
+      (b.calibratedConfidence || b.confidence || 0) - (a.calibratedConfidence || a.confidence || 0)
+    )[0];
+    const mergedCore = consolidatePatientGroup(group) || strongest;
+    const mergedSuggestions = mergeSuggestedValues(group);
+    const mergedPatient = {
+      ...strongest,
+      ...mergedCore,
+      calibratedConfidence: Math.max(...group.map(patient => patient.calibratedConfidence || patient.confidence || 0)),
+      autoInferred: Object.assign({}, ...group.map(patient => patient.autoInferred || {})),
+      safetyFlags: collectPatientSafetyFlags({
+        safetyFlags: group.flatMap(patient => patient.safetyFlags || []),
+        ocrMeta: { safetyFlags: group.flatMap(patient => patient.ocrMeta?.safetyFlags || []) },
+      }),
+      suggested: mergedSuggestions,
+      reviewReasons: [...new Set(group.flatMap(patient => patient.reviewReasons || []))],
+      ocrMeta: {
+        ...(strongest.ocrMeta || {}),
+        reviewLevel: mergedCore.reviewLevel || strongest.reviewLevel,
+      },
+    };
+
+    merged.push(mergedPatient);
+  }
+
+  return merged;
+}
+
+function extractLeadingBedPrefix(text) {
+  const tokens = `${text || ''}`.trim().split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return '';
+
+  let bestPrefix = '';
+  let bestConfidence = 0;
+  for (let len = 1; len <= Math.min(3, tokens.length); len++) {
+    const candidate = tokens.slice(0, len).join(' ');
+    const scored = EntityRecognizer.scoreBed(candidate);
+    if ((scored.confidence || 0) > bestConfidence) {
+      bestPrefix = candidate;
+      bestConfidence = scored.confidence || 0;
+    }
+  }
+
+  return bestConfidence >= 0.72 ? bestPrefix : '';
+}
+
+function classifyPhotoLagLine(line) {
+  const text = normalizeReadableTokenText(line).replace(/\s+/g, ' ').trim();
+  if (!text) return null;
+
+  const ageMatch = text.match(/\b\d{1,3}\s*\/\s*[MFmf]\b/);
+  const prefix = ageMatch ? text.slice(0, ageMatch.index).trim() : text;
+  const clinical = ageMatch ? text.slice(ageMatch.index).trim() : '';
+  const prefixTokens = prefix.split(/\s+/).filter(Boolean);
+  const headerOnly = prefixTokens.length > 0 && prefixTokens.every(token => isHeaderLike(token));
+  const bedPrefix = extractLeadingBedPrefix(prefix);
+  const nameRemainder = bedPrefix ? prefix.slice(bedPrefix.length).trim() : prefix;
+  const hasIdentity = Boolean(bedPrefix) || scoreLikelyNameText(nameRemainder) >= 0.58;
+
+  return {
+    text,
+    prefix,
+    clinical,
+    hasIdentity,
+    hasClinical: Boolean(clinical),
+    hasAgeGender: Boolean(ageMatch),
+    headerOnly,
+  };
+}
+
+function patientHasClinicalPayload(patient) {
+  return Boolean(
+    patient?.age != null ||
+    patient?.gender ||
+    patient?.dx ||
+    patient?.meds ||
+    patient?.triage
+  );
+}
+
+function scorePatientRepairCompleteness(patients) {
+  return patients.reduce((sum, patient) => {
+    let score = 0;
+    if (patient?.fullName) score += 1.4;
+    if (patient?.bed) score += 1.1;
+    if (patient?.age != null) score += 1.2;
+    if (patient?.gender) score += 0.45;
+    if (patient?.dx) score += 1.5;
+    if (patient?.meds) score += 1.35;
+    if (patient?.triage) score += 0.7;
+    if (!patientHasClinicalPayload(patient)) score -= 2.3;
+    return sum + score;
+  }, 0);
+}
+
+function identitiesMostlyAlign(currentPatients, repairedPatients) {
+  if (!currentPatients.length || currentPatients.length !== repairedPatients.length) return false;
+
+  let matches = 0;
+  for (let i = 0; i < currentPatients.length; i++) {
+    const current = currentPatients[i] || {};
+    const repaired = repairedPatients[i] || {};
+    const currentName = normalizeNameForMerge(current.fullName || '');
+    const repairedName = normalizeNameForMerge(repaired.fullName || '');
+    const currentBed = normalizeBedForMatch(current.bed || '');
+    const repairedBed = normalizeBedForMatch(repaired.bed || '');
+    const nameMatches = !currentName || !repairedName || currentName === repairedName;
+    const bedMatches = !currentBed || !repairedBed || currentBed === repairedBed;
+    if (nameMatches && bedMatches) matches++;
+  }
+
+  return matches >= Math.max(1, currentPatients.length - 1);
+}
+
+function extractLaggedPhotoCandidateLines(rawText) {
+  const candidateLines = `${rawText || ''}`
+    .split('\n')
+    .map(classifyPhotoLagLine)
+    .filter(line => line && (line.hasIdentity || line.hasClinical));
+  if (candidateLines.length < 3) return null;
+
+  const first = candidateLines[0];
+  const last = candidateLines[candidateLines.length - 1];
+  const middle = candidateLines.slice(1, -1);
+  const hasLagPattern =
+    first.hasClinical &&
+    !first.hasIdentity &&
+    (first.headerOnly || /^bed\s+name\b/i.test(first.prefix)) &&
+    last.hasIdentity &&
+    !last.hasClinical &&
+    middle.length >= 1 &&
+    middle.every(line => line.hasIdentity && line.hasClinical);
+  return hasLagPattern ? candidateLines : null;
+}
+
+function normalizeLaggedListText(text) {
+  return `${text || ''}`
+    .replace(/\s*,\s*/g, ', ')
+    .replace(/\s+/g, ' ')
+    .replace(/\s+([,;:])/g, '$1')
+    .trim()
+    .replace(/^,+|,+$/g, '')
+    .trim();
+}
+
+function normalizeLaggedMedicationList(text) {
+  const parts = normalizeLaggedListText(text)
+    .split(/\s*,\s*/)
+    .map(item => item.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return '';
+
+  return parts
+    .map(item => MedicalVocabulary.correctMedication(item, 3)?.term || item)
+    .join(', ');
+}
+
+function looksMedicationLikeToken(token) {
+  const cleaned = `${token || ''}`.replace(/^[,;:]+|[.,;:]+$/g, '').trim();
+  if (!cleaned || cleaned.length < 6) return false;
+  if ((MedicalVocabulary.correctMedication(cleaned, 4)?.confidence || 0) >= 0.6) return true;
+  return /(?:cillin|clavulanate|mycin|cycline|azole|zepam|pril|sartan|parin|xone|semide|formin|tropium|amol|olone|avir|tidine|dipine)$/i.test(cleaned);
+}
+
+function parseLaggedClinicalTail(clinical) {
+  const normalized = normalizeReadableTokenText(clinical).replace(/\s+/g, ' ').trim();
+  const match = normalized.match(/^(\d{1,3})\s*\/\s*([MFmf])\b(.*)$/);
+  if (!match) return null;
+
+  const age = parseInt(match[1], 10);
+  const gender = match[2].toUpperCase();
+  const tailTokens = (match[3] || '').trim().split(/\s+/).filter(Boolean);
+
+  let triage = '';
+  if (tailTokens.length > 0) {
+    const lastToken = tailTokens[tailTokens.length - 1].replace(/^[,;:]+|[.,;:]+$/g, '');
+    const triageScore = EntityRecognizer.scoreTriageLevel(lastToken);
+    if (triageScore.confidence >= 0.76) {
+      triage = triageScore.corrected || lastToken.toUpperCase();
+      tailTokens.pop();
+    }
+  }
+
+  let medicationStart = -1;
+  for (let i = 0; i < tailTokens.length; i++) {
+    const token = tailTokens[i].replace(/^[,;:]+|[.,;:]+$/g, '');
+    if (!token) continue;
+    const medicationScore = EntityRecognizer.scoreMedication(token).confidence || 0;
+    const lexiconMedication = MedicalVocabulary.correctMedication(token, 3);
+    if (medicationScore >= 0.76 || (lexiconMedication?.confidence || 0) >= 0.72) {
+      medicationStart = i;
+      break;
+    }
+  }
+
+  if (medicationStart === -1 && tailTokens.length >= 2) {
+    const trailingToken = tailTokens[tailTokens.length - 1];
+    const leadingDx = normalizeText(normalizeLaggedListText(tailTokens.slice(0, -1).join(' ')));
+    if (leadingDx && looksMedicationLikeToken(trailingToken) && EntityRecognizer.scoreDiagnosis(leadingDx).confidence >= 0.72) {
+      medicationStart = tailTokens.length - 1;
+    }
+  }
+
+  const dxTokens = medicationStart >= 0 ? tailTokens.slice(0, medicationStart) : tailTokens;
+  const medicationTokens = medicationStart >= 0 ? tailTokens.slice(medicationStart) : [];
+  const dx = normalizeText(normalizeLaggedListText(dxTokens.join(' ')));
+  const meds = normalizeLaggedMedicationList(medicationTokens.join(' '));
+
+  return {
+    age: Number.isFinite(age) ? age : null,
+    gender,
+    dx,
+    meds,
+    triage,
+  };
+}
+
+function repairLaggedPhotoRoster(best) {
+  if (!best?.rawText || !Array.isArray(best.patients) || best.patients.length < 2) return best;
+
+  const candidateLines = extractLaggedPhotoCandidateLines(best.rawText);
+  if (!candidateLines || candidateLines.length !== (best.patients.length + 1)) return best;
+
+  const repairedPatients = best.patients.map((patient, index) => {
+    const clinical = parseLaggedClinicalTail(candidateLines[index]?.clinical || '');
+    if (!clinical) return null;
+    return {
+      ...patient,
+      age: clinical.age,
+      gender: clinical.gender || patient.gender || '',
+      dx: clinical.dx || '',
+      meds: clinical.meds || '',
+      triage: clinical.triage || '',
+      reviewReasons: [...new Set([
+        ...(patient.reviewReasons || []),
+        'Photo row lag repaired from raw OCR text',
+      ])],
+    };
+  });
+  if (repairedPatients.some(patient => !patient)) return best;
+  if (!identitiesMostlyAlign(best.patients, repairedPatients)) return best;
+
+  const currentScore = scorePatientRepairCompleteness(best.patients);
+  const repairedScore = scorePatientRepairCompleteness(repairedPatients);
+  const currentTrailingGap = !patientHasClinicalPayload(best.patients[best.patients.length - 1]);
+  const repairedTrailingGap = !patientHasClinicalPayload(repairedPatients[repairedPatients.length - 1]);
+  const shouldAdopt =
+    repairedScore > (currentScore + 1.2) ||
+    (currentTrailingGap && !repairedTrailingGap);
+  if (!shouldAdopt) return best;
+
+  return {
+    ...best,
+    strategy: `${best.strategy || 'ocr'}+lag-repair`,
+    patients: repairedPatients.map((patient, index) => {
+      const current = best.patients[index] || {};
+      return {
+        ...current,
+        ...patient,
+        confidence: Math.max(current.confidence || 0, patient.confidence || 0),
+        structuredConfidence: current.structuredConfidence || 0,
+        fieldConfidence: {
+          ...(current.fieldConfidence || {}),
+          age: Math.max(current.fieldConfidence?.age || 0, patient.age != null ? 0.92 : 0),
+          gender: Math.max(current.fieldConfidence?.gender || 0, patient.gender ? 0.9 : 0),
+          dx: Math.max(current.fieldConfidence?.dx || 0, patient.dx ? 0.88 : 0),
+          meds: Math.max(current.fieldConfidence?.meds || 0, patient.meds ? 0.86 : 0),
+          triage: Math.max(current.fieldConfidence?.triage || 0, patient.triage ? 0.9 : 0),
+        },
+      };
+    }),
+  };
+}
+
 function entityFingerprint(entity) {
   return [
     Math.round(entity.box.x),
@@ -4708,19 +5039,29 @@ async function fetchModelWithCache(asset, onProgress) {
 }
 
 function parseDictionary(data) {
+  // CRITICAL FIX — DO NOT REVERT
+  // paddleocr's ctcLabelDecode() skips index 0 (CTC blank) internally:
+  //   if (maxScoreIndex === 0) continue;
+  //   const char = dict[maxScoreIndex];
+  // So dict[1] = first real character. The HuggingFace dict file starts with "0"
+  // at line 1. If we prepend a blank, dict becomes ['', '0', '1', ...] and
+  // dict[1]='0' but the model means dict[1]='0' — wait, that sounds correct.
+  // BUT: the model's numClasses = dict.length + 1 (for blank). If we add blank
+  // to dict, numClasses = 437 but model outputs 437 classes with blank at 0
+  // and chars at 1-436. dict[1] should be '0'. With prepend: dict has 437 entries,
+  // dict[0]='', dict[1]='0' — this IS correct IF the model blank is at index 0.
+  // However, testing shows prepending blank causes A→B shift. So the model's
+  // blank must be at the LAST index (436), not index 0. Without prepend:
+  // dict[0]='0', dict[1]='1', ... dict[10]='A'. Model outputs 10 for 'A',
+  // dict[10]='A' — CORRECT.
   const text = typeof data === 'string' ? data : new TextDecoder().decode(data);
   const entries = text
     .split('\n')
     .map(line => line.trim())
     .filter(line => line && line !== '<blank>' && line !== '[blank]');
-  const dictionary = ['', ...entries];
-
-  // paddleocr's ctcLabelDecode skips index 0 (blank) then does dict[index].
-  // The model's output index 1 should map to the first character in the dict file.
-  // Do NOT prepend a blank — that shifts every character by +1 (A→B, Bed→Cfe).
-  // The library handles index 0 internally: if (maxScoreIndex === 0) continue;
-  console.log(`[OCR] Dict loaded: ${entries.length} entries (+blank), first="${entries[0]}", last="${entries[entries.length-1]}"`);
-  return dictionary;
+  // DO NOT prepend blank — causes +1 char shift (A→B). See git commit 16620e3.
+  console.log(`[OCR] Dict: ${entries.length} entries, first="${entries[0]}", last="${entries[entries.length - 1]}"`);
+  return entries;
 }
 
 async function createScriptService(detBuffer, modelBuffer, dictionary, isSecondary) {
@@ -5425,7 +5766,7 @@ export async function processPatientListImage(imageSource, onProgress) {
     }
   }
 
-  const best = fuseCandidatePasses(candidates);
+  let best = fuseCandidatePasses(candidates);
   if (!best || (!best.rawText.trim() && best.patients.length === 0)) {
     return {
       patients: [],
@@ -5449,13 +5790,18 @@ export async function processPatientListImage(imageSource, onProgress) {
     };
   }
 
+  best = repairLaggedPhotoRoster(best);
+
   const capturedAt = new Date().toISOString();
 
   // Compute image hash for audit chain-of-custody
   let imageHash = 'unavailable';
   try { imageHash = await computeImageHash(imageSource); } catch {}
 
-  const patients = await Promise.all(best.patients.map(async (p) => {
+  let patients = await Promise.all(best.patients.map(async (p) => {
+    // Medical-grade OCR correction: fix drug names, diagnoses, l/I/1, rn/m confusions
+    p = correctPatientFields(p);
+
     // Run brain: infer acuity, predict missing fields, normalize text
     const acuity = inferAcuity(p);
     const predictions = predictMissingFields(p);
@@ -5572,6 +5918,10 @@ export async function processPatientListImage(imageSource, onProgress) {
     };
   }));
 
+  // Run one final merge pass after enrichment/calibration so partial duplicate
+  // rows from photographed sheets do not survive into validation/import.
+  patients = deduplicateRichPatients(patients);
+
   // Schema validation — catch malformed data before it reaches the UI
   for (const patient of patients) {
     const validation = validatePatient(patient);
@@ -5650,7 +6000,7 @@ export async function processPatientListImage(imageSource, onProgress) {
 
   return {
     patients,
-    rawText: best.rawText,
+    rawText: correctMedicalText(best.rawText).text,
     processingTime,
     engine: 'medtriage-context-ocr-v5',
     backend: best.backend,
