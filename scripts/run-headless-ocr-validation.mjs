@@ -98,8 +98,22 @@ const page = await browser.newPage();
 page.setDefaultTimeout(300000); // 5 min — ONNX model download can be slow
 page.setDefaultNavigationTimeout(300000);
 
-// Navigate to app
+// Clear IndexedDB model cache to ensure fresh dict is loaded
 await page.goto(`http://localhost:${PORT}`, { waitUntil: 'networkidle0' });
+await page.evaluate(async () => {
+  // Delete cached OCR models so the fixed dictionary gets re-fetched
+  try {
+    const dbs = await indexedDB.databases();
+    for (const db of dbs) {
+      if (db.name && db.name.includes('ocr')) {
+        indexedDB.deleteDatabase(db.name);
+        console.log('[HEADLESS] Cleared cache:', db.name);
+      }
+    }
+  } catch {}
+});
+// Reload after clearing cache
+await page.reload({ waitUntil: 'networkidle0' });
 
 // Wait for OCR engine to be available
 console.log('  Waiting for OCR engine to load...');
