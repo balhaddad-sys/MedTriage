@@ -3306,6 +3306,18 @@ function shouldMerge(a, b) {
   if (aCivilId && bCivilId && aCivilId !== bCivilId) return false;
   if (aCivilId && bCivilId && aCivilId === bCivilId) return true;
 
+  const aNormalizedName = a.fullName ? normalizeNameForMerge(a.fullName) : '';
+  const bNormalizedName = b.fullName ? normalizeNameForMerge(b.fullName) : '';
+  const exactNameMatch = aNormalizedName && bNormalizedName && aNormalizedName === bNormalizedName;
+  const nearNameMatch = exactNameMatch || (
+    aNormalizedName &&
+    bNormalizedName &&
+    ocrDistance(aNormalizedName, bNormalizedName) <= 1
+  );
+  const oneMissingBed = Boolean(aBed) !== Boolean(bBed);
+  const gendersCompatible = !a.gender || !b.gender || a.gender === b.gender;
+  if (nearNameMatch && oneMissingBed && gendersCompatible) return true;
+
   if (a.gender && b.gender && a.gender !== b.gender) return false;
   if (a.age != null && b.age != null && Math.abs(a.age - b.age) > 8) return false;
 
@@ -3325,10 +3337,8 @@ function shouldMerge(a, b) {
   }
 
   if (a.fullName && b.fullName) {
-    const normalizedA = normalizeNameForMerge(a.fullName);
-    const normalizedB = normalizeNameForMerge(b.fullName);
-    const dist = ocrDistance(normalizedA, normalizedB);
-    const minNameLength = Math.min(normalizedA.length, normalizedB.length);
+    const dist = ocrDistance(aNormalizedName, bNormalizedName);
+    const minNameLength = Math.min(aNormalizedName.length, bNormalizedName.length);
     const multiWordNames = /\s/.test(a.fullName) && /\s/.test(b.fullName);
     const shortSingleTokenPair = !multiWordNames && minNameLength < 8;
     const strictDistance = shortSingleTokenPair ? 1 : 2;
@@ -3667,6 +3677,8 @@ function mapEntityToColumnRole(entityType) {
 }
 
 function resolveAssemblyEntityType(entity) {
+  if (entity.entity === 'HEADER') return 'HEADER';
+
   const columnRole = entity.meta?.columnRole;
   if (!columnRole) return entity.entity;
 
@@ -3883,6 +3895,11 @@ function describeProjectedRow(row) {
   let leftmost = Infinity;
   const wardContext = extractWardContext(row);
   const rowText = buildRowText(row);
+  const actualTypes = row.map(entity => resolveAssemblyEntityType(entity));
+  const actualHardAnchorCount = actualTypes.filter(type => ['BED', 'CIVIL_ID'].includes(type)).length;
+  const actualNameCount = actualTypes.filter(type => type === 'NAME').length;
+  const actualSupportCount = actualTypes.filter(type => ['AGE_GENDER', 'AGE', 'GENDER'].includes(type)).length;
+  const actualClinicalCount = actualTypes.filter(type => ['DIAGNOSIS', 'MEDICATION', 'TRIAGE', 'ALLERGY', 'STATUS', 'SHEET_STATUS', 'ASSIGNED_DOCTOR', 'O2', 'ISOLATION'].includes(type)).length;
 
   for (const entity of row) {
     if (entity.entity === 'HEADER' || isHeaderLike(entity.text)) headerCellCount++;
@@ -3930,6 +3947,10 @@ function describeProjectedRow(row) {
     hasHardAnchor: hasRole('BED') || hasRole('CIVIL_ID'),
     hasSoftAnchor: hasRole('NAME') || hasRole('AGE_GENDER'),
     hasClinical: roles.some(role => ['DIAGNOSIS', 'MEDICATION', 'TRIAGE', 'ALLERGY', 'STATUS', 'O2', 'ISOLATION'].includes(role)),
+    actualHardAnchorCount,
+    actualNameCount,
+    actualSupportCount,
+    actualClinicalCount,
     identityScore,
     rowText,
   };
@@ -3971,17 +3992,27 @@ function shouldMergeProjectedLeadIn(previousProfile, currentProfile, firstColumn
   const yGap = Math.abs(currentProfile.centerY - previousProfile.centerY);
   if (yGap > Math.max(34, avgHeight * 1.75)) return false;
 
+  const previousHeaderSpill =
+    previousProfile.headerCellCount >= 1 &&
+    previousProfile.actualClinicalCount > 0 &&
+    previousProfile.actualHardAnchorCount === 0 &&
+    previousProfile.actualNameCount === 0 &&
+    (currentProfile.actualHardAnchorCount > 0 || currentProfile.actualNameCount > 0);
+  if (previousHeaderSpill) return true;
+
   const previousClinicalOnly =
-    (previousProfile.hasClinical || previousProfile.roles.includes('AGE_GENDER') || previousProfile.roles.includes('AGE')) &&
-    !previousProfile.hasHardAnchor &&
-    !previousProfile.roles.includes('NAME') &&
-    previousProfile.roleCount > 0 &&
+    (previousProfile.actualClinicalCount > 0 || previousProfile.actualSupportCount > 0) &&
+    previousProfile.actualHardAnchorCount === 0 &&
+    previousProfile.actualNameCount === 0 &&
     previousProfile.roles.every(role =>
       ['AGE_GENDER', 'AGE', 'GENDER', 'DIAGNOSIS', 'MEDICATION', 'TRIAGE', 'ALLERGY', 'STATUS', 'SHEET_STATUS', 'ASSIGNED_DOCTOR', 'O2', 'ISOLATION'].includes(role)
     );
   if (!previousClinicalOnly) return false;
 
-  const currentHasIdentity = currentProfile.hasHardAnchor || currentProfile.hasSoftAnchor;
+  const currentHasIdentity =
+    currentProfile.actualHardAnchorCount > 0 ||
+    currentProfile.actualNameCount > 0 ||
+    currentProfile.actualSupportCount > 0;
   if (!currentHasIdentity) return false;
 
   const previousStartsAfterIdentityColumns = previousProfile.leftmost > (firstColumnX + Math.max(28, avgHeight * 1.35));
@@ -4163,6 +4194,113 @@ function mergeProjectedRows(rows, initialContext = {}) {
   }
 
   return merged;
+}
+
+function isProjectedIdentityAnchorEntity(entity) {
+  const type = resolveAssemblyEntityType(entity);
+  return ['BED', 'CIVIL_ID', 'NAME'].includes(type);
+}
+
+function isProjectedIdentitySupportEntity(entity) {
+  const type = resolveAssemblyEntityType(entity);
+  return ['AGE_GENDER', 'AGE', 'GENDER'].includes(type);
+}
+
+function isTransferableProjectedEntity(entity) {
+  if (!entity || entity.entity === 'HEADER' || entity.meta?.sheetContext) return false;
+  const role = resolveEntityColumnRole(entity) || resolveAssemblyEntityType(entity);
+  return ['AGE_GENDER', 'AGE', 'GENDER', 'DIAGNOSIS', 'MEDICATION', 'TRIAGE', 'ALLERGY', 'STATUS', 'ASSIGNED_DOCTOR', 'SHEET_STATUS', 'O2', 'ISOLATION'].includes(role);
+}
+
+function buildProjectedRowAnchors(clusters) {
+  return clusters
+    .map((cluster, clusterIndex) => {
+      const hardAnchors = cluster.filter(entity => ['BED', 'CIVIL_ID'].includes(resolveAssemblyEntityType(entity)));
+      const nameAnchors = cluster.filter(entity => resolveAssemblyEntityType(entity) === 'NAME');
+      const supportAnchors = cluster.filter(isProjectedIdentitySupportEntity);
+      const anchorEntities = hardAnchors.length > 0
+        ? hardAnchors
+        : nameAnchors;
+      if (anchorEntities.length === 0) return null;
+
+      return {
+        clusterIndex,
+        centerY: average(anchorEntities.map(entity => entity.box.cy), average(cluster.map(entity => entity.box.cy), 0)),
+        hardAnchorCount: hardAnchors.length,
+        nameAnchorCount: nameAnchors.length,
+        supportAnchorCount: supportAnchors.length,
+      };
+    })
+    .filter(Boolean);
+}
+
+function rebalanceProjectedEntities(clusters) {
+  if (clusters.length < 2) return clusters;
+
+  let working = clusters.map(cluster => [...cluster]);
+  const avgHeight = average(working.flat().map(entity => entity.box.h), 20);
+  const maxSnapDistance = Math.max(32, avgHeight * 2.3);
+  const improvementMargin = Math.max(10, avgHeight * 0.35);
+
+  for (let pass = 0; pass < 2; pass++) {
+    const anchors = buildProjectedRowAnchors(working);
+    if (anchors.length < 2) break;
+
+    const anchorByCluster = new Map(anchors.map(anchor => [anchor.clusterIndex, anchor]));
+    const nearestAnchorForY = centerY => anchors.reduce((best, anchor) => {
+      if (!best) return anchor;
+      return Math.abs(anchor.centerY - centerY) < Math.abs(best.centerY - centerY) ? anchor : best;
+    }, null);
+
+    const moves = [];
+
+    for (let clusterIndex = 0; clusterIndex < working.length; clusterIndex++) {
+      const cluster = working[clusterIndex];
+      const clusterHasOwnAnchor = anchorByCluster.has(clusterIndex);
+      if (clusterHasOwnAnchor) continue;
+
+      for (const entity of cluster) {
+        if (!isTransferableProjectedEntity(entity)) continue;
+
+        const nearestAnchor = nearestAnchorForY(entity.box.cy);
+        if (!nearestAnchor || nearestAnchor.clusterIndex === clusterIndex) continue;
+
+        const nearestDistance = Math.abs(entity.box.cy - nearestAnchor.centerY);
+        if (nearestDistance > maxSnapDistance) continue;
+
+        moves.push({
+          from: clusterIndex,
+          to: nearestAnchor.clusterIndex,
+          entity,
+        });
+      }
+    }
+
+    if (moves.length === 0) break;
+
+    const outbound = new Map();
+    const inbound = new Map();
+
+    for (const move of moves) {
+      if (!outbound.has(move.from)) outbound.set(move.from, new Set());
+      if (!inbound.has(move.to)) inbound.set(move.to, []);
+      outbound.get(move.from).add(move.entity);
+      inbound.get(move.to).push(move.entity);
+    }
+
+    working = working
+      .map((cluster, clusterIndex) => {
+        const removed = outbound.get(clusterIndex);
+        const nextCluster = removed ? cluster.filter(entity => !removed.has(entity)) : [...cluster];
+        const additions = inbound.get(clusterIndex);
+        if (additions?.length) nextCluster.push(...additions);
+        nextCluster.sort((a, b) => a.box.cy - b.box.cy || a.box.cx - b.box.cx);
+        return nextCluster;
+      })
+      .filter(cluster => cluster.length > 0);
+  }
+
+  return working;
 }
 
 function patientHasStrongIdentity(patient) {
@@ -4575,13 +4713,14 @@ function parseDictionary(data) {
     .split('\n')
     .map(line => line.trim())
     .filter(line => line && line !== '<blank>' && line !== '[blank]');
+  const dictionary = ['', ...entries];
 
   // paddleocr's ctcLabelDecode skips index 0 (blank) then does dict[index].
   // The model's output index 1 should map to the first character in the dict file.
   // Do NOT prepend a blank — that shifts every character by +1 (A→B, Bed→Cfe).
   // The library handles index 0 internally: if (maxScoreIndex === 0) continue;
-  console.log(`[OCR] Dict loaded: ${entries.length} entries, first="${entries[0]}", last="${entries[entries.length-1]}"`);
-  return entries;
+  console.log(`[OCR] Dict loaded: ${entries.length} entries (+blank), first="${entries[0]}", last="${entries[entries.length-1]}"`);
+  return dictionary;
 }
 
 async function createScriptService(detBuffer, modelBuffer, dictionary, isSecondary) {
