@@ -385,6 +385,13 @@ const HEADER_ROLE_PATTERNS = [
     ],
   },
   {
+    role: 'TRIAGE',
+    patterns: [
+      /^(?:triage|priority|acuity)$/i,
+      /^(?:\u0627\u0644\u0641\u0631\u0632|\u0627\u0644\u0623\u0648\u0644\u0648\u064A\u0629|\u0627\u0644\u062D\u062F\u0629)$/i,
+    ],
+  },
+  {
     role: 'ALLERGY',
     patterns: [
       /^(?:allerg(?:y|ies)|allergy\s*status)$/i,
@@ -589,7 +596,7 @@ function dedupeWarnings(warnings) {
 }
 
 function normalizeNameForMerge(name) {
-  return `${name || ''}`.replace(/[^A-Za-z\u0600-\u06FF]/g, '').toUpperCase();
+  return humanizeLikelyNameText(name).replace(/[^A-Za-z\u0600-\u06FF]/g, '').toUpperCase();
 }
 
 function mergeListValues(a, b) {
@@ -611,11 +618,95 @@ function normalizeCivilIdForMatch(value) {
     .replace(/[Il|]/g, '1');
 }
 
+function titleCaseLatinToken(token) {
+  if (!token) return token;
+  if (/^[A-Z0-9-]{2,6}$/.test(token)) return token;
+  return token.charAt(0).toUpperCase() + token.slice(1).toLowerCase();
+}
+
+function humanizeLikelyNameText(text) {
+  const raw = `${text || ''}`.trim();
+  if (!raw || /\d/.test(raw) || /[\u0600-\u06FF]/.test(raw)) return raw;
+
+  const spaced = raw
+    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/([A-Za-z])(?=Al[- ]?[A-Z])/g, '$1 ')
+    .replace(/\b([Aa])l(?=[A-Z][a-z])/g, '$1l-')
+    .replace(/\b([Aa])l\s+(?=[A-Z][a-z])/g, '$1l-')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return spaced
+    .split(/\s+/)
+    .map(token => {
+      if (!token) return token;
+      if (/^Al[- ]/i.test(token)) {
+        const rest = token.replace(/^Al[- ]?/i, '');
+        return rest ? `Al-${titleCaseLatinToken(rest)}` : 'Al';
+      }
+      if (/^[A-Za-z][A-Za-z'’-]*$/.test(token)) return titleCaseLatinToken(token);
+      return token;
+    })
+    .join(' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeDetectedBedText(text) {
+  const raw = `${text || ''}`.trim();
+  if (!raw) return raw;
+
+  const compact = raw.replace(/\s+/g, '');
+  const upperCompact = compact.toUpperCase();
+  const prefixMatch = upperCompact.match(/^([A-Z0-9-]+?)(\d{1,3})$/);
+  if (prefixMatch) {
+    const [, prefixRaw, digits] = prefixMatch;
+    const prefix = prefixRaw.replace(/0/g, 'O').replace(/1/g, 'I');
+    if (prefix === 'ROOM' || prefix === 'RM') return `Room ${digits}`;
+    if (prefix === 'BED' || prefix === 'B') return `Bed ${digits}`;
+    if (/^(?:ICU|CCU|HDU|NICU|PICU)$/.test(prefix)) return `${prefix}-${digits}`;
+  }
+
+  const canonical = raw.toUpperCase().replace(/O/g, '0').replace(/\s+/g, '');
+  if (/^[A-E]-[MF]-\d{1,2}$/i.test(canonical)) return canonical;
+  if (/^\d{1,3}-\d{1,3}$/.test(canonical)) return canonical;
+  if (/^\d[A-Z]-\d{1,2}$/i.test(canonical)) return canonical;
+  if (/^(?:ICU|CCU|HDU|NICU|PICU)-?\d{1,2}$/i.test(upperCompact)) {
+    const normalized = upperCompact.match(/^(ICU|CCU|HDU|NICU|PICU)-?(\d{1,2})$/i);
+    return normalized ? `${normalized[1].toUpperCase()}-${normalized[2]}` : raw;
+  }
+
+  return raw
+    .replace(/^r[0o]{2}m\s*/i, 'Room ')
+    .replace(/^rm\s*/i, 'Room ')
+    .replace(/^bed\s*/i, 'Bed ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function normalizeReadableTokenText(text) {
+  let value = `${text || ''}`.trim();
+  if (!value) return value;
+
+  value = normalizeDetectedBedText(value);
+  value = humanizeLikelyNameText(value);
+  value = value
+    .replace(/([:;])(?=\S)/g, '$1 ')
+    .replace(/(?<=[A-Za-z])(?=\d{2,4}\b)/g, ' ')
+    .replace(/(?<=\d)(?=[A-Z][a-z])/g, ' ')
+    .replace(/(?<=[a-z])(?=[A-Z][a-z])/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+
+  return value;
+}
+
 const FIELD_CONFIDENCE_KEYS = {
   fullName: 'fullName',
   age: 'age',
   gender: 'gender',
   bed: 'bed',
+  triage: 'triage',
   civilId: 'civilId',
   dx: 'dx',
   meds: 'meds',
@@ -642,6 +733,7 @@ function canonicalizeConsensusValue(field, value) {
     case 'age':
       return /^\d+$/.test(text) ? text : `${parseInt(text, 10) || ''}`;
     case 'gender':
+    case 'triage':
     case 'code':
     case 'sheetStatus':
     case 'o2':
@@ -669,7 +761,7 @@ function normalizeConsensusOutput(field, value) {
     case 'fullName':
       return text.replace(/\s+/g, ' ');
     case 'bed':
-      return normalizeBedForMatch(text) || text.toUpperCase();
+      return normalizeDetectedBedText(text) || text.replace(/\s+/g, ' ').trim();
     case 'civilId':
       return normalizeCivilIdForMatch(text) || text;
     case 'age': {
@@ -677,6 +769,7 @@ function normalizeConsensusOutput(field, value) {
       return Number.isFinite(age) ? age : null;
     }
     case 'gender':
+    case 'triage':
     case 'code':
     case 'sheetStatus':
     case 'o2':
@@ -802,7 +895,7 @@ function consolidatePatientGroup(patients) {
   if (patients.length === 0) return null;
 
   const scalarFields = [
-    'fullName', 'age', 'gender', 'bed', 'civilId',
+    'fullName', 'age', 'gender', 'bed', 'triage', 'civilId',
     'allergies', 'code', 'assignedDoctor', 'sheetStatus', 'ward', 'o2', 'iso',
     'suggestedTriage', 'suggestedMobility',
   ];
@@ -822,6 +915,7 @@ function consolidatePatientGroup(patients) {
     age: scalarConsensus.age.value,
     gender: scalarConsensus.gender.value,
     bed: scalarConsensus.bed.value,
+    triage: scalarConsensus.triage.value,
     civilId: scalarConsensus.civilId.value,
     dx: listConsensus.dx.value,
     meds: listConsensus.meds.value,
@@ -852,11 +946,12 @@ function consolidatePatientGroup(patients) {
   merged.confidence = clamp(weightedAverage([
     { value: fieldConfidence.fullName, weight: 3 },
     { value: fieldConfidence.bed, weight: 2.5 },
-    { value: ageGenderConfidence, weight: 2.1 },
-    { value: fieldConfidence.age, weight: merged.gender ? 0.4 : 1.1 },
-    { value: fieldConfidence.gender, weight: merged.age != null ? 0.4 : 1.1 },
-    { value: fieldConfidence.civilId, weight: 1.5 },
-    { value: fieldConfidence.dx, weight: 1.7 },
+      { value: ageGenderConfidence, weight: 2.1 },
+      { value: fieldConfidence.age, weight: merged.gender ? 0.4 : 1.1 },
+      { value: fieldConfidence.gender, weight: merged.age != null ? 0.4 : 1.1 },
+      { value: fieldConfidence.civilId, weight: 1.5 },
+      { value: fieldConfidence.dx, weight: 1.7 },
+      { value: fieldConfidence.triage, weight: 0.9 },
       { value: fieldConfidence.meds, weight: 1.1 },
       { value: fieldConfidence.allergies, weight: 0.7 },
       { value: fieldConfidence.code, weight: 0.6 },
@@ -1786,21 +1881,29 @@ const MedicalVocabulary = {
   // Works for Arabic script, English transliterated, and mixed
   lookupName(text) {
     if (!text || text.length < 2) return null;
-    const words = text.trim().split(/\s+/);
     let bestConf = 0;
 
-    for (const word of words) {
-      const conf = this._lookupSingleName(word);
-      if (conf > bestConf) bestConf = conf;
-    }
+    const variants = [...new Set([
+      `${text || ''}`.trim(),
+      humanizeLikelyNameText(text),
+    ].filter(Boolean))];
 
-    // Multi-word bonus — if any word matches a name, the whole thing is likely a name
-    if (bestConf > 0 && words.length >= 2) bestConf = Math.min(1.0, bestConf + 0.1);
+    for (const variant of variants) {
+      const words = variant.trim().split(/\s+/);
 
-    // Check learned names (self-expanding from training data)
-    const learned = lookupLearnedName(text);
-    if (learned && learned.confidence > bestConf) {
-      bestConf = learned.confidence;
+      for (const word of words) {
+        const conf = this._lookupSingleName(word);
+        if (conf > bestConf) bestConf = conf;
+      }
+
+      // Multi-word bonus — if any word matches a name, the whole thing is likely a name
+      if (bestConf > 0 && words.length >= 2) bestConf = Math.min(1.0, bestConf + 0.1);
+
+      // Check learned names (self-expanding from training data)
+      const learned = lookupLearnedName(variant);
+      if (learned && learned.confidence > bestConf) {
+        bestConf = learned.confidence;
+      }
     }
 
     return bestConf > 0 ? { confidence: bestConf } : null;
@@ -2000,6 +2103,7 @@ const EntityRecognizer = {
       this.scoreGender(t),
       this.scoreCivilId(t),
       this.scoreWard(t),
+      this.scoreTriageLevel(t),
       this.scoreO2(t),
       this.scoreIsolation(upper),
       this.scoreMobility(t),
@@ -2050,11 +2154,12 @@ const EntityRecognizer = {
   },
 
   scoreBed(t) {
-    const canonical = t.toUpperCase().replace(/O/g, '0');
+    const normalized = normalizeDetectedBedText(t);
+    const canonical = normalized.toUpperCase().replace(/O/g, '0');
     if (/^[A-E]-[MF]-\d{1,2}$/i.test(canonical))
       return { entity: 'BED', confidence: 0.99, corrected: canonical };
-    if (/^(?:bed|rm|room|\u0633\u0631\u064A\u0631|\u063A\u0631\u0641\u0629)\s*#?\s*(\d{1,3})/i.test(t))
-      return { entity: 'BED', confidence: 0.9, corrected: t };
+    if (/^(?:bed|rm|room|\u0633\u0631\u064A\u0631|\u063A\u0631\u0641\u0629)\s*#?\s*(\d{1,3})/i.test(normalized))
+      return { entity: 'BED', confidence: 0.9, corrected: normalized };
     if (/^\d{1,3}\s*-\s*\d{1,3}$/i.test(canonical))
       return { entity: 'BED', confidence: 0.86, corrected: canonical.replace(/\s+/g, '') };
     if (/^[A-E]\d{1,2}$/i.test(canonical))
@@ -2067,8 +2172,8 @@ const EntityRecognizer = {
     if (/^(?:B|BED)\s*\d{1,3}$/i.test(canonical))
       return { entity: 'BED', confidence: 0.78, corrected: canonical };
     // ICU beds: "ICU-1", "ICU 3", "CCU-2"
-    if (/^(?:ICU|CCU|HDU|NICU|PICU)\s*-?\s*\d{1,2}$/i.test(t))
-      return { entity: 'BED', confidence: 0.90, corrected: t.replace(/\s+/g, '-').toUpperCase() };
+    if (/^(?:ICU|CCU|HDU|NICU|PICU)\s*-?\s*\d{1,2}$/i.test(normalized))
+      return { entity: 'BED', confidence: 0.90, corrected: normalized.replace(/\s+/g, '-').toUpperCase() };
     return { entity: 'BED', confidence: 0 };
   },
 
@@ -2199,9 +2304,9 @@ const EntityRecognizer = {
     const match = normalized.match(/^(dr\.?|doctor|consultant|team)\s*(?:[:\-]\s*)?(.+)$/i);
     if (!match || !match[2]) return { entity: 'ASSIGNED_DOCTOR', confidence: 0 };
 
-    const doctorText = match[2]
+    const doctorText = humanizeLikelyNameText(match[2]
       .replace(/^[`"'~.,:;!?()[\]{}<>]+|[`"'~.,:;!?()[\]{}<>]+$/g, '')
-      .trim();
+      .trim());
     if (!doctorText || /\d/.test(doctorText) || isHeaderLike(doctorText)) {
       return { entity: 'ASSIGNED_DOCTOR', confidence: 0 };
     }
@@ -2224,12 +2329,14 @@ const EntityRecognizer = {
   scoreName(t) {
     let conf = 0;
     if (!t || t.length < 2) return { entity: 'NAME', confidence: 0 };
+    const humanized = humanizeLikelyNameText(t);
 
     // Reject: has digits (except MRN-like which is handled by CIVIL_ID), or is a header
     if (/\d/.test(t) || isHeaderLike(t)) return { entity: 'NAME', confidence: 0 };
     if (/^(?:dr\.?|doctor|consultant|team)\b/i.test(t.trim())) return { entity: 'NAME', confidence: 0 };
     if (this.scoreSheetStatus(t).confidence >= 0.76) return { entity: 'NAME', confidence: 0 };
     if (this.scoreWard(t).confidence >= 0.88) return { entity: 'NAME', confidence: 0 };
+    if (this.scoreTriageLevel(t).confidence >= 0.76) return { entity: 'NAME', confidence: 0 };
 
     // Reject: all uppercase short tokens that are known medical terms (not names)
     // Don't blanket-reject uppercase — PaddleOCR outputs "ALI", "OMAR", "DANA" in caps
@@ -2239,7 +2346,7 @@ const EntityRecognizer = {
 
     const hasArabic = /[\u0600-\u06FF]/.test(t);
     const arabicLen = (t.match(/[\u0600-\u06FF]/g) || []).length;
-    const words = t.trim().split(/\s+/);
+    const words = humanized.trim().split(/\s+/);
 
     // === Arabic text ===
     if (hasArabic && arabicLen >= 2) {
@@ -2289,19 +2396,19 @@ const EntityRecognizer = {
       // ALL CAPS multi-word — PaddleOCR outputs "AHMED AL-MUTAIRI" in caps
       if (words.every(w => /^[A-Z]/.test(w))) conf = Math.max(conf, 0.80);
       // Database-backed: any word matches a known name
-      const match = MedicalVocabulary.lookupName(t);
+      const match = MedicalVocabulary.lookupName(humanized);
       if (match && match.confidence >= 0.7) conf = Math.max(conf, match.confidence);
       // All lowercase multi-word but database match
       if (match && match.confidence >= 0.8 && words.every(w => /^[a-z]/.test(w))) {
         conf = Math.max(conf, 0.78);
       }
       // Mixed/any-case multi-word phrases with only letters — likely a name
-      if (words.length >= 2 && words.every(w => /^[a-zA-Z]{2,}$/.test(w)) && !MedicalVocabulary.correctTerm(t, 0)) {
+      if (words.length >= 2 && words.every(w => /^[a-zA-Z]{2,}$/.test(w)) && !MedicalVocabulary.correctTerm(humanized, 0)) {
         conf = Math.max(conf, 0.65);
       }
     }
 
-    const diagnosisEvidence = collectDiagnosisEvidence(t);
+    const diagnosisEvidence = collectDiagnosisEvidence(humanized);
     const stronglyClinicalPhrase = diagnosisEvidence.termMatches.length >= 2 ||
       diagnosisEvidence.termMatches.some(match => match.len >= 2) ||
       (diagnosisEvidence.startsWithClinicalTerm && diagnosisEvidence.detailHits > 0) ||
@@ -2311,14 +2418,14 @@ const EntityRecognizer = {
     else if (diagnosisEvidence.termMatches.length >= 1) conf *= 0.55;
 
     // === Penalize if it's a medical term ===
-    const medMatch = MedicalVocabulary.correctTerm(t, 0);
+    const medMatch = MedicalVocabulary.correctTerm(humanized, 0);
     if (medMatch) conf *= 0.25;
 
     // === Penalize if it looks like a medication ===
-    const medName = MedicalVocabulary.correctMedication(t, 0);
+    const medName = MedicalVocabulary.correctMedication(humanized, 0);
     if (medName) conf *= 0.3;
 
-    return { entity: 'NAME', confidence: conf };
+    return { entity: 'NAME', confidence: conf, corrected: humanized };
   },
 
   scoreDiagnosis(rawText) {
@@ -2401,6 +2508,38 @@ const EntityRecognizer = {
   },
 
   scoreMedication(t) {
+    const normalized = `${t || ''}`.trim();
+    const listTokens = normalized
+      .split(/[;,|]+/)
+      .map(token => token.trim())
+      .filter(Boolean);
+
+    if (listTokens.length >= 2) {
+      const indexedMatches = listTokens.map((token, index) => {
+        const match = MedicalVocabulary.correctMedication(token, 2);
+        if (match) return { index, token, match };
+        const normalizedToken = normalizeLatinOcrToken(token);
+        if (normalizedToken && normalizedToken !== token) {
+          const normalizedMatch = MedicalVocabulary.correctMedication(normalizedToken, 2);
+          if (normalizedMatch) return { index, token, match: normalizedMatch };
+        }
+        return null;
+      }).filter(Boolean);
+
+      const strongMatches = indexedMatches.filter(entry => (entry.match?.confidence || 0) >= 0.72);
+      if (strongMatches.length >= Math.max(2, Math.ceil(listTokens.length * 0.5))) {
+        const corrected = listTokens.map((token, index) =>
+          indexedMatches.find(entry => entry.index === index)?.match?.term || token
+        ).join(', ');
+        const avgConfidence = average(strongMatches.map(entry => entry.match.confidence), 0.75);
+        return {
+          entity: 'MEDICATION',
+          confidence: clamp(0.68 + (avgConfidence * 0.24) + (Math.min(strongMatches.length, 4) * 0.03)),
+          corrected,
+        };
+      }
+    }
+
     const match = MedicalVocabulary.correctMedication(t, 2);
     if (!match) return { entity: 'MEDICATION', confidence: 0 };
     let conf = 0.55 + match.confidence * 0.45;
@@ -2420,6 +2559,43 @@ const EntityRecognizer = {
     const statuses = { 'DNR': 1, 'DNAR': 1, 'FULL CODE': 1, 'COMFORT': 0.9, 'NFR': 0.9 };
     const conf = statuses[upper] || 0;
     return { entity: 'STATUS', confidence: conf, corrected: upper };
+  },
+
+  scoreTriageLevel(t) {
+    const normalized = `${t || ''}`.trim().replace(/\s+/g, ' ').toUpperCase();
+    if (!normalized) return { entity: 'TRIAGE', confidence: 0 };
+
+    const levels = ['RED', 'YELLOW', 'GREEN'];
+    if (levels.includes(normalized)) {
+      return { entity: 'TRIAGE', confidence: 0.98, corrected: normalized };
+    }
+
+    const variants = [...new Set([
+      stripForLexicon(normalized),
+      normalizeLatinOcrToken(normalized),
+    ].filter(Boolean))];
+
+    let bestLevel = '';
+    let bestDistance = Infinity;
+    for (const level of levels) {
+      const levelKey = stripForLexicon(level);
+      const distance = Math.min(...variants.map(variant => ocrDistance(variant, levelKey, 1)));
+      if (distance < bestDistance) {
+        bestDistance = distance;
+        bestLevel = level;
+      }
+    }
+
+    if (bestLevel && bestDistance <= 1) {
+      const base = Math.max(bestLevel.length, variants[0]?.length || bestLevel.length, 1);
+      return {
+        entity: 'TRIAGE',
+        confidence: clamp(0.72 + (1 - (bestDistance / base)) * 0.22),
+        corrected: bestLevel,
+      };
+    }
+
+    return { entity: 'TRIAGE', confidence: 0 };
   },
 
   scoreSheetStatus(t) {
@@ -2586,6 +2762,7 @@ const SpatialClusterer = {
       if (row.entities.some(entity => entity.entity === 'AGE')) score += 0.3;
       if (row.entities.some(entity => entity.entity === 'GENDER')) score += 0.2;
       if (hasPotentialNameAnchor(row.entities)) score += 0.9;
+      if (row.entities.some(entity => resolveAssemblyEntityType(entity) === 'TRIAGE')) score += 0.18;
       if (row.entities.some(entity => resolveAssemblyEntityType(entity) === 'DIAGNOSIS')) score += 0.2;
       if (row.entities.some(entity => ['ASSIGNED_DOCTOR', 'SHEET_STATUS'].includes(resolveAssemblyEntityType(entity)))) score += 0.12;
       return score;
@@ -2617,7 +2794,7 @@ const PatientAssembler = {
   assemble(cluster) {
     const patient = {
       fullName: null, age: null, gender: null, bed: null,
-      dx: null, meds: null, allergies: null, code: null,
+      triage: null, dx: null, meds: null, allergies: null, code: null,
       assignedDoctor: null, sheetStatus: null,
       confidence: 0, warnings: [], flags: [],
       fieldConfidence: {}, rawEntityCount: cluster.length,
@@ -2664,6 +2841,12 @@ const PatientAssembler = {
           if (!patient.gender) {
             patient.gender = entity.meta.gender;
             patient.fieldConfidence.gender = entity.confidence;
+          }
+          break;
+        case 'TRIAGE':
+          if (!patient.triage || entity.confidence > (patient.fieldConfidence.triage || 0)) {
+            patient.triage = (entity.corrected || entity.text || '').toUpperCase();
+            patient.fieldConfidence.triage = entity.confidence;
           }
           break;
         case 'DIAGNOSIS': diagnoses.push(entity); break;
@@ -2740,7 +2923,7 @@ const PatientAssembler = {
     const clusterSpan = Math.max(1, clusterMaxX - clusterMinX);
     const clinicalBoundary = Math.min(
       ...cluster
-        .filter(entity => ['DIAGNOSIS', 'MEDICATION', 'ASSIGNED_DOCTOR', 'SHEET_STATUS', 'STATUS', 'O2', 'ISOLATION'].includes(resolveAssemblyEntityType(entity)))
+        .filter(entity => ['DIAGNOSIS', 'MEDICATION', 'TRIAGE', 'ASSIGNED_DOCTOR', 'SHEET_STATUS', 'STATUS', 'O2', 'ISOLATION'].includes(resolveAssemblyEntityType(entity)))
         .map(entity => entity.box.x),
       Infinity
     );
@@ -2788,7 +2971,7 @@ const PatientAssembler = {
       const sorted = [...names].sort((a, b) =>
         isArabic ? b.box.cx - a.box.cx : a.box.cx - b.box.cx
       );
-      patient.fullName = [...new Set(sorted.map(e => (e.corrected || e.text).trim()).filter(Boolean))].join(' ');
+      patient.fullName = [...new Set(sorted.map(e => humanizeLikelyNameText(e.corrected || e.text)).filter(Boolean))].join(' ');
       patient.fieldConfidence.fullName = average(names.map(e => e.confidence), 0.45);
     }
 
@@ -2812,7 +2995,7 @@ const PatientAssembler = {
     }
 
     const structuredCore = structureRoles.includes('NAME') && structureRoles.includes('DIAGNOSIS');
-    const structuredSupportCount = ['ASSIGNED_DOCTOR', 'SHEET_STATUS', 'WARD', 'BED', 'GENDER', 'AGE_GENDER']
+    const structuredSupportCount = ['ASSIGNED_DOCTOR', 'SHEET_STATUS', 'WARD', 'BED', 'GENDER', 'AGE_GENDER', 'TRIAGE']
       .filter(role => structureRoles.includes(role)).length;
     const structuredRosterTriplet = structuredCore && projectedColumnCount >= 3 && (patient.assignedDoctor || patient.sheetStatus);
     const sparseStructuredRoster = structuredRosterTriplet && !patient.bed && patient.age == null && !patient.gender && !patient.civilId;
@@ -2832,6 +3015,7 @@ const PatientAssembler = {
     if (patient.fullName && patient.dx && structuredCore) structureBonus += 0.12;
     if (patient.assignedDoctor && structureRoles.includes('ASSIGNED_DOCTOR')) structureBonus += 0.05;
     if (patient.sheetStatus && structureRoles.includes('SHEET_STATUS')) structureBonus += 0.04;
+    if (patient.triage && structureRoles.includes('TRIAGE')) structureBonus += 0.04;
     if (patient.ward && structureRoles.includes('WARD')) structureBonus += 0.04;
     if (sheetContextCount > 0) structureBonus += Math.min(sheetContextCount, 2) * 0.03;
     if (projectedColumnCount >= 3) structureBonus += 0.05;
@@ -2844,6 +3028,7 @@ const PatientAssembler = {
       { value: patient.fieldConfidence.ageGender, weight: 2.1 },
       { value: patient.fieldConfidence.age, weight: patient.gender ? 0.4 : 1.1 },
       { value: patient.fieldConfidence.gender, weight: patient.age ? 0.4 : 1.1 },
+      { value: patient.fieldConfidence.triage, weight: 0.9 },
       { value: patient.fieldConfidence.dx, weight: 1.7 },
       { value: patient.fieldConfidence.meds, weight: 1.1 },
       { value: patient.fieldConfidence.allergies, weight: 0.7 },
@@ -3019,12 +3204,26 @@ function splitDetections(detections) {
       simpleTokens.length <= 6 &&
       EntityRecognizer.scoreDiagnosis(fullText).confidence >= 0.76
     );
+    const preserveBedPhraseCell = (
+      simpleTokens.length >= 2 &&
+      simpleTokens.length <= 3 &&
+      EntityRecognizer.scoreBed(fullText).confidence >= 0.76
+    );
+    const preserveDelimitedClinicalCell = (
+      /[;,]+/.test(fullText) &&
+      (
+        EntityRecognizer.scoreDiagnosis(fullText).confidence >= 0.68 ||
+        EntityRecognizer.scoreMedication(fullText).confidence >= 0.68
+      )
+    );
     if (
       isHeaderLike(fullText) ||
       EntityRecognizer.scoreWard(fullText).confidence >= 0.72 ||
       EntityRecognizer.scoreSheetStatus(fullText).confidence >= 0.76 ||
       preservePhraseCell ||
-      preserveClinicalPhraseCell
+      preserveBedPhraseCell ||
+      preserveClinicalPhraseCell ||
+      preserveDelimitedClinicalCell
     ) {
       result.push(det);
       continue;
@@ -3110,6 +3309,21 @@ function shouldMerge(a, b) {
   if (a.gender && b.gender && a.gender !== b.gender) return false;
   if (a.age != null && b.age != null && Math.abs(a.age - b.age) > 8) return false;
 
+  const aDx = stripForLexicon(a.dx);
+  const bDx = stripForLexicon(b.dx);
+  const aMeds = stripForLexicon(a.meds);
+  const bMeds = stripForLexicon(b.meds);
+  const clinicalDxMatch = aDx && bDx && (aDx === bDx || aDx.includes(bDx) || bDx.includes(aDx));
+  const clinicalMedsMatch = aMeds && bMeds && (aMeds === bMeds || aMeds.includes(bMeds) || bMeds.includes(aMeds));
+  const onePartialIdentity = (!a.fullName || !a.bed) || (!b.fullName || !b.bed);
+  const tightlyCompatible = (a.age != null && b.age != null && Math.abs(a.age - b.age) <= 1) &&
+    (!a.gender || !b.gender || a.gender === b.gender);
+
+  if (onePartialIdentity && tightlyCompatible) {
+    if (clinicalDxMatch && (clinicalMedsMatch || !a.meds || !b.meds)) return true;
+    if (clinicalMedsMatch && (clinicalDxMatch || !a.dx || !b.dx)) return true;
+  }
+
   if (a.fullName && b.fullName) {
     const normalizedA = normalizeNameForMerge(a.fullName);
     const normalizedB = normalizeNameForMerge(b.fullName);
@@ -3147,11 +3361,12 @@ function filterMeaningfulEntities(entities) {
 }
 
 function scoreLikelyNameText(text) {
-  const raw = `${text || ''}`.trim();
+  const raw = humanizeLikelyNameText(text);
   if (!raw || raw.length < 2 || /\d/.test(raw) || isHeaderLike(raw)) return 0;
   if (EntityRecognizer.scoreWard(raw).confidence > 0.72) return 0;
   if (EntityRecognizer.scoreSheetStatus(raw).confidence > 0.76) return 0;
   if (EntityRecognizer.scoreStatus(raw.toUpperCase()).confidence > 0.82) return 0;
+  if (EntityRecognizer.scoreTriageLevel(raw).confidence > 0.82) return 0;
   if (EntityRecognizer.scoreO2(raw).confidence > 0.82) return 0;
   if (EntityRecognizer.scoreIsolation(raw.toUpperCase()).confidence > 0.82) return 0;
 
@@ -3216,6 +3431,7 @@ function rowIdentityScore(entities) {
   if (entities.some(entity => entity.entity === 'GENDER')) score += 0.25;
   if (entities.some(entity => entity.entity === 'CIVIL_ID')) score += 0.6;
   if (hasPotentialNameAnchor(entities)) score += 0.95;
+  if (entities.some(entity => resolveAssemblyEntityType(entity) === 'TRIAGE')) score += 0.18;
   if (entities.some(entity => resolveAssemblyEntityType(entity) === 'DIAGNOSIS')) score += 0.2;
   if (entities.some(entity => ['ASSIGNED_DOCTOR', 'SHEET_STATUS'].includes(resolveAssemblyEntityType(entity)))) score += 0.12;
   return score;
@@ -3325,6 +3541,7 @@ function applyRoleProjection(entity, role) {
     },
     DIAGNOSIS: EntityRecognizer.scoreDiagnosis.bind(EntityRecognizer),
     MEDICATION: EntityRecognizer.scoreMedication.bind(EntityRecognizer),
+    TRIAGE: EntityRecognizer.scoreTriageLevel.bind(EntityRecognizer),
     ALLERGY: EntityRecognizer.scoreAllergy.bind(EntityRecognizer),
     STATUS: EntityRecognizer.scoreStatus.bind(EntityRecognizer),
     SHEET_STATUS: EntityRecognizer.scoreSheetStatus.bind(EntityRecognizer),
@@ -3370,6 +3587,7 @@ function resolveColumnRole(text) {
 
   // Fallback: infer role from content patterns (was unreachable dead code before)
   const cleaned = `${text || ''}`.trim().replace(/[:\-]+$/, '');
+  if (/^(?:triage|priority|acuity)$/i.test(cleaned)) return 'TRIAGE';
   if (/^(?:o2|oxygen|airway|resp|fio2)$/i.test(cleaned)) return 'O2';
   if (/^(?:iso|isolation|precautions?)$/i.test(cleaned)) return 'ISOLATION';
   if (/^(?:mob|mobility|transport)$/i.test(cleaned)) return 'MOBILITY';
@@ -3421,6 +3639,8 @@ function mapEntityToColumnRole(entityType) {
       return 'DIAGNOSIS';
     case 'MEDICATION':
       return 'MEDICATION';
+    case 'TRIAGE':
+      return 'TRIAGE';
     case 'ALLERGY':
       return 'ALLERGY';
     case 'STATUS':
@@ -3451,7 +3671,7 @@ function resolveAssemblyEntityType(entity) {
   if (!columnRole) return entity.entity;
 
   const projectedEntityType = mapColumnRoleToEntityType(columnRole);
-  if (!['NAME', 'DIAGNOSIS', 'MEDICATION', 'ALLERGY', 'STATUS', 'ASSIGNED_DOCTOR', 'SHEET_STATUS', 'WARD', 'O2', 'ISOLATION'].includes(projectedEntityType)) {
+  if (!['NAME', 'DIAGNOSIS', 'MEDICATION', 'TRIAGE', 'ALLERGY', 'STATUS', 'ASSIGNED_DOCTOR', 'SHEET_STATUS', 'WARD', 'O2', 'ISOLATION'].includes(projectedEntityType)) {
     return entity.entity;
   }
 
@@ -3462,7 +3682,7 @@ function resolveAssemblyEntityType(entity) {
     return 'WARD';
   }
 
-  if (['UNKNOWN', 'NAME', 'DIAGNOSIS', 'MEDICATION', 'WARD'].includes(entity.entity)) {
+  if (['UNKNOWN', 'NAME', 'DIAGNOSIS', 'MEDICATION', 'TRIAGE', 'WARD'].includes(entity.entity)) {
     return projectedEntityType;
   }
 
@@ -3477,6 +3697,8 @@ function mapColumnRoleToEntityType(role) {
       return 'DIAGNOSIS';
     case 'MEDICATION':
       return 'MEDICATION';
+    case 'TRIAGE':
+      return 'TRIAGE';
     case 'ALLERGY':
       return 'ALLERGY';
     case 'STATUS':
@@ -3543,6 +3765,11 @@ function inferColumnsFromRows(rows, imageWidth) {
         const diagnosisScore = EntityRecognizer.scoreDiagnosis(text).confidence || 0;
         if (diagnosisScore >= 0.5) {
           roleWeights.set('DIAGNOSIS', (roleWeights.get('DIAGNOSIS') || 0) + diagnosisScore);
+        }
+
+        const triageScore = EntityRecognizer.scoreTriageLevel(text).confidence || 0;
+        if (triageScore >= 0.72) {
+          roleWeights.set('TRIAGE', (roleWeights.get('TRIAGE') || 0) + triageScore);
         }
       });
 
@@ -3616,12 +3843,37 @@ function resolveEntityColumnRole(entity) {
 }
 
 function buildRowText(row) {
-  return [...row]
-    .sort((a, b) => a.box.cx - b.box.cx)
-    .map(entity => entity.corrected || entity.text || '')
-    .join(' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+  const sorted = [...row].sort((a, b) => a.box.cx - b.box.cx);
+  const parts = [];
+  let previous = null;
+
+  for (const entity of sorted) {
+    const text = normalizeReadableTokenText(entity.corrected || entity.text || '');
+    if (!text) continue;
+
+    if (!previous) {
+      parts.push(text);
+      previous = entity;
+      continue;
+    }
+
+    const gap = entity.box.x - (previous.box.x + previous.box.w);
+    const prevText = normalizeReadableTokenText(previous.corrected || previous.text || '');
+    const approxCharWidth = Math.max(6, previous.box.w / Math.max(prevText.replace(/\s+/g, '').length, 1));
+    parts.push(gap > approxCharWidth * 2.6 ? `  ${text}` : ` ${text}`);
+    previous = entity;
+  }
+
+  return parts.join('').replace(/\s+/g, ' ').trim();
+}
+
+function buildRecognizedRawText(entities) {
+  return groupEntitiesIntoRows(
+    entities.filter(entity => entity.entity !== 'NOISE')
+  )
+    .map(row => buildRowText(row))
+    .filter(Boolean)
+    .join('\n');
 }
 
 function describeProjectedRow(row) {
@@ -3652,6 +3904,7 @@ function describeProjectedRow(row) {
   if (hasRole('AGE_GENDER')) identityScore += 0.85;
   if (hasRole('DIAGNOSIS')) identityScore += 0.45;
   if (hasRole('MEDICATION')) identityScore += 0.35;
+  if (hasRole('TRIAGE')) identityScore += 0.22;
   if (hasRole('ALLERGY')) identityScore += 0.25;
   if (hasRole('STATUS')) identityScore += 0.22;
   if (hasRole('O2')) identityScore += 0.2;
@@ -3676,7 +3929,7 @@ function describeProjectedRow(row) {
     centerY: average(row.map(entity => entity.box.cy), 0),
     hasHardAnchor: hasRole('BED') || hasRole('CIVIL_ID'),
     hasSoftAnchor: hasRole('NAME') || hasRole('AGE_GENDER'),
-    hasClinical: roles.some(role => ['DIAGNOSIS', 'MEDICATION', 'ALLERGY', 'STATUS', 'O2', 'ISOLATION'].includes(role)),
+    hasClinical: roles.some(role => ['DIAGNOSIS', 'MEDICATION', 'TRIAGE', 'ALLERGY', 'STATUS', 'O2', 'ISOLATION'].includes(role)),
     identityScore,
     rowText,
   };
@@ -3686,7 +3939,7 @@ function isProjectedSectionRow(profile) {
   if (profile.strongHeaderRow || profile.strongWardBanner) return true;
   if (profile.hasHardAnchor || profile.hasSoftAnchor || profile.hasClinical) return false;
   if (profile.headerCellCount >= Math.max(1, Math.ceil(profile.entityCount / 2))) return true;
-  return profile.roleCount > 0 && profile.roles.every(role => ['WARD', 'STATUS', 'SHEET_STATUS', 'O2', 'ISOLATION'].includes(role));
+  return profile.roleCount > 0 && profile.roles.every(role => ['WARD', 'TRIAGE', 'STATUS', 'SHEET_STATUS', 'O2', 'ISOLATION'].includes(role));
 }
 
 function shouldMergeProjectedContinuation(previousProfile, currentProfile, firstColumnX, avgHeight) {
@@ -3697,7 +3950,7 @@ function shouldMergeProjectedContinuation(previousProfile, currentProfile, first
   if (yGap > Math.max(34, avgHeight * 1.75)) return false;
 
   const onlyContinuationRoles = currentProfile.roleCount > 0 && currentProfile.roles.every(role =>
-    ['DIAGNOSIS', 'MEDICATION', 'ALLERGY', 'STATUS', 'SHEET_STATUS', 'ASSIGNED_DOCTOR', 'O2', 'ISOLATION', 'WARD'].includes(role)
+    ['DIAGNOSIS', 'MEDICATION', 'TRIAGE', 'ALLERGY', 'STATUS', 'SHEET_STATUS', 'ASSIGNED_DOCTOR', 'O2', 'ISOLATION', 'WARD'].includes(role)
   );
   if (onlyContinuationRoles) return true;
 
@@ -3710,6 +3963,32 @@ function shouldMergeProjectedContinuation(previousProfile, currentProfile, first
   }
 
   return currentProfile.identityScore < 0.65 && startsAfterIdentityColumns;
+}
+
+function shouldMergeProjectedLeadIn(previousProfile, currentProfile, firstColumnX, avgHeight) {
+  if (!previousProfile || !currentProfile) return false;
+
+  const yGap = Math.abs(currentProfile.centerY - previousProfile.centerY);
+  if (yGap > Math.max(34, avgHeight * 1.75)) return false;
+
+  const previousClinicalOnly =
+    (previousProfile.hasClinical || previousProfile.roles.includes('AGE_GENDER') || previousProfile.roles.includes('AGE')) &&
+    !previousProfile.hasHardAnchor &&
+    !previousProfile.roles.includes('NAME') &&
+    previousProfile.roleCount > 0 &&
+    previousProfile.roles.every(role =>
+      ['AGE_GENDER', 'AGE', 'GENDER', 'DIAGNOSIS', 'MEDICATION', 'TRIAGE', 'ALLERGY', 'STATUS', 'SHEET_STATUS', 'ASSIGNED_DOCTOR', 'O2', 'ISOLATION'].includes(role)
+    );
+  if (!previousClinicalOnly) return false;
+
+  const currentHasIdentity = currentProfile.hasHardAnchor || currentProfile.hasSoftAnchor;
+  if (!currentHasIdentity) return false;
+
+  const previousStartsAfterIdentityColumns = previousProfile.leftmost > (firstColumnX + Math.max(28, avgHeight * 1.35));
+  const currentStartsEarlier = currentProfile.leftmost < (previousProfile.leftmost - Math.max(18, avgHeight * 0.8));
+  if (!previousStartsAfterIdentityColumns || !currentStartsEarlier) return false;
+
+  return true;
 }
 
 function extractWardContext(row) {
@@ -3864,6 +4143,13 @@ function mergeProjectedRows(rows, initialContext = {}) {
     }
     const profile = describeProjectedRow(contextualRow);
     if (isProjectedSectionRow(profile)) continue;
+
+    if (merged.length > 0 && shouldMergeProjectedLeadIn(previousProfile, profile, firstColumnX, avgHeight)) {
+      merged[merged.length - 1].push(...contextualRow);
+      merged[merged.length - 1].sort((a, b) => a.box.cy - b.box.cy || a.box.cx - b.box.cx);
+      previousProfile = describeProjectedRow(merged[merged.length - 1]);
+      continue;
+    }
 
     if (merged.length > 0 && shouldMergeProjectedContinuation(previousProfile, profile, firstColumnX, avgHeight)) {
       merged[merged.length - 1].push(...contextualRow);
@@ -4285,19 +4571,16 @@ async function fetchModelWithCache(asset, onProgress) {
 
 function parseDictionary(data) {
   const text = typeof data === 'string' ? data : new TextDecoder().decode(data);
-  const rawEntries = text.split('\n').map(line => line.trim());
-  const entries = rawEntries.filter(Boolean);
+  const entries = text
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line && line !== '<blank>' && line !== '[blank]');
 
-  // The paddleocr library's ctcLabelDecode() already handles index 0 as blank
-  // (line: if (maxScoreIndex === 0) continue). So dict[1] should map to the
-  // first real character. Do NOT prepend a blank — that causes a +1 shift on
-  // every character (A→B, 0→1, etc.)
-  //
-  // Strip any explicit blank marker if the dict file has one.
-  if (entries[0] === '<blank>' || entries[0] === '[blank]') {
-    return entries.slice(1);
-  }
-
+  // paddleocr's ctcLabelDecode skips index 0 (blank) then does dict[index].
+  // The model's output index 1 should map to the first character in the dict file.
+  // Do NOT prepend a blank — that shifts every character by +1 (A→B, Bed→Cfe).
+  // The library handles index 0 internally: if (maxScoreIndex === 0) continue;
+  console.log(`[OCR] Dict loaded: ${entries.length} entries, first="${entries[0]}", last="${entries[entries.length-1]}"`);
   return entries;
 }
 
@@ -4717,6 +5000,7 @@ export function analyzeOcrWords(words, imageWidth, imageHeight) {
   // 3b. Context-aware refinement — use spatial neighbors to fix misclassifications
   const entities = refineEntitiesByContext(rawEntities, imageWidth);
   const entityCount = entities.filter(entity => entity.entity !== 'NOISE' && entity.entity !== 'HEADER').length;
+  const reconstructedRawText = buildRecognizedRawText(entities);
   console.log(`[OCR] Entities: ${entityCount} meaningful out of ${entities.length} total`);
   entities.filter(e => e.entity !== 'NOISE').slice(0, 15).forEach(e =>
     console.log(`[OCR]   "${e.text}" → ${e.entity} (conf=${e.confidence.toFixed(2)})`)
@@ -4739,6 +5023,8 @@ export function analyzeOcrWords(words, imageWidth, imageHeight) {
 
   return {
     patients: finalized,
+    rawText: reconstructedRawText,
+    entities,
     entityCount,
     clusterCount: bestHypothesis?.clusters?.length || 0,
     analysisScore,
@@ -4791,10 +5077,15 @@ function buildPassCandidate(results, canvas, profileId, meta = {}) {
       confidence: r.confidence,
     }));
 
-  const rawText = words.map(w => w.text).join(' ');
   const analysis = words.length > 0
     ? analyzeOcrWords(words, canvas.width || 1000, canvas.height || 1000)
-    : { patients: [], entityCount: 0, clusterCount: 0, analysisScore: 0, strategy: 'none', hypotheses: [] };
+    : { patients: [], rawText: '', entities: [], entityCount: 0, clusterCount: 0, analysisScore: 0, strategy: 'none', hypotheses: [] };
+  const rawText = analysis.rawText || buildRecognizedRawText(words.map(w => ({
+    text: w.text,
+    corrected: w.text,
+    entity: 'UNKNOWN',
+    box: normalizeBox(w.bbox || w),
+  })));
 
   const wordConfidence = average(words.map(w => w.confidence), 0.4);
   const qualityScore = clamp(
@@ -4862,20 +5153,41 @@ function fuseCandidatePasses(candidates) {
 export async function processPatientListImage(imageSource, onProgress) {
   const startTime = performance.now();
 
-  // VLM Enhancement: If the local VLM Docker engine is running, use it
-  // as a supplementary backend for higher accuracy on complex documents.
-  // The VLM results augment (not replace) the built-in PaddleOCR pipeline.
+  // VLM Fast Path: offload OCR to laptop/server — skip heavy WASM on phone
   let vlmResult = null;
   try {
     const vlmReady = await isVlmAvailable();
     if (vlmReady) {
-      onProgress?.('VLM engine detected — running enhanced analysis...');
+      onProgress?.('VLM server detected — offloading OCR...');
       vlmResult = await processWithVlm(imageSource, onProgress);
-      console.log('[OCR] VLM engine returned', vlmResult?.vlmElements?.length || 0, 'elements');
+      console.log('[OCR] VLM returned', vlmResult?.vlmElements?.length || 0, 'elements');
+      if (vlmResult?.rawText?.trim()) {
+        return {
+          patients: [], rawText: vlmResult.rawText,
+          processingTime: performance.now() - startTime,
+          engine: 'medtriage-vlm-offload', backend: vlmResult.backend || 'vlm-paddle',
+          entityCount: vlmResult.vlmElements?.length || 0, clusterCount: 0,
+          qualityScore: vlmResult.qualityScore || 0.85,
+          qualityBand: vlmResult.qualityScore >= 0.85 ? 'HIGH' : 'MEDIUM',
+          wordConfidence: vlmResult.qualityScore || 0.85, profile: 'vlm-offload',
+          reviewCount: vlmResult.vlmSummary?.flagged_for_review || 0,
+          consensusPasses: 1, strategy: 'vlm-offload',
+          vlm: { available: true, backend: vlmResult.backend,
+                 elementsCount: vlmResult.vlmElements?.length || 0,
+                 avgConfidence: vlmResult.vlmSummary?.avg_confidence || 0 },
+          passes: [{ profile: 'vlm', qualityScore: vlmResult.qualityScore || 0.85,
+                     qualityBand: 'HIGH', patients: 0, backend: vlmResult.backend,
+                     strategy: 'vlm-offload' }],
+        };
+      }
     }
   } catch (err) {
-    console.warn('[OCR] VLM engine unavailable, using built-in pipeline:', err.message);
+    console.warn('[OCR] VLM unavailable, using local pipeline:', err.message);
   }
+
+  // Local WASM pipeline (fallback when VLM server is not running)
+  const isMobile = typeof navigator !== 'undefined' &&
+    /Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent);
 
   const runtime = await initContextOCR(onProgress);
 
@@ -4884,7 +5196,15 @@ export async function processPatientListImage(imageSource, onProgress) {
   let variants;
   try {
     baseCanvas = await ImagePreprocessor.process(imageSource);
-    variants = ImagePreprocessor.buildVariants(baseCanvas);
+    if (isMobile) {
+      // Mobile: only 2 variants (source + balanced) for speed
+      variants = [
+        { id: 'source', label: 'Source image', canvas: baseCanvas },
+        { id: 'balanced', label: 'Balanced cleanup', canvas: ImagePreprocessor.applyProfile(baseCanvas, 'balanced') },
+      ];
+    } else {
+      variants = ImagePreprocessor.buildVariants(baseCanvas);
+    }
   } catch {
     variants = [{ id: 'source', label: 'Source image', canvas: imageSource }];
   }
@@ -4936,7 +5256,7 @@ export async function processPatientListImage(imageSource, onProgress) {
   }
 
   const currentBest = pickBestCandidate(candidates);
-  if (baseCanvas && (!currentBest || currentBest.qualityScore < 0.82 || currentBest.reviewCount > Math.ceil(Math.max(currentBest.patients.length, 1) * 0.45))) {
+  if (!isMobile && baseCanvas && (!currentBest || currentBest.qualityScore < 0.82 || currentBest.reviewCount > Math.ceil(Math.max(currentBest.patients.length, 1) * 0.45))) {
     const rescueVariants = ImagePreprocessor.buildRescueVariants(baseCanvas);
     for (const variant of rescueVariants) {
       onProgress?.(`Rescue OCR (${variant.label})...`);
@@ -5064,7 +5384,7 @@ export async function processPatientListImage(imageSource, onProgress) {
       ...p,
       dx: finalDx || p.dx || '',
       gender: p.gender || '',  // empty if OCR didn't extract it
-      triage: '',              // never auto-assign — clinician must confirm
+      triage: p.triage || '',  // only if OCR actually read it
       mobility: '',            // never auto-assign
       o2: p.o2 || '',          // only if OCR actually read it
       iso: p.iso || '',        // only if OCR actually read it

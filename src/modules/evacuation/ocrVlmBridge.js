@@ -6,8 +6,13 @@
 //
 // Falls back gracefully to the built-in engine if the VLM server is unavailable.
 
-const VLM_API_BASE = 'http://localhost:8701';
-const VLM_TIMEOUT_MS = 30000;
+// Auto-detect VLM server: try same-host first, then local network
+// On phone, window.location.hostname will be the laptop's IP
+const VLM_HOST = typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+  ? window.location.hostname  // Phone accessing via laptop IP
+  : 'localhost';              // Desktop/localhost
+const VLM_API_BASE = `http://${VLM_HOST}:8701`;
+const VLM_TIMEOUT_MS = 60000; // 60s for phone over WiFi
 
 let vlmAvailable = null; // null = unknown, true/false = cached probe result
 let lastProbeTime = 0;
