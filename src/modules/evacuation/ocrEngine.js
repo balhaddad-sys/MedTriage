@@ -16,7 +16,7 @@ import { isVlmAvailable, processWithVlm } from './ocrVlmBridge.js';
 import { logOcrTransaction, computeImageHash } from './ocrAuditLog.js';
 import { calibratePatient } from './ocrCalibration.js';
 import { suggestClinicalParameters } from './ocrTriageSuggestor.js';
-import { validatePatient } from './ocrPatientSchema.js';
+import { validatePatient, createSafetyFlag, collectPatientSafetyFlags } from './ocrPatientSchema.js';
 
 // ====== IMAGE PREPROCESSING ======
 const ImagePreprocessor = {
@@ -4285,7 +4285,20 @@ async function fetchModelWithCache(asset, onProgress) {
 
 function parseDictionary(data) {
   const text = typeof data === 'string' ? data : new TextDecoder().decode(data);
-  return text.split('\n').map(line => line.trim()).filter(Boolean);
+  const rawEntries = text.split('\n').map(line => line.trim());
+  const entries = rawEntries.filter(Boolean);
+
+  // The paddleocr library's ctcLabelDecode() already handles index 0 as blank
+  // (line: if (maxScoreIndex === 0) continue). So dict[1] should map to the
+  // first real character. Do NOT prepend a blank — that causes a +1 shift on
+  // every character (A→B, 0→1, etc.)
+  //
+  // Strip any explicit blank marker if the dict file has one.
+  if (entries[0] === '<blank>' || entries[0] === '[blank]') {
+    return entries.slice(1);
+  }
+
+  return entries;
 }
 
 async function createScriptService(detBuffer, modelBuffer, dictionary, isSecondary) {
@@ -4996,23 +5009,38 @@ export async function processPatientListImage(imageSource, onProgress) {
     const safetyFlags = [];
     const autoInferred = {};
     if (!p.gender && predictions.gender) {
-      safetyFlags.push({ field: 'gender', reason: 'Auto-inferred from name', value: predictions.gender, status: 'UNVALIDATED' });
+      safetyFlags.push(createSafetyFlag('AUTO_INFERRED_GENDER', {
+        reason: 'Auto-inferred from name',
+        value: predictions.gender,
+      }));
       autoInferred.gender = true;
     }
     if (clinicalSuggestions.triage.triage && !p.suggestedTriage) {
-      safetyFlags.push({ field: 'triage', reason: clinicalSuggestions.triage.reasoning, value: clinicalSuggestions.triage.triage, status: 'UNVALIDATED' });
+      safetyFlags.push(createSafetyFlag('AUTO_INFERRED_TRIAGE', {
+        reason: clinicalSuggestions.triage.reasoning,
+        value: clinicalSuggestions.triage.triage,
+      }));
       autoInferred.triage = true;
     }
     if (clinicalSuggestions.mobility.mobility !== 'AMBULATORY') {
-      safetyFlags.push({ field: 'mobility', reason: clinicalSuggestions.mobility.reasoning, value: clinicalSuggestions.mobility.mobility, status: 'UNVALIDATED' });
+      safetyFlags.push(createSafetyFlag('AUTO_INFERRED_MOBILITY', {
+        reason: clinicalSuggestions.mobility.reasoning,
+        value: clinicalSuggestions.mobility.mobility,
+      }));
       autoInferred.mobility = true;
     }
     if (clinicalSuggestions.o2.o2 !== 'NONE') {
-      safetyFlags.push({ field: 'o2', reason: clinicalSuggestions.o2.reasoning, value: clinicalSuggestions.o2.o2, status: 'UNVALIDATED' });
+      safetyFlags.push(createSafetyFlag('AUTO_INFERRED_O2', {
+        reason: clinicalSuggestions.o2.reasoning,
+        value: clinicalSuggestions.o2.o2,
+      }));
       autoInferred.o2 = true;
     }
     if (clinicalSuggestions.isolation.iso !== 'NONE') {
-      safetyFlags.push({ field: 'isolation', reason: clinicalSuggestions.isolation.reasoning, value: clinicalSuggestions.isolation.iso, status: 'UNVALIDATED' });
+      safetyFlags.push(createSafetyFlag('AUTO_INFERRED_ISOLATION', {
+        reason: clinicalSuggestions.isolation.reasoning,
+        value: clinicalSuggestions.isolation.iso,
+      }));
       autoInferred.isolation = true;
     }
 
@@ -5077,6 +5105,7 @@ export async function processPatientListImage(imageSource, onProgress) {
         acuityScore: acuity.acuityScore,
         acuitySignals: acuity.signals,
         imageHash,
+        autoSafetyFlags: safetyFlags,
         safetyNotice: safetyFlags.length > 0
           ? `${safetyFlags.length} field(s) auto-inferred — clinician confirmation required`
           : null,
@@ -5087,14 +5116,12 @@ export async function processPatientListImage(imageSource, onProgress) {
   // Schema validation — catch malformed data before it reaches the UI
   for (const patient of patients) {
     const validation = validatePatient(patient);
+    const mergedSafetyFlags = collectPatientSafetyFlags({
+      safetyFlags: patient.ocrMeta?.autoSafetyFlags || patient.safetyFlags || [],
+      ocrMeta: { safetyFlags: validation.safetyFlags || [] },
+    });
     patient.schemaValid = validation.valid;
     patient.schemaErrors = validation.errors;
-    patient.safetyFlags = [...(patient.safetyFlags || []), ...validation.safetyFlags.map(flag => ({
-      field: flag.replace(/_/g, ' ').toLowerCase(),
-      reason: `Schema: ${flag}`,
-      value: '',
-      status: 'UNVALIDATED',
-    }))];
     // Merge schema warnings into reviewReasons so UI can explain the badge
     if (validation.warnings.length > 0 || !validation.valid) {
       const schemaReasons = [
@@ -5122,8 +5149,16 @@ export async function processPatientListImage(imageSource, onProgress) {
       ];
     }
     // Attach safety flags to patient metadata for the signoff gate
-    patient.safetyFlags = safetyFlags;
-    patient.ocrMeta = { ...(patient.ocrMeta || {}), safetyFlags };
+    patient.safetyFlags = mergedSafetyFlags;
+    patient.ocrMeta = {
+      ...(patient.ocrMeta || {}),
+      reviewLevel: patient.reviewLevel,
+      safetyFlags: mergedSafetyFlags,
+      safetyFlagCodes: mergedSafetyFlags.map(flag => flag.code).filter(Boolean),
+      schemaValid: validation.valid,
+      schemaErrors: validation.errors,
+      schemaWarnings: validation.warnings,
+    };
   }
 
   // Recompute reviewCount AFTER schema validation escalations

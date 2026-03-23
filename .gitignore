@@ -26,4 +26,10 @@ __pycache__/
 *.pyc
 training/ocr/augmented/
 training/ocr/mega_training/
+training/ocr/results/
+training/ocr/vlm/adapters/
+training/ocr/vlm/__pycache__/
+training/ocr/vlm/training_dataset.json
+training/ocr/vlm/learned_corrections.json
 training/ocr/ground-truth/images/*.png
+training/ocr/ground-truth/font_test_*.png

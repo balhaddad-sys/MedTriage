@@ -10,8 +10,8 @@ import { test, describe } from 'node:test';
 import assert from 'node:assert/strict';
 
 // Import PRODUCTION code — these are the actual modules the OCR engine uses
-import { validatePatient } from '../src/modules/evacuation/ocrPatientSchema.js';
-import { computeCER, computeWER, computeFieldAccuracy } from '../src/modules/evacuation/ocrValidation.js';
+import { validatePatient, assessOcrImportReadiness } from '../src/modules/evacuation/ocrPatientSchema.js';
+import { computeCER, computeWER, computeFieldAccuracy, runValidation } from '../src/modules/evacuation/ocrValidation.js';
 import { suggestTriage, suggestMobility, suggestClinicalParameters } from '../src/modules/evacuation/ocrTriageSuggestor.js';
 
 // ═══════════════════════════════════════════════════════════════════
@@ -49,6 +49,13 @@ describe('Patient Schema Validation (production)', () => {
     const result = validatePatient({ dx: 'CHF' });
     assert.equal(result.valid, false);
     assert.ok(result.errors.some(e => /identifier/i.test(e)));
+  });
+
+  test('treats whitespace-only identifiers as missing', () => {
+    const result = validatePatient({ fullName: '   ', bed: '   ', civilId: '   ' });
+    assert.equal(result.valid, false);
+    assert.ok(result.safetyFlags.includes('NAME_MISSING'));
+    assert.ok(result.safetyFlags.includes('BED_MISSING'));
   });
 
   test('warns when allergies missing', () => {
@@ -104,6 +111,40 @@ describe('Dangerous Defaults Eliminated', () => {
   test('"FULL" code does NOT flag safety (it was explicitly captured)', () => {
     const result = validatePatient({ fullName: 'Test', code: 'FULL' });
     assert.ok(!result.safetyFlags.includes('CODE_STATUS_UNKNOWN'));
+  });
+});
+
+describe('OCR Import Readiness', () => {
+  test('REVIEW OCR record requires explicit clinician confirmation', () => {
+    const result = assessOcrImportReadiness({
+      fullName: 'Ahmed Al-Mutairi',
+      bed: 'A-01',
+      allergies: 'NKDA',
+      code: 'FULL',
+      gender: 'M',
+      ocrImported: true,
+      reviewLevel: 'REVIEW',
+      ocrMeta: {},
+    });
+    assert.equal(result.ready, false);
+    assert.ok(result.blockers.some(blocker => blocker.code === 'CLINICIAN_CONFIRMATION_REQUIRED'));
+  });
+
+  test('confirmed OCR REVIEW record is importable when schema-valid', () => {
+    const result = assessOcrImportReadiness({
+      fullName: 'Ahmed Al-Mutairi',
+      bed: 'A-01',
+      allergies: 'NKDA',
+      code: 'FULL',
+      gender: 'M',
+      ocrImported: true,
+      reviewLevel: 'REVIEW',
+      ocrMeta: {
+        clinicianConfirmed: true,
+        clinicianConfirmedAt: '2026-03-22T10:00:00.000Z',
+      },
+    });
+    assert.equal(result.ready, true);
   });
 });
 
@@ -196,6 +237,24 @@ describe('Validation Metrics (production)', () => {
     );
     assert.ok(result.overall < 1.0);
     assert.ok(result.fields.dx.accuracy < 1.0);
+  });
+
+  test('validation report records field accuracy and synthetic-only grade', () => {
+    const report = runValidation({
+      engine: 'test-engine',
+      results: [{
+        rawText: 'A1 Ahmed CHF',
+        patients: [{ fullName: 'Ahmed', bed: 'A1', dx: 'CHF' }],
+      }],
+    }, [{
+      imageId: 'gt-1',
+      rawText: 'A1 Ahmed CHF',
+      patients: [{ fullName: 'Ahmed', bed: 'A1', dx: 'CHF' }],
+    }], 'synthetic');
+
+    assert.equal(report.aggregate.fieldAccuracy.name, 1);
+    assert.equal(report.aggregate.fieldAccuracy.bed, 1);
+    assert.equal(report.medicalGradeAssessment.grade, 'SYNTHETIC_ONLY');
   });
 });
 

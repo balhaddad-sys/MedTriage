@@ -193,6 +193,7 @@ export function computeFieldAccuracy(predictedPatients, referencePatients) {
 // Run validation against a ground truth dataset
 // dataSource: 'synthetic' | 'real-world' — MUST be 'real-world' for medical-grade claim
 export function runValidation(ocrResults, groundTruth, dataSource = 'synthetic') {
+  const fieldAggregate = {};
   const report = {
     timestamp: new Date().toISOString(),
     engineVersion: ocrResults.engine || 'unknown',
@@ -226,6 +227,19 @@ export function runValidation(ocrResults, groundTruth, dataSource = 'synthetic')
     report.aggregate.cer.values.push(cer);
     report.aggregate.wer.values.push(wer);
     report.aggregate.patientDetectionRate.values.push(fieldAcc.patientMatchRate);
+
+    for (const [fieldName, stats] of Object.entries(fieldAcc.fields || {})) {
+      if (!fieldAggregate[fieldName]) {
+        fieldAggregate[fieldName] = { correct: 0, total: 0, cerSum: 0, cerCount: 0 };
+      }
+      fieldAggregate[fieldName].correct += stats.correct || 0;
+      fieldAggregate[fieldName].total += stats.total || 0;
+      const errorCount = Math.max(0, (stats.total || 0) - (stats.correct || 0));
+      if (errorCount > 0) {
+        fieldAggregate[fieldName].cerSum += (stats.avgCER || 0) * errorCount;
+        fieldAggregate[fieldName].cerCount += errorCount;
+      }
+    }
   }
 
   // Compute aggregate stats
@@ -241,8 +255,17 @@ export function runValidation(ocrResults, groundTruth, dataSource = 'synthetic')
     }
   }
 
+  const fieldAliases = { fullName: 'name', bed: 'bed', dx: 'dx' };
+  for (const [fieldName, stats] of Object.entries(fieldAggregate)) {
+    const accuracy = stats.total > 0 ? stats.correct / stats.total : null;
+    report.aggregate.fieldAccuracy[fieldName] = accuracy;
+    if (fieldAliases[fieldName]) {
+      report.aggregate.fieldAccuracy[fieldAliases[fieldName]] = accuracy;
+    }
+  }
+
   // Medical-grade assessment
-  report.medicalGradeAssessment = assessMedicalGrade(report.aggregate);
+  report.medicalGradeAssessment = assessMedicalGrade(report.aggregate, report.syntheticOnly);
 
   return report;
 }

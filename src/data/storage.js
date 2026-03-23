@@ -1,5 +1,6 @@
 // IndexedDB storage engine — single database, multiple object stores
 // Replaces idb-keyval which creates separate DBs per store (causes transaction conflicts)
+import { validatePatient, assessOcrImportReadiness } from '../modules/evacuation/ocrPatientSchema.js';
 
 const DB_NAME = 'medevac-v3';
 const DB_VERSION = 1;
@@ -121,6 +122,17 @@ export async function getPatient(id) {
 }
 
 export async function savePatient(patient) {
+  const validation = validatePatient(patient);
+  if (!validation.valid) {
+    throw new Error(validation.errors[0] || 'Patient record failed validation');
+  }
+  const existingPatient = patient?.id ? await getPatient(patient.id) : null;
+  if (patient?.ocrImported && !existingPatient) {
+    const readiness = assessOcrImportReadiness(patient, validation);
+    if (!readiness.ready) {
+      throw new Error(readiness.message);
+    }
+  }
   patient.modifiedAt = new Date().toISOString();
   await setItem(STORES.patients, patient.id, patient);
   return patient;

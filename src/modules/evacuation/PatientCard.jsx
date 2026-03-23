@@ -123,13 +123,13 @@ export default function PatientCard({ patient, forceExpand, onExpanded }) {
         <div style={styles.body}>
           <div style={styles.row}>
             <div>
-              <span style={styles.name}>{p.fullName || 'Unknown'}</span>
+              <span style={{ ...styles.name, ...(p.fullName ? {} : { color: colors.amber }) }}>{p.fullName || 'Name not captured'}</span>
               <span style={styles.ageGender}>{p.age}{p.gender ? `/${p.gender}` : ''}</span>
             </div>
             {expanded ? <ChevronUp size={16} color={colors.text3} /> : <ChevronDown size={16} color={colors.text3} />}
           </div>
           <div style={styles.row}>
-            <span style={styles.bed}>{p.bed || 'No bed'}</span>
+            <span style={{ ...styles.bed, ...(p.bed ? {} : { color: colors.amber }) }}>{p.bed || 'Bed not captured'}</span>
             <span style={styles.dx}>{p.dx || ''}</span>
           </div>
           <div style={styles.tags}>

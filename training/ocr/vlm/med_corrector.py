@@ -208,6 +208,33 @@ CHAR_SWAPS = [
 ]
 
 
+# Common English + medical words for algorithmic OCR degarbling
+# Used when the dictionary doesn't have the exact garbled form
+COMMON_MEDICAL_WORDS = {
+    # Common English
+    'from','with','daily','the','and','for','not','this','that','was','are','but',
+    'have','had','has','his','her','they','been','said','each','which','their',
+    'will','other','about','many','then','them','these','some','would','like',
+    'into','time','very','when','come','could','more','after','also','made',
+    'before','back','only','where','most','made','over','such','through',
+    'mobility','isolation','triage','allergies','diagnosis','medication',
+    'replacement','assessment','treatment','management','improvement',
+    'department','supplement','environment','emergency','admission',
+    'discharge','transferred','ambulatory','condition','elevation',
+    # Medical terms commonly garbled by rn->m or 1->l
+    'amiodarone','meropenem','methotrexate','metronidazole','midazolam',
+    'morphine','mobility','membrane','management','mechanism','medication',
+    'meningitis','metabolism','metformin','metoprolol','monitoring',
+    'albuterol','ticagrelor','hydroxychloroquine','piperacillin',
+    'tacrolimus','norepinephrine','dobutamine','epinephrine','dopamine',
+    'sultan','hospital','blue','replacement','disseminated','coagulation',
+    'ventilator','associated','pneumonia','hepatorenal','syndrome',
+    'hyperosmolar','hyperglycemic','necrotizing','fasciitis','peritonitis',
+    'spontaneous','bacterial','pneumothorax','subarachnoid','hemorrhage',
+    'decompensated','failure','warfarin','preeclampsia','intravascular',
+}
+
+
 class MedTermCorrector:
     """Corrects OCR errors in medical text using dictionary + pattern matching."""
 
@@ -236,6 +263,10 @@ class MedTermCorrector:
             return text, []
 
         corrections = []
+
+        # Pass 0: Universal OCR confusables (l/I/1, O/0, rn/m) on whole text
+        text = self._fix_ocr_confusables(text, corrections)
+
         words = text.split()
         result = []
 
@@ -274,13 +305,193 @@ class MedTermCorrector:
 
         return corrected_text, corrections
 
+    def _fix_ocr_confusables(self, text, corrections):
+        """Fix universal OCR l/I/1 and O/0 confusions using context rules."""
+        original = text
+
+        # Known medical abbreviations where l/I/1/0 get swapped
+        # These are CONTEXT-AWARE — only fix when the pattern is unambiguous
+        ABBREV_FIXES = {
+            # l -> I in uppercase medical abbreviations
+            'lV': 'IV', 'lCU': 'ICU', 'lM': 'IM', 'lNR': 'INR',
+            'BlD': 'BID', 'TlD': 'TID', 'QlD': 'QID',
+            'DKl': 'DKI', 'AKl': 'AKI', 'AMl': 'AMI',
+            'Gl ': 'GI ', 'Dl ': 'DI ', 'DVl': 'DVI',
+            'MRl': 'MRI', 'CTl': 'CTI', 'BMl': 'BMI',
+            'lVF': 'IVF', 'lBD': 'IBD', 'lBS': 'IBS',
+            'STEMl': 'STEMI', 'NSTEMl': 'NSTEMI',
+            # 1 -> l in names/words
+            'A1-': 'Al-', 'a1-': 'al-',
+            'Su1fa': 'Sulfa', 'su1fa': 'sulfa',
+            'Abdu11ah': 'Abdullah', 'abdu11ah': 'abdullah',
+            # Common word-level l/I swaps
+            'dally': 'daily', 'Dally': 'Daily',
+            'faliure': 'failure', 'fallure': 'failure',
+            'dlsease': 'disease', 'Dlsease': 'Disease',
+            'dlagnosls': 'diagnosis', 'Dlagnosls': 'Diagnosis',
+            'dlabetic': 'diabetic', 'Dlabetic': 'Diabetic',
+            'wlth': 'with', 'Wlth': 'With',
+            'lnjury': 'injury', 'lnfarction': 'infarction',
+            'lnfection': 'infection', 'lnflammation': 'inflammation',
+            'congeslive': 'congestive', 'Congeslive': 'Congestive',
+            'obstructlve': 'obstructive', 'Obstructlve': 'Obstructive',
+            'acqulred': 'acquired', 'communlty': 'community',
+            'Communlty': 'Community',
+            'atrlal': 'atrial', 'Atrlal': 'Atrial',
+            'fibrlllation': 'fibrillation',
+            'pulrnonary': 'pulmonary', 'Pulrnonary': 'Pulmonary',
+            'ernbolism': 'embolism',
+            'kldney': 'kidney', 'Kldney': 'Kidney',
+            'chronie': 'chronic', 'Chronie': 'Chronic',
+            # rn -> m confusions
+            'pneurnonia': 'pneumonia', 'pneurnonla': 'pneumonia',
+            'treatrnent': 'treatment', 'managernent': 'management',
+            'assessrnent': 'assessment', 'irnprovement': 'improvement',
+            'environrnent': 'environment', 'departrnent': 'department',
+            'supplernent': 'supplement', 'replacernent': 'replacement',
+            # 1/l in names and common words
+            'Kha1id': 'Khalid', 'kha1id': 'khalid',
+            'A11ergies': 'Allergies', 'a11ergies': 'allergies',
+            'c1opidogrel': 'clopidogrel', 'C1opidogrel': 'Clopidogrel',
+            'c1indamycin': 'clindamycin', 'c1arithromycin': 'clarithromycin',
+            # Missed drug names
+            'clprofloxacln': 'ciprofloxacin', 'clprofloxacin': 'ciprofloxacin',
+            'aspinn': 'aspirin', 'Aspinn': 'Aspirin',
+            'Su1fa': 'Sulfa', 'su1fa': 'sulfa',
+            # Transpositions
+            'shcok': 'shock', 'Shcok': 'Shock',
+            'shcck': 'shock', 'sahock': 'shock',
+            # rn/m in brand-name words
+            'Al-Sharnmari': 'Al-Shammari', 'al-sharnmari': 'al-shammari',
+            # More rn -> m at word boundaries
+            'rnobility': 'mobility', 'rnedication': 'medication',
+            'rneropenem': 'meropenem', 'rnethotrexate': 'methotrexate',
+            'rnidazolam': 'midazolam', 'rnorphine': 'morphine',
+            'rnetoprolol': 'metoprolol', 'rnetformin': 'metformin',
+            'rnanagement': 'management', 'rnembrane': 'membrane',
+            'rnonitoring': 'monitoring', 'rnechanism': 'mechanism',
+            'frorn': 'from', 'Frorn': 'From',
+            'decornpensated': 'decompensated',
+            'Dlsserninated': 'Disseminated', 'dlsserninated': 'disseminated',
+            'syndrorne': 'syndrome', 'Syndrorne': 'Syndrome',
+            'hernorrhage': 'hemorrhage', 'Hernorrhage': 'Hemorrhage',
+            'dobutarnine': 'dobutamine',
+            'arnodarone': 'amiodarone', 'Arnodarone': 'Amiodarone',
+            'pneurnonia': 'pneumonia', 'pneurncthorax': 'pneumothorax',
+            'preec1arnpsia': 'preeclampsia', 'preeclarnpsia': 'preeclampsia',
+            'Hyperosrno1ar': 'Hyperosmolar', 'hyperosrno1ar': 'hyperosmolar',
+            'hyperglycernic': 'hyperglycemic',
+            # 1 -> l in common words
+            'B1ue': 'Blue', 'b1ue': 'blue',
+            'rep1acement': 'replacement', 'Rep1acement': 'Replacement',
+            'e1evation': 'elevation', 'E1evation': 'Elevation',
+            'Hospita1': 'Hospital', 'hospita1': 'hospital',
+            'Su1tan': 'Sultan', 'su1tan': 'sultan',
+            'Hepatorena1': 'Hepatorenal', 'hepatorena1': 'hepatorenal',
+            'bacterla1': 'bacterial', 'Bacterla1': 'Bacterial',
+            'Ventl1ator': 'Ventilator', 'ventl1ator': 'ventilator',
+            'ticagre1or': 'ticagrelor',
+            'hydroxych1oroquine': 'hydroxychloroquine',
+            'a1buterol': 'albuterol',
+            # Misc common garbles
+            'allergles': 'allergies', 'Allergles': 'Allergies',
+            'trlage': 'triage', 'Trlage': 'Triage',
+            'lsolation': 'isolation', 'Isolatlon': 'Isolation',
+            'norepinephrlne': 'norepinephrine',
+            'plperacillin': 'piperacillin',
+            'tacrollmus': 'tacrolimus',
+            'warfarln': 'warfarin', 'Warfarln': 'Warfarin',
+            'coagulatlon': 'coagulation',
+            'peritonitls': 'peritonitis',
+            'fasciitls': 'fasciitis', 'Necrotlzing': 'Necrotizing',
+            'necrotlzing': 'necrotizing',
+            'assoclated': 'associated', 'Assoclated': 'Associated',
+            'Subarachnold': 'Subarachnoid', 'subarachnold': 'subarachnoid',
+            'Fatirna': 'Fatima', 'fatirna': 'fatima',
+            'lNH': 'INH', 'DNl': 'DNI',
+        }
+
+        # Abbreviations that must ALWAYS be uppercase (never case-adjust)
+        FORCE_UPPER = {'IV','ICU','IM','INR','BID','TID','QID','AMI','AKI',
+                       'GI','DI','MRI','BMI','IVF','IBD','IBS','STEMI','NSTEMI',
+                       'INH','DNI','DVI'}
+
+        for wrong, right in ABBREV_FIXES.items():
+            if wrong in text:
+                # If the right side is a known uppercase abbreviation, always use uppercase
+                if right.rstrip(' ') in FORCE_UPPER:
+                    text = text.replace(wrong, right)
+                else:
+                    idx = text.find(wrong)
+                    if idx >= 0:
+                        before_is_space = (idx == 0 or text[idx-1] in ' \t\n:;,.(')
+                        original_was_lower = wrong[0].islower()
+                        if before_is_space and original_was_lower and right[0].isupper():
+                            right_adjusted = right[0].lower() + right[1:]
+                            text = text.replace(wrong, right_adjusted, 1)
+                        else:
+                            text = text.replace(wrong, right)
+
+        if text != original:
+            corrections.append({
+                "original": original, "corrected": text,
+                "method": "ocr_confusable",
+            })
+
+        return text
+
     def _try_char_swaps(self, word):
-        """Try common OCR character swaps to find a dictionary match."""
+        """Try common OCR character swaps to find a dictionary match.
+        Uses multi-pass approach: single swaps, then combined swaps."""
+        # Pass 1: Single character swaps
         for old_char, new_char in CHAR_SWAPS:
             if old_char in word:
                 candidate = word.replace(old_char, new_char)
                 if candidate in self.dictionary:
                     return self.dictionary[candidate]
+
+        # Pass 2: rn -> m (the #1 OCR confusion for medical text)
+        if 'rn' in word:
+            candidate = word.replace('rn', 'm')
+            if candidate in self.dictionary:
+                return self.dictionary[candidate]
+            # Also check direct known words
+            if candidate in COMMON_MEDICAL_WORDS:
+                return candidate
+
+        # Pass 3: 1 -> l replacements (digit one -> letter L)
+        if '1' in word:
+            candidate = word.replace('1', 'l')
+            if candidate in self.dictionary:
+                return self.dictionary[candidate]
+            if candidate in COMMON_MEDICAL_WORDS:
+                return candidate
+
+        # Pass 4: Combined swaps (rn->m AND 1->l together)
+        candidate = word
+        if 'rn' in candidate:
+            candidate = candidate.replace('rn', 'm')
+        if '1' in candidate:
+            candidate = candidate.replace('1', 'l')
+        if 'l' in candidate and candidate != word:
+            # Also try l->i for remaining
+            pass
+        if candidate != word:
+            if candidate in self.dictionary:
+                return self.dictionary[candidate]
+            if candidate in COMMON_MEDICAL_WORDS:
+                return candidate
+
+        # Pass 5: l -> i in middle of words (not at start)
+        if len(word) > 3:
+            for i in range(1, len(word)):
+                if word[i] == 'l':
+                    candidate = word[:i] + 'i' + word[i+1:]
+                    if candidate in self.dictionary:
+                        return self.dictionary[candidate]
+                    if candidate in COMMON_MEDICAL_WORDS:
+                        return candidate
+
         return None
 
     def _check_lab_values(self, text):

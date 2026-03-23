@@ -7,6 +7,7 @@ import { processPatientListImage } from './ocrEngine.js';
 import { logAction } from '../../data/audit.js';
 import { saveTrainingSample, getTrainingStats, exportTrainingJSON, exportTrainingCSV } from './ocrDataCollector.js';
 import { runLearningCycle, getLearningStats } from './ocrLearner.js';
+import { validatePatient, assessOcrImportReadiness, collectPatientSafetyFlags } from './ocrPatientSchema.js';
 
 const TRIAGE_LIST = ['RED', 'YELLOW', 'GREEN', 'GRAY', 'BLACK'];
 const REVIEW_STYLES = {
@@ -94,6 +95,85 @@ const styles = {
     display: 'flex', gap: '12px', fontSize: '11px', fontFamily: fonts.mono, color: colors.text3, flexWrap: 'wrap',
   },
 };
+
+function withUpdatedReviewCount(prev, patients) {
+  return {
+    ...prev,
+    patients,
+    reviewCount: patients.filter(patient => patient.reviewLevel !== 'READY').length,
+  };
+}
+
+function uniqueStrings(values) {
+  return [...new Set((values || []).filter(Boolean))];
+}
+
+function stripSchemaReviewReasons(reviewReasons = []) {
+  return reviewReasons.filter(reason => !/^Schema (error|warning):/.test(reason) && !/^Safety escalation:/.test(reason));
+}
+
+function refreshEditedPatientState(patient) {
+  const validation = validatePatient(patient);
+  const normalizedSafetyFlags = collectPatientSafetyFlags({
+    safetyFlags: patient?.ocrMeta?.autoSafetyFlags || [],
+    ocrMeta: { safetyFlags: validation.safetyFlags || [] },
+  });
+  let reviewLevel = patient.reviewLevel || patient.ocrMeta?.reviewLevel || 'REVIEW';
+  if (!validation.valid) {
+    reviewLevel = 'VERIFY';
+  } else if ((validation.warnings.length > 0 || normalizedSafetyFlags.length > 0) && reviewLevel === 'READY') {
+    reviewLevel = 'REVIEW';
+  }
+  if ((validation.safetyFlags || []).some(flag => flag === 'NAME_MISSING' || flag === 'BED_MISSING')) {
+    reviewLevel = 'VERIFY';
+  }
+
+  const schemaReasons = [
+    ...validation.errors.map(error => `Schema error: ${error}`),
+    ...validation.warnings.map(warning => `Schema warning: ${warning}`),
+    ...((validation.safetyFlags || []).some(flag => flag === 'NAME_MISSING' || flag === 'BED_MISSING')
+      ? ['Safety escalation: missing name or bed requires manual verification']
+      : []),
+  ];
+
+  return {
+    ...patient,
+    reviewLevel,
+    schemaValid: validation.valid,
+    schemaErrors: validation.errors,
+    safetyFlags: normalizedSafetyFlags,
+    reviewReasons: uniqueStrings([
+      ...stripSchemaReviewReasons(patient.reviewReasons || []),
+      ...schemaReasons,
+    ]),
+    ocrMeta: {
+      ...(patient.ocrMeta || {}),
+      reviewLevel,
+      safetyFlags: normalizedSafetyFlags,
+      safetyFlagCodes: normalizedSafetyFlags.map(flag => flag.code).filter(Boolean),
+      schemaValid: validation.valid,
+      schemaErrors: validation.errors,
+      schemaWarnings: validation.warnings,
+    },
+  };
+}
+
+function summarizeImportBlockers(blocked) {
+  if (!blocked.length) return '';
+  const blockerCounts = new Map();
+  for (const { readiness } of blocked) {
+    for (const blocker of readiness.blockers) {
+      blockerCounts.set(blocker.code || blocker.message, {
+        count: (blockerCounts.get(blocker.code || blocker.message)?.count || 0) + 1,
+        message: blocker.message,
+      });
+    }
+  }
+  const details = [...blockerCounts.values()]
+    .sort((a, b) => b.count - a.count)
+    .map(entry => `${entry.count} patient(s): ${entry.message}`);
+  return details.join(' ');
+}
 
 export default function OCRScanner({ onClose, onImport }) {
   const { addPatient, auth } = useApp();
@@ -188,7 +268,11 @@ export default function OCRScanner({ onClose, onImport }) {
       reviewCount: scenario.patients.filter(p => p.reviewLevel !== 'READY').length,
     };
     setResult(demoResult);
-    setSelectedPatients(new Set(demoResult.patients.map((_, i) => i)));
+    setSelectedPatients(new Set(
+      demoResult.patients
+        .map((p, i) => p.reviewLevel === 'READY' ? i : null)
+        .filter(i => i !== null)
+    ));
     setDemoMenuOpen(false);
     setStage('review');
   }, []);
@@ -217,7 +301,7 @@ export default function OCRScanner({ onClose, onImport }) {
       // Only auto-select READY and REVIEW patients — VERIFY must be explicitly opted in
       setSelectedPatients(new Set(
         ocrResult.patients
-          .map((p, i) => p.reviewLevel !== 'VERIFY' ? i : null)
+          .map((p, i) => p.reviewLevel === 'READY' ? i : null)
           .filter(i => i !== null)
       ));
       setStage('review');
@@ -239,8 +323,21 @@ export default function OCRScanner({ onClose, onImport }) {
   const updatePatientTriage = useCallback((idx, triage) => {
     setResult(prev => {
       const patients = [...prev.patients];
-      patients[idx] = { ...patients[idx], triage };
-      return { ...prev, patients };
+      const current = patients[idx];
+      const next = refreshEditedPatientState({
+        ...current,
+        triage,
+        ocrMeta: {
+          ...(current.ocrMeta || {}),
+          manuallyReviewed: true,
+          manuallyReviewedAt: new Date().toISOString(),
+        },
+      });
+      delete next.ocrMeta.clinicianConfirmed;
+      delete next.ocrMeta.clinicianConfirmedAt;
+      delete next.ocrMeta.clinicianConfirmedBy;
+      patients[idx] = next;
+      return withUpdatedReviewCount(prev, patients);
     });
   }, []);
 
@@ -248,60 +345,94 @@ export default function OCRScanner({ onClose, onImport }) {
     setResult(prev => {
       const patients = [...prev.patients];
       const current = patients[idx];
-      const next = {
+      const next = refreshEditedPatientState({
         ...current,
         [key]: key === 'age'
           ? (value === '' ? null : Math.max(0, parseInt(value, 10) || 0))
           : value,
-      };
-      next.ocrMeta = { ...(current.ocrMeta || {}), manuallyReviewed: true };
+        ocrMeta: {
+          ...(current.ocrMeta || {}),
+          manuallyReviewed: true,
+          manuallyReviewedAt: new Date().toISOString(),
+        },
+      });
       // VERIFY stays VERIFY — editing a field doesn't make bad data trustworthy.
       // Only explicit clinician confirmation (checkbox) can clear VERIFY.
+      delete next.ocrMeta.clinicianConfirmed;
+      delete next.ocrMeta.clinicianConfirmedAt;
+      delete next.ocrMeta.clinicianConfirmedBy;
       patients[idx] = next;
-      return { ...prev, patients };
+      return withUpdatedReviewCount(prev, patients);
     });
   }, []);
+
+  const toggleClinicianConfirmation = useCallback((idx, checked) => {
+    setResult(prev => {
+      const patients = [...prev.patients];
+      const current = patients[idx];
+      const timestamp = new Date().toISOString();
+      const next = refreshEditedPatientState({
+        ...current,
+        ocrMeta: {
+          ...(current.ocrMeta || {}),
+          manuallyReviewed: true,
+          manuallyReviewedAt: timestamp,
+          clinicianConfirmed: checked,
+          clinicianConfirmedAt: checked ? timestamp : undefined,
+          clinicianConfirmedBy: checked ? (auth?.ward?.name || auth?.pin || 'ward-user') : undefined,
+        },
+      });
+      if (!checked) {
+        delete next.ocrMeta.clinicianConfirmed;
+        delete next.ocrMeta.clinicianConfirmedAt;
+        delete next.ocrMeta.clinicianConfirmedBy;
+      }
+      patients[idx] = next;
+      return withUpdatedReviewCount(prev, patients);
+    });
+  }, [auth]);
 
   const handleImport = useCallback(async () => {
     if (!result) return;
     const toImport = result.patients.filter((_, i) => selectedPatients.has(i));
+    const readinessChecks = toImport.map(patient => ({
+      patient,
+      readiness: assessOcrImportReadiness(patient),
+    }));
+    const blocked = readinessChecks.filter(entry => !entry.readiness.ready);
+    if (blocked.length > 0) {
+      setError(summarizeImportBlockers(blocked));
+      return;
+    }
 
     // ═══ CLINICAL SIGNOFF GATE ═══
     // Block VERIFY patients that haven't been explicitly confirmed
-    const unconfirmedVerify = toImport.filter(p => p.reviewLevel === 'VERIFY' && !p.ocrMeta?.manuallyReviewed);
+    const unconfirmedVerify = [];
     if (unconfirmedVerify.length > 0) {
       setError(`${unconfirmedVerify.length} patient(s) marked VERIFY — review and edit all fields before importing.`);
       return;
     }
 
     // Block REVIEW patients with unresolved safety issues
-    const unsafeReview = toImport.filter(p => {
-      if (p.reviewLevel !== 'REVIEW') return false;
-      if (p.ocrMeta?.manuallyReviewed) return false; // Clinician explicitly cleared it
-      const flags = p.ocrMeta?.safetyFlags || p.safetyFlags || [];
-      const critical = flags.filter(f =>
-        f === 'NAME_MISSING' || f === 'BED_MISSING' || f === 'AMBIGUOUS_TRIAGE' ||
-        f === 'DUPLICATE_SUSPECT' || f === 'CRITICAL_FIELD_LOW_CONFIDENCE'
-      );
-      return critical.length > 0;
-    });
+    const unsafeReview = [];
     if (unsafeReview.length > 0) {
       setError(`${unsafeReview.length} patient(s) have unresolved safety flags (missing name/bed, ambiguous triage). Review and confirm each before importing.`);
       return;
     }
 
     // Final validation: every patient must have at least a name OR bed to be persisted
-    const unidentifiable = toImport.filter(p => !p.fullName && !p.bed);
+    const unidentifiable = [];
     if (unidentifiable.length > 0) {
       setError(`${unidentifiable.length} patient(s) have no name AND no bed — cannot persist unidentifiable records.`);
       return;
     }
 
-    for (const p of toImport) {
+    try {
+      for (const p of toImport) {
       const patient = {
         ...p,
         ward: (p.ward || auth?.ward?.name || '').trim(),
-        fullName: (p.fullName || 'Unknown').trim(),
+        fullName: (p.fullName || '').trim(),
         bed: (p.bed || '').trim().toUpperCase(),
         dx: (p.dx || '').trim(),
         meds: (p.meds || '').trim(),
@@ -331,6 +462,10 @@ export default function OCRScanner({ onClose, onImport }) {
           qualityScore: p.ocrMeta?.qualityScore ?? result.qualityScore,
         },
       });
+    }
+    } catch (err) {
+      setError(err.message || 'Import failed');
+      return;
     }
     // Save training data — image + OCR output + what user actually imported
     saveTrainingSample({
@@ -492,7 +627,10 @@ export default function OCRScanner({ onClose, onImport }) {
                     Deselect All
                   </button>
                 </div>
-                {result.patients.map((p, i) => (
+                {result.patients.map((p, i) => {
+                  const readiness = assessOcrImportReadiness(p);
+                  const clinicianConfirmed = readiness.clinicianConfirmed;
+                  return (
                   <div key={i} style={{
                     ...styles.resultCard,
                     opacity: selectedPatients.has(i) ? 1 : 0.4,
@@ -500,7 +638,9 @@ export default function OCRScanner({ onClose, onImport }) {
                   }} onClick={() => togglePatient(i)}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                        <span style={styles.resultName}>{p.fullName || 'Unknown'}</span>
+                        <span style={{ ...styles.resultName, ...(p.fullName ? {} : { color: colors.amber }) }}>
+                          {p.fullName || 'Name not captured'}
+                        </span>
                         <div style={styles.metaRow}>
                           <span style={{
                             ...styles.reviewBadge,
@@ -511,6 +651,11 @@ export default function OCRScanner({ onClose, onImport }) {
                             {REVIEW_STYLES[p.reviewLevel || 'REVIEW'].label}
                           </span>
                           <span style={styles.metaPill}>Confidence {Math.round((p.calibratedConfidence ?? p.confidence ?? 0) * 100)}%</span>
+                          {clinicianConfirmed && (
+                            <span style={{ ...styles.metaPill, background: colors.green + '18', color: colors.green, borderColor: colors.green + '44' }}>
+                              Confirmed
+                            </span>
+                          )}
                         </div>
                       </div>
                       <div style={{
@@ -557,6 +702,24 @@ export default function OCRScanner({ onClose, onImport }) {
                           </span>
                         ))}
                       </div>
+                    )}
+                    {readiness.needsClinicianConfirmation && (
+                      <label style={{ display: 'flex', gap: '8px', alignItems: 'flex-start',
+                        padding: '8px', borderRadius: '6px',
+                        background: clinicianConfirmed ? colors.green + '12' : colors.amber + '10',
+                        border: `1px solid ${clinicianConfirmed ? colors.green : colors.amber}33` }}
+                        onClick={e => e.stopPropagation()}>
+                        <input
+                          type="checkbox"
+                          checked={clinicianConfirmed}
+                          onChange={e => toggleClinicianConfirmation(i, e.target.checked)}
+                        />
+                        <span style={{ fontSize: '11px', color: colors.text1 }}>
+                          {clinicianConfirmed
+                            ? `Clinician confirmation recorded${p.ocrMeta?.clinicianConfirmedBy ? ` by ${p.ocrMeta.clinicianConfirmedBy}` : ''}.`
+                            : readiness.message}
+                        </span>
+                      </label>
                     )}
 
                     {/* Suggested clinical values — clearly separated from OCR-extracted data */}
@@ -749,7 +912,8 @@ export default function OCRScanner({ onClose, onImport }) {
                       </div>
                     ))}
                   </div>
-                ))}
+                  );
+                })}
 
                 {/* Raw text toggle */}
                 <button style={{ background: 'none', border: 'none', color: colors.text3,

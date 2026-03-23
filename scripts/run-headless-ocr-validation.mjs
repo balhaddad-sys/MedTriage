@@ -86,6 +86,7 @@ console.log('[3/4] Launching headless Chromium...');
 const puppeteer = await import('puppeteer');
 const browser = await puppeteer.default.launch({
   headless: 'new',
+  protocolTimeout: 600000, // CDP call timeout for long ONNX/model preload steps
   args: [
     '--no-sandbox',
     '--disable-setuid-sandbox',
@@ -94,7 +95,8 @@ const browser = await puppeteer.default.launch({
   ],
 });
 const page = await browser.newPage();
-page.setDefaultTimeout(120000);
+page.setDefaultTimeout(300000); // 5 min — ONNX model download can be slow
+page.setDefaultNavigationTimeout(300000);
 
 // Navigate to app
 await page.goto(`http://localhost:${PORT}`, { waitUntil: 'networkidle0' });
@@ -116,6 +118,24 @@ try {
   await browser.close();
   server.close();
   process.exit(1);
+}
+
+// Step 3b: Preload OCR models (first call is slow — downloads ONNX models)
+console.log('  Preloading OCR models (first run downloads ONNX, ~30-60s)...');
+try {
+  await page.evaluate(async () => {
+    if (window.preloadOcrModels) window.preloadOcrModels();
+    // Wait for models to initialize by running a tiny test image
+    const testCanvas = document.createElement('canvas');
+    testCanvas.width = 200; testCanvas.height = 50;
+    const ctx = testCanvas.getContext('2d');
+    ctx.fillStyle = '#fff'; ctx.fillRect(0, 0, 200, 50);
+    ctx.fillStyle = '#000'; ctx.font = '20px Arial'; ctx.fillText('test', 10, 35);
+    await window.processPatientListImage(testCanvas);
+  });
+  console.log('  OCR models preloaded and warm');
+} catch (e) {
+  console.log(`  Preload warning: ${e.message} — continuing anyway`);
 }
 
 // Step 4: Process each image
