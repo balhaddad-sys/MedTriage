@@ -4,7 +4,7 @@
 // being presented to the user. This catches malformed data, impossible values,
 // and dangerous field combinations.
 
-const VALID_TRIAGE = new Set(['RED', 'YELLOW', 'GREEN', '']);
+const VALID_TRIAGE = new Set(['RED', 'YELLOW', 'GREEN', 'BLACK', 'GRAY', '']);
 const VALID_MOBILITY = new Set(['AMBULATORY', 'WHEELCHAIR', 'STRETCHER', 'CRITICAL_TRANSPORT', '']);
 const VALID_GENDER = new Set(['M', 'F', '']);
 const VALID_REVIEW_LEVEL = new Set(['READY', 'REVIEW', 'VERIFY', '']);
@@ -174,7 +174,7 @@ export function validatePatient(patient) {
 
   // Confidence sanity
   if (patient.confidence != null) {
-    if (typeof patient.confidence !== 'number' || patient.confidence < 0 || patient.confidence > 1.1) {
+    if (typeof patient.confidence !== 'number' || patient.confidence < 0 || patient.confidence > 1.0) {
       errors.push(`Confidence out of range: ${patient.confidence}`);
     }
   }

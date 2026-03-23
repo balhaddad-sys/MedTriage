@@ -127,7 +127,7 @@ export async function verifyAuditChain() {
       const payload = JSON.stringify({
         id: r.id, timestamp: r.timestamp, imageHash: r.imageHash,
         prevHash: r.prevHash, patientCount: r.patients?.length || 0,
-        reviewLevels: r.reviewLevels,
+        reviewLevels: r.patientSummary?.byReviewLevel || r.reviewLevels,
       });
       const computed = await sha256(payload);
       if (computed !== r.recordHash) {
@@ -300,7 +300,7 @@ export async function logOcrTransaction({
     const recordPayload = JSON.stringify({
       id: record.id, timestamp: record.timestamp, imageHash: record.imageHash,
       prevHash: record.prevHash, patientCount: record.patients?.length || 0,
-      reviewLevels: record.reviewLevels,
+      reviewLevels: record.patientSummary?.byReviewLevel || null,
     });
     record.recordHash = await sha256(recordPayload);
 

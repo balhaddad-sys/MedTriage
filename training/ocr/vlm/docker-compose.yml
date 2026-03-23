@@ -16,8 +16,6 @@
 #           "medocr_airgap" network (internal: true).
 ##############################################################
 
-version: "3.9"
-
 networks:
   medocr_airgap:
     driver: bridge

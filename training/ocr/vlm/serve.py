@@ -23,6 +23,9 @@ from fastapi.responses import JSONResponse
 from inference_engine import MedGradeInferenceEngine
 from audit_logger import AuditLogger
 
+MAX_FILE_SIZE = 50 * 1024 * 1024  # 50 MB per file
+MAX_BATCH_SIZE = 20  # Maximum files per batch request
+
 app = FastAPI(
     title="MedGrade OCR API",
     description="Air-gapped medical document OCR with self-expanding intelligence",
@@ -63,6 +66,8 @@ async def process_image(
 
     with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as tmp:
         content = await file.read()
+        if len(content) > MAX_FILE_SIZE:
+            raise HTTPException(413, f"File too large ({len(content)} bytes, max {MAX_FILE_SIZE})")
         tmp.write(content)
         tmp_path = tmp.name
 
@@ -80,6 +85,8 @@ async def process_batch(
     user: str = Form(default="api_user"),
 ):
     """Process multiple medical document images."""
+    if len(files) > MAX_BATCH_SIZE:
+        raise HTTPException(400, f"Too many files ({len(files)}, max {MAX_BATCH_SIZE})")
     results = []
     engine = get_engine()
 
@@ -123,12 +130,13 @@ async def stats():
     training_dir = engine.training_dir
 
     processed = len(list(results_dir.glob("*.json")))
-    flagged = sum(1 for f in review_dir.glob("*.jsonl")
-                  for line in open(f) if line.strip())
+    flagged = 0
+    for f in review_dir.glob("*.jsonl"):
+        flagged += sum(1 for line in f.read_text(encoding="utf-8").splitlines() if line.strip())
     pairs = 0
     pairs_file = training_dir / "corrections.jsonl"
     if pairs_file.exists():
-        pairs = sum(1 for line in open(pairs_file) if line.strip())
+        pairs = sum(1 for line in pairs_file.read_text(encoding="utf-8").splitlines() if line.strip())
 
     return {
         "documents_processed": processed,
