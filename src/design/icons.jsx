@@ -137,3 +137,8 @@ export const ScanIcon = (props) => <I {...props} d={<>
   <path d="M21 17v2a2 2 0 01-2 2h-2" /><path d="M7 21H5a2 2 0 01-2-2v-2" />
   <path d="M7 12h10" />
 </>} />;
+
+export const BookIcon = (props) => <I {...props} d={<>
+  <path d="M4 19.5A2.5 2.5 0 016.5 17H20" />
+  <path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" />
+</>} />;
