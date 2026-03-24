@@ -14,6 +14,8 @@ import { boostEntityScore, resolveUnknownEntity, lookupLearnedName, lookupLearne
 import { disambiguate, inferAcuity, extractStructuredData, predictMissingFields, normalizeText, validateAgeDiagnosis } from './ocrBrain.js';
 import { isVlmAvailable, processWithVlm } from './ocrVlmBridge.js';
 import { correctMedicalText, correctPatientFields } from './ocrMedCorrector.js';
+import { correctTableRow, assessConfidence, ShifuLearningEngine, initShifu, saveShifu, shifuCorrect, shifuLearn } from './shifu/index.js';
+import { VOCABULARY } from './shifu/shifuVocabulary.js';
 import { logOcrTransaction, computeImageHash } from './ocrAuditLog.js';
 import { calibratePatient } from './ocrCalibration.js';
 import { suggestClinicalParameters } from './ocrTriageSuggestor.js';
@@ -5039,6 +5041,21 @@ async function fetchModelWithCache(asset, onProgress) {
 }
 
 function parseDictionary(data) {
+  const text = typeof data === 'string' ? data : new TextDecoder().decode(data);
+  const entries = text
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => line && line !== '<blank>' && line !== '[blank]');
+  // paddleocr's ctcLabelDecode() skips class 0 as the CTC blank and then reads
+  // dict[maxScoreIndex] for the emitted symbol, so the first real character must
+  // live at dict[1]. Prepending the blank token keeps the bundled runtime aligned.
+  const dictionary = ['', ...entries];
+  console.log(
+    `[OCR] Dict: ${dictionary.length} entries (including CTC blank), second="${dictionary[1]}", last="${dictionary[dictionary.length - 1]}"`
+  );
+  return dictionary;
+  /*
+
   // CRITICAL FIX — DO NOT REVERT
   // paddleocr's ctcLabelDecode() skips index 0 (CTC blank) internally:
   //   if (maxScoreIndex === 0) continue;
@@ -5062,6 +5079,7 @@ function parseDictionary(data) {
   // DO NOT prepend blank — causes +1 char shift (A→B). See git commit 16620e3.
   console.log(`[OCR] Dict: ${entries.length} entries, first="${entries[0]}", last="${entries[entries.length - 1]}"`);
   return entries;
+  */
 }
 
 async function createScriptService(detBuffer, modelBuffer, dictionary, isSecondary) {
@@ -5085,6 +5103,58 @@ async function createScriptService(detBuffer, modelBuffer, dictionary, isSeconda
 }
 
 let contextOcrRuntime = null;
+
+// Shifu V2 Learning Engine singleton — persists across scans, learns from every correction
+let shifuEngine = null;
+
+async function getShifuEngine() {
+  if (shifuEngine) return shifuEngine;
+  try {
+    // Try to restore from Firebase
+    const { getFirestore } = await import('firebase/firestore');
+    const db = getFirestore();
+    shifuEngine = await initShifu(db);
+  } catch {
+    // No Firebase available (offline/dev) — start fresh in-memory
+    shifuEngine = new ShifuLearningEngine(VOCABULARY);
+    console.log('[Shifu] Started fresh engine (no Firebase)');
+  }
+  return shifuEngine;
+}
+
+/**
+ * Call when a nurse confirms or corrects a patient record.
+ * Feeds the learning loop: confusion profile, ward vocabulary, context chains.
+ */
+export async function recordPatientCorrection(original, corrected) {
+  const engine = await getShifuEngine();
+  const ocrRow = {
+    Patient: original.fullName || original.name || '',
+    Diagnosis: original.dx || '',
+    Doctor: original.assignedDoctor || original.doctor || '',
+    Room: original.bed || '',
+    Status: original.sheetStatus || '',
+  };
+  const confirmedRow = {
+    Patient: corrected.fullName || corrected.name || '',
+    Diagnosis: corrected.dx || '',
+    Doctor: corrected.assignedDoctor || corrected.doctor || '',
+    Room: corrected.bed || '',
+    Status: corrected.sheetStatus || '',
+  };
+  engine.learn(ocrRow, confirmedRow);
+  // Persist to Firebase every 10 corrections
+  if (engine.correctionCount % 10 === 0) {
+    try {
+      const { getFirestore } = await import('firebase/firestore');
+      await saveShifu(getFirestore(), engine);
+    } catch {}
+  }
+}
+
+export function getLearningStats() {
+  return shifuEngine ? shifuEngine.getStats() : { totalCorrections: 0 };
+}
 let contextOcrInitPromise = null;
 let arabicInitPromise = null;
 let detBufferCached = null;
@@ -5802,6 +5872,47 @@ export async function processPatientListImage(imageSource, onProgress) {
     // Medical-grade OCR correction: fix drug names, diagnoses, l/I/1, rn/m confusions
     p = correctPatientFields(p);
 
+    // Shifu static corrector: field-aware corrections plus safety flags
+    try {
+      const ocrRow = {
+        Patient: p.fullName || '',
+        Diagnosis: p.dx || '',
+        Room: p.bed || '',
+        Doctor: p.assignedDoctor || '',
+        Status: p.sheetStatus || '',
+      };
+      const staticRow = correctTableRow(ocrRow);
+      const patientDecision = assessConfidence(staticRow.corrected.Patient || {});
+      const diagnosisDecision = assessConfidence(staticRow.corrected.Diagnosis || {});
+      const roomDecision = assessConfidence(staticRow.corrected.Room || {});
+      const doctorDecision = assessConfidence(staticRow.corrected.Doctor || {});
+      const statusDecision = assessConfidence(staticRow.corrected.Status || {});
+
+      if (staticRow.corrected.Patient?.output && patientDecision !== 'reject' && !staticRow.corrected.Patient.hasLowConfidenceWords) {
+        p.fullName = staticRow.corrected.Patient.output;
+      }
+      if (staticRow.corrected.Diagnosis?.output && diagnosisDecision !== 'reject' && !staticRow.corrected.Diagnosis.hasLowConfidenceWords) {
+        p.dx = staticRow.corrected.Diagnosis.output;
+      }
+      if (staticRow.corrected.Room?.output && roomDecision !== 'reject' && !staticRow.corrected.Room.hasLowConfidenceWords) {
+        p.bed = staticRow.corrected.Room.output;
+      }
+      if (staticRow.corrected.Doctor?.output && doctorDecision !== 'reject' && !staticRow.corrected.Doctor.hasLowConfidenceWords) {
+        p.assignedDoctor = staticRow.corrected.Doctor.output;
+      }
+      if (staticRow.corrected.Status?.output && statusDecision !== 'reject' && !staticRow.corrected.Status.hasLowConfidenceWords) {
+        p.sheetStatus = staticRow.corrected.Status.output;
+      }
+
+      if (staticRow.safetyFlags?.length > 0) {
+        p.shifuFlags = staticRow.safetyFlags;
+        p.needsReview = p.needsReview || staticRow.hasDangers || staticRow.hasWarnings;
+      }
+      p.shifuConfidence = assessConfidence(staticRow);
+    } catch (e) {
+      console.warn('[Shifu] Correction failed:', e.message);
+    }
+
     // Run brain: infer acuity, predict missing fields, normalize text
     const acuity = inferAcuity(p);
     const predictions = predictMissingFields(p);
@@ -6043,6 +6154,8 @@ export function preloadOcrModels() {
   if (contextOcrRuntime || contextOcrInitPromise) return;
   // Fire-and-forget background init — errors are non-fatal
   initContextOCR(() => {}).catch(() => {});
+  // Initialize Shifu V2 learning engine (loads from Firebase or starts fresh)
+  getShifuEngine().catch(() => {});
 }
 
 export { MedicalVocabulary, ClinicalValidator };

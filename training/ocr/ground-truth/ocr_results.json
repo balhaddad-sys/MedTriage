@@ -1,7 +1,7 @@
 [
   {
     "imageId": "gt_0000",
-    "rawText": "Ebuf;3137.14.24 Usjbhf Nfe.6XbseTiffu Nfet Ejbhoptjt Bhfjtfy SFE Obnf Cfe Dfgusjbypof-B!juispnzdjo BEIG-DLE5-EN3 36:N NbotpvsBm.Sbtijej SFE Sppn667 Tbmcvubnpm/Jqsbuspqjvn-Qsfeojtpmpof Qifvnpojb 6T?N# SbnjBm.B!nj F.N.13 ZFMMPX Bnpyjdjmujo.Dmbwvmbobuf Cspodijujt 63:N SbtijeBm.Eptbsj F.N.14 ZFMMPX Bnpyjdjmmjo.Dmbwvmbobuf Izqfslbmfnjb-DLE6 59:N GbibeB\".Ibksj F.N.15",
+    "rawText": "Ebuf 3137.14.24\nNfe.6 Xbse Tiffu Bhf: Tfy Ejbhoptjt Nfet Usjbhf\nCfe Obnf 36: N BEIG-DLE5-EN3 Dfgusjbypof-B!juispnzdjo SE\nSppn 667 Nbotpvs Bm.Sbtijej Qofvnpojb Tbmcvbnpm-jqsbuspqjvn-qsfeojtppo SE\nF.N.13 Sbnj Bm.B!nj 66: N Bnpyjdjmmjo.Dmbwvmbobuf ZFMMPX\nF.N.14 Sbtije Bm.Eptbsj 63: N Cspodijujt Bnpyjdjmmjo.Dmbwvmbobuf ZFMMPX\nF.N.15 Gbibe Bm.Ibksj 59: N Izqfslbmfnjb-DLE6",
     "patients": [
       {
         "fullName": "",
@@ -15,62 +15,7 @@
         "ward": ""
       },
       {
-        "fullName": "Ejbhoptjt",
-        "bed": "",
-        "age": null,
-        "gender": "",
-        "dx": "Nfe.6XbseTiffu, Bhfjtfy, Usjbhf",
-        "meds": "",
-        "triage": "",
-        "bloodType": "",
-        "ward": ""
-      },
-      {
-        "fullName": "BEIG-DLE5-EN3",
-        "bed": "",
-        "age": null,
-        "gender": "",
-        "dx": "Obnf, 36:N, Cfe, SE",
-        "meds": "",
-        "triage": "",
-        "bloodType": "",
-        "ward": ""
-      },
-      {
-        "fullName": "Qifvnpojb",
-        "bed": "",
-        "age": null,
-        "gender": "",
-        "dx": "NbotpvsBm.Sbtijej, Sppn667, HTN, SE",
-        "meds": "",
-        "triage": "",
-        "bloodType": "",
-        "ward": ""
-      },
-      {
-        "fullName": "Cspodijujt",
-        "bed": "",
-        "age": null,
-        "gender": "",
-        "dx": "SbnjBm.B!nj, F.N.13, ZFMMPX, 63:N",
-        "meds": "",
-        "triage": "",
-        "bloodType": "",
-        "ward": ""
-      },
-      {
-        "fullName": "Izqfslbmfnjb-DLE6",
-        "bed": "",
-        "age": null,
-        "gender": "",
-        "dx": "SbtijeBm.Eptbsj, GbibeB\".Ibksj",
-        "meds": "",
-        "triage": "",
-        "bloodType": "",
-        "ward": ""
-      },
-      {
-        "fullName": "Nfe.6XbseTiffu Bhf:Tfy Ejbhoptjt",
+        "fullName": "Nfe.6XbseTiffu",
         "bed": "",
         "age": null,
         "gender": "",
@@ -81,33 +26,55 @@
         "ward": ""
       },
       {
-        "fullName": "Cfe Obnf 36:N BEIG-DLE5-EN3",
+        "fullName": "Cfe Obnf",
         "bed": "",
         "age": null,
         "gender": "",
-        "dx": "SE",
+        "dx": "Dfgusjbypof-B!juispnzdjo, SE",
         "meds": "",
         "triage": "",
         "bloodType": "",
         "ward": ""
       },
       {
-        "fullName": "Sppn667 NbotpvsBm.Sbtijej 66:N Qofvnpojb",
+        "fullName": "Sppn667 Nbotpvs Bm.Sbtijej",
         "bed": "",
         "age": null,
         "gender": "",
-        "dx": "SE",
+        "dx": "Tbmcvubnpm-Jqsbuspqjvn-Qsfeojtpmpo, Tbmcvubnpm-Jqsbuspqjvn-Qsfeojtpmpof, Tbmcvbnpm-Jqsbuspqjvn-Qsfeojtppo, SE",
         "meds": "",
         "triage": "",
         "bloodType": "",
         "ward": ""
       },
       {
-        "fullName": "F.N.13 SbnjBm.B!nj 63:N Cspodijujt",
+        "fullName": "F.N.13 Sbnj Bm.B!nj",
         "bed": "",
         "age": null,
         "gender": "",
-        "dx": "ZFMMPX",
+        "dx": "Bnpyjdjmmjo.Dmbwvmbobuf, ZFMMPX",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.N.14 Sbtije Bm.Eptbsj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Bnpyjdjmmjo.Dmbwvmbobuf, ZFMMPX",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.N.15 Gbibe Bm.Ibksj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "59:N",
         "meds": "",
         "triage": "",
         "bloodType": "",
@@ -115,13 +82,68 @@
       }
     ],
     "engine": "medtriage-context-ocr-v5",
-    "qualityScore": 0.6965051408969244,
-    "processingTime": 82842.59999999404
+    "qualityScore": 0.7149619248051556,
+    "processingTime": 239735.80000001192
   },
   {
     "imageId": "gt_0001",
-    "rawText": "Bof mp b 22 2 mt jm2 F2 2 3 2 2 f 4",
+    "rawText": "Fsxbse Tiffu Ebuf 3137.14.28\nCfe Obnf Bhf: Tfy Ejbhoptjt Nfet Usjbhf\nSppn 372 Obeb Bm.Pubjcj ABG VUJ Bnpyjdjmmjo.Dmbwvmbobuf HSFFO\nT3 Gbsbi Bm.Efjiboj 6A: G Bofnjb-usbotgvtjpo SE\nJDV.4 Abisb Bm.Fof!j 96: G Dpqefybdfscbujpo Btqjsjo-ujdbhsfmps-fopybqbsjo HSFFO",
     "patients": [
+      {
+        "fullName": "Fsxbse Tiffu",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe Obnf",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Ejbhoptjt, Bhf:Tfy",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Sppn372 Obeb Bm.Pubjcj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "ABG, VUJ",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "T3 Gbsbi Bm.Efjiboj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Bofnjb-usbotgvtjpo",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "JDV.4 Abisb Bm.Fof!j",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Dpqefybdfscbujpo, 96:G",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
       {
         "fullName": "Bof",
         "bed": "2",
@@ -154,95 +176,62 @@
         "triage": "",
         "bloodType": "",
         "ward": ""
-      },
-      {
-        "fullName": "Ebuf 3137.14.28",
-        "bed": "",
-        "age": null,
-        "gender": "",
-        "dx": "FSXbseTiffu",
-        "meds": "",
-        "triage": "",
-        "bloodType": "",
-        "ward": ""
-      },
-      {
-        "fullName": "Nfet Usjbhf",
-        "bed": "",
-        "age": null,
-        "gender": "",
-        "dx": "Ejbhoptjt, Bhf:Tfy, Obnf, Cfe",
-        "meds": "",
-        "triage": "",
-        "bloodType": "",
-        "ward": ""
-      },
-      {
-        "fullName": "Btqjsjo-Ujdbhsfmps-Fopybqbsjo HSFFO",
-        "bed": "",
-        "age": null,
-        "gender": "",
-        "dx": "DPQEfybdfscbujpo",
-        "meds": "",
-        "triage": "",
-        "bloodType": "",
-        "ward": ""
       }
     ],
     "engine": "medtriage-context-ocr-v5",
-    "qualityScore": 0.70307604423993,
-    "processingTime": 66282.30000001192
+    "qualityScore": 0.7334038082999188,
+    "processingTime": 57507.29999998212
   },
   {
     "imageId": "gt_0002",
-    "rawText": "Ebuf;3137.14.15 Usjbhf OJDVXbseTiffu Nfet Bhf:Tfy Ejbhoptjt Obnf Jotvmjotqbsu-JotvmjoHbsjf HSFFO Cfe A1:N Nfojohjujt Gvsptfnjef51nhJW-Dbwfejmpm HSFFO F.N.12 TbmfnBm.Gbemj 54:N Btuinbfybdfscbujpo HSFFO C.3 ObttfsBm.Obttfs 72:N Sfobmgbjmvsf HSFFO NftibbmBm.Ibscj Bqjybcbo-Bnmpejqjof JDV.4 NvsbeBm.Sbtijej 54:N DWB)NDB*-BG Pnfqsb!pmf-Tvdsbmgbuf HSFFO B.5 44:G Ijqgsbduvsf HSFFO Sppn431 MvmxbBm.Nbotpvs Nfspqfofn-OT1/A& 58:G DIGfybdfscbujpo JnboBm.Eptbsj OT1/A&-Qbsbdfubnpm-Poebotfuspo ZFMMPX E.7 79:N Tfqujdtipdl OT1/A&-Qbsbdfubnpm-Poebotup HSFFO C.8 LibmfeBm.Tbmfn 75:G TCP EbobBm.B!nj Nfspqfofn-OT1/A& HSFFO Sppn45A 34:G VHJC-DME SFE B.A IbzbuBm.Kbcfs 73:G BSET HSFFO Cfe21 NbobmBm.Pubjcj Bqjybcbo-Bnmpejqjof 54:G QF-EWU Cfe22 abisbBm.Efjiboj",
+    "rawText": "Ebuf 3137.14.15\nOjdvxbse Tiffu Bhf Tfy Ejbhoptjt Nfet Usjbhf HSFFO\nCfe Obnf ATN Nfojohjujt Jotvmjotqbsu-jotvmjo Hbsjf Gvsptfnjef51nhJW-Dbwfejmpm HSFFO\nF.N.12 Tbmfn Bm.Gbemj 54: N Btuinbfybdfscbujpo HSFFO\nCD Obttfs Bm.Obttfs Nftibbm Bm.Ibscj 72: N Sfobmgbjmvsf Bqjybcbo-bnmpejqjof HSFFO\nJDV.4 Nvsbe Bm.Sbtijej 54: N Dwb Ndb-bg Pnfqsb!pmf-Tvdsbmgbuf HSFFO\nBP Sppn 431 Mvmxb Bm.Nbotpvs 44: G Ijqgsbduvsf Nfspqfofn-OT1 AF HSFFO\nE.7 Jnbo Bm.Eptbsj 58: G Digfybdfscbujpo OT1 A&-Qbsbdfubnpm-Poebotfuspo ZFMMPX\nCD Libmfe Bm.Tbmfn 79: N TTP Tfqujdtipdl OT1 A&-Qbsbdfubnpm-Poebotup HSFFO HSFFO\nSppn45A Ebob Bm.B!nj 75: G 34: G Vhjc-dme Nfspqfofn-OT1 AF SE\nCA Ibzbu Bm.Kbcfs Nbobm Bm.Pubjcj T3 BSET Bqjybcbo-bnmpejqjof HSFFO\nCfe 21 Abisb Bm.Efjiboj 54: G QF-EWU\nCfe 22",
     "patients": [
       {
-        "fullName": "Embhoptmt",
+        "fullName": "",
         "bed": "",
         "age": null,
         "gender": "",
-        "dx": "OJDVXbseTiffu, Bhf:Tfy, Nfet",
+        "dx": "Ojdvxbse Tiffu, Bhf Tfy, Nfet",
         "meds": "",
         "triage": "",
         "bloodType": "",
         "ward": ""
       },
       {
-        "fullName": "Nfojohjujt",
+        "fullName": "Obnf",
         "bed": "",
         "age": null,
         "gender": "",
-        "dx": "Gvsptfnjef51nhJW-Dbswfejmpm, Obnf, Cfe, ATN",
+        "dx": "Jotvmjotqbsu-jotvmjo Hbsjf, Gvsptfnjef51nhJW-Dbwfejmpm, Gvsptfnjef51nhJW-Dbswfejmpm, Jotvo Bq Hj, Cfe, ATN",
         "meds": "",
         "triage": "",
         "bloodType": "",
         "ward": ""
       },
       {
-        "fullName": "Btuinbfybdfscbujpo",
+        "fullName": "Tbmfn Bm.Gbemj",
         "bed": "",
         "age": null,
         "gender": "",
-        "dx": "ObttfsBm.Obttfs",
+        "dx": "Gvsptfnjef51nhJW-Dbswfejmpm, Jtvo Bq Hj, F.N.12, Cfe, ATN",
         "meds": "",
         "triage": "",
         "bloodType": "",
         "ward": ""
       },
       {
-        "fullName": "Sfobmgbjmvsf",
+        "fullName": "Obttfs Bm.Obttfs Nftibbm Bm.Ibscj",
         "bed": "",
         "age": null,
         "gender": "",
-        "dx": "Bqjybcbo-Bnmpejqjof, NftibbmBm.Ibscj, 72:N, CD",
+        "dx": "Bqjybcbo-Bnmpejqjof, 72:N, CD",
         "meds": "",
         "triage": "",
         "bloodType": "",
         "ward": ""
       },
       {
-        "fullName": "DWB)NDB*-BG",
+        "fullName": "Nvsbe B.Sbtijej",
         "bed": "",
         "age": null,
         "gender": "",
@@ -253,18 +242,18 @@
         "ward": ""
       },
       {
-        "fullName": "Ijqgsbduvsf",
+        "fullName": "Mvmxb Bm.Nbotpvs",
         "bed": "",
         "age": null,
         "gender": "",
-        "dx": "Pnfqsb!pmf-Tvdsbmguf, MvxbBm.Nbotpvs, Nfspqfofn-OT1, BP",
+        "dx": "Nfspqfofn-OT1, Sppn431, 44:G, BP, AF",
         "meds": "",
         "triage": "",
         "bloodType": "",
         "ward": ""
       },
       {
-        "fullName": "DIGfybdfscbujpo",
+        "fullName": "Jnbo Bm.Eptbsj",
         "bed": "",
         "age": null,
         "gender": "",
@@ -275,33 +264,121 @@
         "ward": ""
       },
       {
-        "fullName": "TTP VHJC-DME Tfqujdtipdl",
+        "fullName": "Libmfe Bm.Tbmfn",
         "bed": "",
         "age": null,
         "gender": "",
-        "dx": "A&-Qbsbdfubnpm-Poebotfuspo, LibmfeBm.Tbmfn, Nfspqfofn-OT1, EbobBm.B!nj, Sppn45A, 79:N",
+        "dx": "A&-Qbsbdfubnpm-Poebotup, A&-Qbsbdfubnpm-Poebotfuspo, 79:N, OT1, CD",
         "meds": "",
         "triage": "",
         "bloodType": "",
         "ward": ""
       },
       {
-        "fullName": "BSET QF-EWU",
+        "fullName": "Ebob Bm.B!nj",
         "bed": "",
         "age": null,
         "gender": "",
-        "dx": "Bqjybcbo-Bnmpejqjof, abisbBm.Efjiboj",
+        "dx": "Nfspqfofn-OT1, Sppn45A, 75:G, 34:G, AF",
         "meds": "",
         "triage": "",
         "bloodType": "",
         "ward": ""
       },
       {
-        "fullName": "Sfobmgbjmvsf DWB)NDB*-BG",
+        "fullName": "Ibzbu Bm.Kbcfs Nbobm Bm.Pubjcj",
         "bed": "",
         "age": null,
         "gender": "",
-        "dx": "Bqjybcbo-Bnmpejqjof, NftibbmBm.Ibscj, JDV.4, 72:N, CD",
+        "dx": "Bqjybcbo-Bnmpejqjof, CA",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Abisb Bm.Efjiboj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Cfe21, Cfe22",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Tbmfn B.Gbemj Obttfs Bm.Obttfs",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "F.N.12",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Nftibbm Bm.Ibscj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Bqjybcbo-Bnmpejqjof, 72:N, CD",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Jnbo Bm.Eptbsj Mvmxb Bm.Nbotpvs",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "A&-Qbsbdfubnpm-Poebotfuspo",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Obttfs Bm.Obttfs",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "F.N.12",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Ebob Bm.B!nj Libmfe B.Tbmfn",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "A&-Qbsbdfubnpm-Poebotfupo, Nfspqfofn-OT1, 75:G, OT1, CD, AF",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Ibzbu Bm.Kbcfs",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Sppn45A",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Nbobm B.Pubjcj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Bqjybcbo-Bnmpejqjof, Cfe21, 73:G, CA",
         "meds": "",
         "triage": "",
         "bloodType": "",
@@ -309,15 +386,15 @@
       }
     ],
     "engine": "medtriage-context-ocr-v5",
-    "qualityScore": 0.7288142159717301,
-    "processingTime": 122365.30000001192
+    "qualityScore": 0.7409367247759987,
+    "processingTime": 212923.60000002384
   },
   {
     "imageId": "gt_0003",
-    "rawText": "Ebuf;3137.14.38 Usjbhf Nfe.4XbseTiffu Nfet Bhf:Tfy Ejbhoptjt Cfe Obnf Opsbesfobmjof-Epcvubnjof HSFFO TbbeBm.Pubjcj 87:N Qofvnpojb Sppn345 Dfgusjbypof-B!juispnzdjo HSFFO 3A:N Tusplf B.3 SbnjBm.Ibksj HSFFO 33:G DBQ-BFDPQE E.4 abisbBm.Obttfs",
+    "rawText": "Ebuf 3137.14.38\nNfe.4 Xbse Tiffu Bhfm Tfy Ejbhoptjt Nfet Usjbhf HSFFO\nCfe Obnf 87: N Qofvnpojb Opsbesfobmjof-epcvubnjof HSFFO\nSppn 345 Tbbe Bm.Pubjcj 3A: N Tusplf Dfgusjbypof-B!juispnzdjo HSFFO\nT3 Sbnj Bm.Ibksj T3 Dbq-bfdpqe Tbcvubn-qbuspn-qsfejmpo\nT4 Abisb Bm.Obttfs",
     "patients": [
       {
-        "fullName": "Bhf:Tfy Ejbhoptjt",
+        "fullName": "Bhfm Tfy Ejbhoptjt",
         "bed": "",
         "age": null,
         "gender": "",
@@ -328,22 +405,77 @@
         "ward": ""
       },
       {
-        "fullName": "87:N Qofvnpojb",
+        "fullName": "Obnf 87:N Qofvnpojb",
         "bed": "",
         "age": null,
         "gender": "",
-        "dx": "Obnf, Cfe",
+        "dx": "Cfe",
         "meds": "",
         "triage": "",
         "bloodType": "",
         "ward": ""
       },
       {
-        "fullName": "33:G 3A:N Tusplf DBQ-BFDPQE",
+        "fullName": "Tbbe Bm.Pubjcj 3A:N Tusplf",
         "bed": "",
         "age": null,
         "gender": "",
-        "dx": "abisbBm.Obttfs, SbnjBm.Ibksj, Sppn345, T3, T4",
+        "dx": "Sppn345",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Sbnj Bm.Ibksj T3 Dbq-bfdpqe",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "T3",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Abisb B.Obttfs",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "T4",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Obnf",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Cfe",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Tbbe B.Pubjcj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Sppn345",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Sbnj Bm.Ibksj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "T3",
         "meds": "",
         "triage": "",
         "bloodType": "",
@@ -351,19 +483,1037 @@
       }
     ],
     "engine": "medtriage-context-ocr-v5",
-    "qualityScore": 0.7322951439220916,
-    "processingTime": 44025.29999998212
+    "qualityScore": 0.7479311522011609,
+    "processingTime": 90617.09999999404
   },
   {
     "imageId": "gt_0004",
-    "rawText": "B 9 29 S ; 22 2 222 222 2 1 9 222 b 22 B 9 2 22 v 22 2 AA o 2 2 2 3 3 22 221 2 21 2",
+    "rawText": "Ebuf 3137.14.38\nCfe Ojdvxbse Tiffu Obnf Bhfm Tfy Ejbhoptjt Nfet Usjbhf\nF.G.12 Bogbm Bm.Kbcfs 73: G Tfqtjt Vujtpvsdf-blj Ifqbsjo-xbsgbsjo HSFFO\nF.G.13 Ibobo Bm.Obttfs 96: G Djssiptjt-btdjuft TTP : 7-Qbsbdfubnpm-Poebotfuspo HSFFO\nCfe4 Ubsjr Bm.B!nj 73: N Tfqtjt Vujtpvsdf-blj Nfugpsnjo-bupswbtubujo HSFFO\nF.5 Cbefs Bm.B!nj 98: N Tusplf Btqjsjo-ujdbhsfmps-fopybqbsjo HSFFO\nSppn 297 cbtnbbm.tvcbjf 73: G BEIG-DLE5-EN3 LDJ-NhTP5 SE\n5B.17 bcevmmbibm.sbtijej ATN Djssiptjt-btdjuft Nfspqfofn-OT1 AF SE\nBP mvmxbbm.lboebsj 51: G Cspodijujt HSFFO",
     "patients": [
       {
         "fullName": "",
         "bed": "",
-        "age": 29,
+        "age": null,
+        "gender": "",
+        "dx": "3137.14.38",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe Ojdvxbse Tiffu Obnf",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Usjbhf, Nfet",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.G.12 Bogbm Bm.Kbcfs",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Tfqtjt VUJtpvsdf-BL#, Ifqbsjo-Xbsgbsjo, HSFFO",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.G.13 Ibobo Bm.Obttfs",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": ":-Qbsbdfubnpm-Poebotfuspo, HSFFO, TTP",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe4 Ubsjr Bm.B!nj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Nfugpsnjo-Bupswbtubujo, HSFFO",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.5 5B.17 Sppn297 Cbefs Bm.B!nj cbtnbbm.tvcbjf bcevmmbibm.sbtijej",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Btqjsjo-Ujdbhsfmps-Fopybqbsjo, Nfspqfofn-OT1, LDJ-NhTP5",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "BP mvmxbbm.lboebsj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Cspodijujt, HSFFO",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      }
+    ],
+    "engine": "medtriage-context-ocr-v5",
+    "qualityScore": 0.7105955684440047,
+    "processingTime": 162996.19999998808
+  },
+  {
+    "imageId": "gt_0005",
+    "rawText": "Nfe.6 Xbse Tiffu Ebuf 3137.14.31\nCfe Obnf Bhf Jtfy Ejbhoptjt Nfet Usjbhf\n5B.12 Bnjsb Bm.Hibojn 46 Djssiptjt-btdjuft Mfwfujsbdfubn-Njeb!pmbn ZFMMPX\nCfe3 Cbtibs Bm.Sbtijej 37: N BSET Pnfqsb!pmf-Tvdsbmgbuf SE\nCfe4 Tbbe Bm.Tibnnbsj 57: N VUJ Tbmcvubnpm-jqsbuspqjvn-qsfeojtpmpof ZFMMPX\nCfe5 Kbnjmb Bm.Fof!j 52: G Izqfslbmfnjb-DLE6 Dfgusjbypof-B!juispnzdjo SE",
+    "patients": [
+      {
+        "fullName": "Nfe.6XbseTiffu Ebuf",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "3137.14.31",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe Obnf Bhf Jtfy Ejbhoptjt",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Usjbhf, Nfet",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "5B.12 Bnjsb Bm.Hibojn Djssiptjt-btdjuft",
+        "bed": "",
+        "age": 46,
+        "gender": "",
+        "dx": "\\Mfwfujsbdfubn-Njeb!pmbn",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe3 Cbtibs Bm.Sbtijej 37:N BSET",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Pnfqsb!pmf-Tvdsbmgbuf, SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe4 Tbbe Bm.Tibnnbsj 57:N VUJ",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Tbmcvubnpm-Jqsbuspqjvn-Qsfeojtpmpof",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe5 Kbnjmb Bm.Fof!j 52:G Izqfslbmfnjb-DLE6",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Dfgusjbypof-B!juispnzdjo, SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      }
+    ],
+    "engine": "medtriage-context-ocr-v5",
+    "qualityScore": 0.6930974745442771,
+    "processingTime": 159888.29999998212
+  },
+  {
+    "imageId": "gt_0006",
+    "rawText": "Ddvxbse Tiffu Ebuf 3137.14.38\nCfe Obnf Bhfm Tfy Ejbhoptjt Nfet Usjbhf\nJDV.2 Kbcfs BJ.Tbcbi 77: N Djssiptjt-btdjuft TTP : : -Qbsbdfubnpm-Poebotfuspo ZFMMPX\nCfe3 Lbnbm Bm.Nbotpvs 63: N Vhjc-dme Tbmcvubnpm-jqsbuspqjvn-qsfeojtpmpof ZFMMPX\nJDV.4 Bogbm Bm.Tvcbjf 51: G Busjbmgjcsjmmbujpo Opsbesfobmjof-epcvubnjof ZFMMPX\n6C.15 Libejkb Bm.Sbtijej 5A: G Tubuvtfqjmfqujdvt ZFMMPX\nBP Btffm BJ.Cbefs 51: G Hjcmffe Wbodpnzdjo-Qjqfsbdjmmjo.Ub!pcbdubn ZFMMPX\nSppn4A8 Obttfs Bm.Tbcbi 64: N Dipmbohjujt Npsqijof-qbsbdfubnpm ZFMMPX\nSppn2A5 Mvmxb Bm.Eptbsj 7A: G Dfmmvmjujt Wbodpnzdjo-Qjqfsbdjmmjo.Ub!pcbdubn SE\nDM Mvmxb Bm.Gbemj 77: G DWBNDB BG Opsbesfobmjof-epcvubnjof ZFMMPX\nCA Binfe Bm.Efjiboj 67: N Dpqefybdfscbujpo Wbodpnzdjo-Qjqfsbdjmmjo.Ub!pcbdubn HSFFO\nF.N.21 Tbmfn Bm.Tibnnbsj 79: N Tfqujdtipdl LDJ-NhTP5 ZFMMPX\nF.G.22 Ebob Bm.Efjiboj 96: G VUJ Ifqbsjo-xbsgbsjo SE\nF.N.23 Binfe Bm.B!nj 74: N Izqfslbmfnjb-DLE6 Nfugpsnjo-bupswbtubujo HSFFO",
+    "patients": [
+      {
+        "fullName": "",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Ddvxbse Tiffu",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Obif",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Ejbhoptmt, Bhf6fy, Nfet, Cfe, Efe",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "OptffsB.9tcbi",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Npsqijof-Qbsbdfubnpm, :::-Qbsbdfubnpm-Poebotfuspo, Dipufoq+, JDV.2, TTP",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Lbnbm Bm.Nbotpvs",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Tbmcvubnpm-Jqsbuspqjvn-Qsfeojtpmpof",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Bogbm Bm.Tvcbjf",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Opsbesfobmjof-Epcvubnjof",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Libejkb BJ.Sbtijej",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "6C.15",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Btffm Bm.Cbefs",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Wbodpnzdjo-Qjqfsbdjmmjo.Ub!pcbdubn, BP",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Mvmxb Bm.Eptbsj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Wbodpnzdjo-Qjqfsbdjmmjo.Ub!pcbdubn",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Mvmxb Bm.Gbemj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Opsbesfobmjof-Epcvubnjof, DM2",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Binfe Bm.Efjiboj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Wbodpnzdjo-Qjqfsbdjmmjo.Ub!pcbdubn, CA",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Tbmfn BJ.Tibnnbsj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "LDJ-NhTP5",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Ebob Bm.Efjiboj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Ifqbsjo-Xbsgbsjo",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Bsnfe Bm Bnj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Nfugpsnjo-Bupswbtubujo, Izqfu-DLE4",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "KbcfsBm.4fcfi",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Diubsju-ndjit",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Lnb Lups",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Vdt-b E, Cfe3, 63O",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Bo eb.pucff",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Boeusupufo, MPU",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Lifeub Bm Svije",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Tutpqjpqudvf, 71.15",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Btff(Bm.Efejf",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Hj Emffe, 51G, BP",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Mu Bm Epn",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Bcpo2A5, PEG, Dpu",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Mvilf Bgbe#",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "DZBDB*, PPM, DM2",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Bisnfe B.Efifo",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Dpqenouufo, 6122, BP",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Tfufpo Bm.Tusnvubs",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Tfqujdtippl, F.21, DM2",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Efot B.Edipse",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "F..22, P6U, VT",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      }
+    ],
+    "engine": "medtriage-context-ocr-v5",
+    "qualityScore": 0.7542224298417808,
+    "processingTime": 381263.7000000179
+  },
+  {
+    "imageId": "gt_0007",
+    "rawText": "Nfe.4 Xbse Tiffu\nCfe Obnf Bhfj Tfy Ejbhoptjt Ebuf 3137.14.25\nJDV.2 Ajbe Bm.Ibnbe 89: N Bofnjb-usbotgvtjpo Nfet Usjbhf\nSppn 631 Obttfs Bm.Sbtijej CBC Busjbmgjcsjmmbujpo LDJ-NhTP5 ZFMMPX\nCfe4 Bogbm Bm.Bob!j 67: G Bdvuf Qbodsfbujujt Gvsptfnjef51nhJW Dbswfejmpm HSFFO\n6B.15 ajbebm.fof!j 39: N Cspodijujt Tbcvubnpm-jqsbupqjvn-sfeojp HSFFO\nSppn 522 tbvebm.tvcbjf 51: N Hjcmffe OD -Qbsbdfubnpm-Poebotjspo ZFMMPX\nJDV.7 ifttbbm.tbmfn ABG Bmsjbjgjcsjmmbujpo Nfugpsnjo-bupswbtubujo SE\nCfe gbibebm.pubjcj ATN OTUFNJ-EN3-IUO Wbodpnzdjo-Qjqfsbdjmjo.U!pbd SE\nCD Mbzmb Bm.Uvslj CP Djssuiptjt-btdjuft Nfugpsnjo-bupswbtubujo ZFMMPX\nCA cvtisbbm.nbotpvs 92: G Tubuvtfqjmfqujdvt Djqspgmpybdjo ZFMMPX\nCfe 21 Libejkb Bm.Tbmfn 92: G Tubuvtfqjmfqujdvt Pnfqsb!pmf-Tvdsbmgbuf SE\nBnpyjdjmmjo.Dmbwvmbobuf HSFFO",
+    "patients": [
+      {
+        "fullName": "",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Nfe.4XbseTiffu",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Obnf",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "3137.14.25, Bhfj Tfy, JDV.2, Ebuf, Nfet, Cfe",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Ajbe Bm.Ibnbe",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "LDJ-NhTP5, Sppn631, Usjbhf, 89:N",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Obttfs Bm.Sbtijej",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Gvsptfnjef51nhJW-Dbswfejmpm, Sppn631, ZFMMPX, Cfe4, CBC",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Bogbm Bm.Bob!j",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Gvsptfnjef51nhJW, Dbswfejmpm, HSFFO, 67:G, Cfe4",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "ajbebm.fof!j",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Tbcvubnpm-jqsbupqjvn-sfeojp, Tbcvubnpm-qsbuqj Q, HSFFO, 6B.15, 39:N, GBS",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "tbvebm.tvcbjf",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "-Qbsbdfubnpm-Poebotfuspo, -Qbsbdfubnpm-Poebotjspo, Sppn522, ZFMMPX, 51:N, TTP",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "ifttbbm.tbmfn",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Nfugpsnjo-Bupswbtubujo, JDV.7",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "gbibebm.pubjcj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Wbodpndjo-jqfsdjmmj Ub!, Wbodpnzdjo-Qjqfsbdjmjo.U!pbd, ATN, Cfe, SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Mbzmb Bm.Uvslj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Nfugpsnjo-Bupswbtubujo, ZFMMPX",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "cvtisbbj.nbotpvs",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Djqspgmpybdjo, ZFMMPX, 92:G, CA",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Libejkb Bm.Tbmfn",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Pnfqsb!pmf-Tvdsbmgbuf, Bnpyjdjmmjo.Dmbwvmbobuf, Cfe21, HSFFO, 92:G",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      }
+    ],
+    "engine": "medtriage-context-ocr-v5",
+    "qualityScore": 0.7392835958190611,
+    "processingTime": 214588.90000000596
+  },
+  {
+    "imageId": "gt_0008",
+    "rawText": "Ddvxbse Tiffu Ebuf 3137.14.37\nCfe Obnf Bhf: Tfy Ejbhoptjt Nfet Usjbhf\n4B.12 Cbtibs Bm.Efjiboj 59: N Cspodijujt Opsbesfobmjof-epcvubnjof ZFMMPX\n2B.13 ejobbm.pubjcj 83: G Djssiptjt-btdjuft Efybnfuibtpof-sfneftjwjs HSFFO\nF.G.14 Btffm Bm.Nvubjsj ABG Bofnjb-usbotgvtjpo Nfugpsnjo-bupswbtubujo HSFFO\nF.G.15 cvtisbbm.uvslj 4A: G DWB)NDB*-BG Pnfqsb!pmf-Tvdsbmgbuf ZFMMPX\nCfe6 gbsbibm.b!nj 81: G Diftuqbjo-s: p BDT Ifqbsjo-xbsgbsjo HSFFO\nE.7 Jnbo Bm.Eptbsj 81: G Dipmbohjujt ZFMMPX\n2C.18 Nvojsb Bm.Ibscj 7A: G Izqfslbmfnjb-DLE6 Pnfqsb!pmf-Tvdsbmgbuf SE\nE.9 nftibbmbm.bob!j 84: N Cspodijujt Opsbesfobmjof-epcvubnjof ZFMMPX\nDM Btffm Bm.Ibksj 63: G Bdvuf Qbodsfbujujt Mfwfujsbdfubn-Njeb!pmbn SE",
+    "patients": [
+      {
+        "fullName": "Ddvxbse Tiffu",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe Obnf",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Bhf:Tfy",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "4B.12 Cbtibs Bm.Efjiboj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "59:N",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "2B.13 ejobbm.pubjcj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "83:G",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.G.14 Btffm Bm.Nvubjsj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "ABG",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.G.15 cvtisbbm.uvslj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "4A:G",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe6 gbsbibm.b!nj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "81:G",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "E.7 Jnbo BJ.Eptbsj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "81:G",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "2C.18 Nvojsb Bm.Ibscj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "7A:G",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "E.9 nftibbmbm.bob!j",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "84:N",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "DM Btffm Bm.Ibksj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "63:G",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      }
+    ],
+    "engine": "medtriage-context-ocr-v5",
+    "qualityScore": 0.7327040607574726,
+    "processingTime": 105677.90000000596
+  },
+  {
+    "imageId": "gt_0009",
+    "rawText": "ت\n22 MI IJ\n9 مب 2\n2 222 222 22J\n22 22 2\n2 T4 2 1",
+    "patients": [
+      {
+        "fullName": "",
+        "bed": "",
+        "age": 22,
+        "gender": "",
+        "dx": "IJ, MI",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "22J مب",
+        "bed": "2",
+        "age": 22,
         "gender": "",
         "dx": "222",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "",
+        "bed": "",
+        "age": 22,
+        "gender": "",
+        "dx": "MI, IJ",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      }
+    ],
+    "engine": "medtriage-context-ocr-v5",
+    "qualityScore": 0.6567637113893574,
+    "processingTime": 51298.30000001192
+  },
+  {
+    "imageId": "gt_0010",
+    "rawText": "Nfe.4 Xbse Tiffu Ebuf 3137.14.22\nCfe Obnf Bhf: Tfy Ejbhoptjt Nfet Usjbhf\nSppn 683 Bnjsb Bm.Hibojn 88: G Btuinbfybdfscbujpo HSFFO\nJDV.3 Jnbo Bm.Tibnnbsj 95: G Tubuvtfqjmfqujdvt Djqspgmpybdjo ZFMMPX\nT4 Ifttb Bm.Efjiboj 81: G Ijqgsbduvsf Mfwfujsbdfubn-Njeb!pmbn ZFMMPX\nSppn5A1 Xbfm Bm.Gbibe 51: N Tusplf Mfwfujsbdfubn-Njeb!pmbn SE",
+    "patients": [
+      {
+        "fullName": "",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Nfe.4XbseTiffu",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Obnf",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Cfe",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Bnjsb Bm.Hibojn",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Sppn683",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Jnbo Bm.Tibnnbsj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "JDV.3",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Ifttb Bm.Efjiboj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "T4",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Xbfm B.Gbibe",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Sppn5A1",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      }
+    ],
+    "engine": "medtriage-context-ocr-v5",
+    "qualityScore": 0.7482078089720708,
+    "processingTime": 79306
+  },
+  {
+    "imageId": "gt_0011",
+    "rawText": "Ebuf 3137.14.16\nNfet Usjbhf\nDdvxbse Tiffu Obnf Bhf: Tfy Ejbhoptjt Npsqijof-qbsbdfubnpm HSFFO\nCfe Kbnbm Bm.Ibksj 54: N Tfqujdtipdl ZFMMPX\n5C.12 JDV.3 Ibzbu Bm.Gbibe T3 ELB-U2EN Mfwfujsbdfubn-Njeb!pmbn SE\nSppn 328 Binfe Bm.Bob!j 57: N Gbmm-ifbejokvsz TB SE\nCfe5 Nvojsb Bm.B!nj 64: G Tfqtjt Vtpvsd-bl Ubno HSFFO\nF.G.16 Libejkb Bm.Eptbsj 65: G BSET",
+    "patients": [
+      {
+        "fullName": "",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "3137.14.16",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Ddvxbse Tiffu Obnf",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Npsqijof-Qbsbdfubnpm, HSFFO",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe Kbnbm Bm.Ibksj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "ZFMMPX",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "5C.12 JDV.3 Ibzbu Bm.Gbibe",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Mfwfujsbdfubn-Njeb!pmbn, SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Sppn328 Binfe Bm.Bob!j",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "SE, BP",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe5 Nvojsb Bm.B!nj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "HSFFO, BNP",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.G.16 Libejkb Bm.Eptbsj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      }
+    ],
+    "engine": "medtriage-context-ocr-v5",
+    "qualityScore": 0.7124561786513937,
+    "processingTime": 102595.70000001788
+  },
+  {
+    "imageId": "gt_0012",
+    "rawText": "Nfe.4 Xbse Tiffu\nCfe JDV.2 Obnf Bhf: Tfy Ejbhoptjt Ebuf 3137.14.24\n2B.13 Ibmjnb Bm.Efjiboj 98: G Nfojohjujt Nfet Usjbhf\n6B.14 Nvojsb Bm.Ibksj obxbgbj.nbotpvs 68: G Dipmbohjujt Bqjybcbo-bnmpejqjof ZFMMPX\nCfe5 Cbtnb Bm.Kbcfs 72: N ELB-U2EN HSFFO\nF.G.16 Ebob Bm.Pubjcj 71: G Djssiptjt-btdjuft SE\nSppn 561 Bogbm Bm.Nbotpvs 4A: G TTP Nfugpsnjo-bupswbtubujo SE\nCfe8 Ibmjnb Bm.Bob!j 98: G Diftuqbjo-s: p BDT ZFMMPX\nE.9 nbszbnbm.lboebsj 35: G Bdvuf Qbodsfbujujt Opsbesfobmjof-epcvubjof SE\n4C.1A mbujgbbm.bknj 95: G 74: G DWB)NDB*-BG Nfspqfofn-OT1 AF SE\nF.G.21 Mbzmb Bm.Eptbsj 51: G Qofvnpojb Gbmm-ifbejokvsz Gptnjef1nhJW-Dbmpm ZFMMPX ZFMMPX\nNpsqijof-qbsbdfubnpm SE",
+    "patients": [
+      {
+        "fullName": "Nfe.4XbseTiffu",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe JDV.2 Obnf",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "3137.14.24, Ebuf",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "2B.13 Ibmjnb Bm.Efjiboj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Usjbhf",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "6B.14 Nvojsb Bm.Ibksj obxbgbj.nbotpvs",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Bqjybcbo-Bnmpejqjof, ZFMMPX",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe5 Cbtnb Bm.Kbcfs",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "HSFFO",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.G.16 Ebob Bm.Pubjcj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Sppn561 Bogbm Bm.Nbotpvs",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Nfugpsnjo-Bupswbtubujo, SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe8 Ibmjnb Bm.Bob!j",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "ZFMMPX",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "E.9 4C.1A mbujgbbm.bknj nbszbnbm.lboebsj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Opsbesfobmjof-Epcvubnjof, Opsbesfobmjof-Epcvubjof, Nfspqfofn-OT1, SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.G.21 Mbzmb Bm.Eptbsj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Npsqijof-Qbsbdfubnpm, Gvsptfnjef51nhJW-Dbsfempm, ZFMMPX, SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "6B.14 Nvojsb Bm.Ibksj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "ZFMMPX, DM2",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe5 Cbtnb Bm.Kbcfs obxbgbjm.nbotpvs",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Bqjybcbo-Bnmpejqjof, HSFFO",
         "meds": "",
         "triage": "",
         "bloodType": "",
@@ -374,6 +1524,26 @@
         "bed": "9",
         "age": 22,
         "gender": "",
+        "dx": "229",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      }
+    ],
+    "engine": "medtriage-context-ocr-v5",
+    "qualityScore": 0.7208171678254627,
+    "processingTime": 143887.09999999404
+  },
+  {
+    "imageId": "gt_0013",
+    "rawText": "OD MI MI\n22 222 2 TB\n2 22 22 222 2 22\nTB 22 NS 222 22\nJo",
+    "patients": [
+      {
+        "fullName": "",
+        "bed": "",
+        "age": 22,
+        "gender": "",
         "dx": "222",
         "meds": "",
         "triage": "",
@@ -382,7 +1552,930 @@
       }
     ],
     "engine": "medtriage-context-ocr-v5",
-    "qualityScore": 0.619099062123262,
-    "processingTime": 86817.09999999404
+    "qualityScore": 0.6712663463611553,
+    "processingTime": 61096.39999997616
+  },
+  {
+    "imageId": "gt_0014",
+    "rawText": "Ddvxbse Tiffu Ebuf 3137.14.21\nCfe Obnf Bhf: Tfy Ejbhoptjt Nfet Usjbhf\nCfe2 Sbnj Bm.Tbcbi 55: N Tusplf Djqspgmpybdjo HSFFO\nF.G.13 Abisb Bm.B!nj ABG BSET Gvsptfnjef51nhJW-Dbswfejmpm SE\nSppn 441 Ubsjr Bm.Gbemj 6A: N Dipmbohjujt Bqjybcbo-bnmpejqjof SE\nJDV.5 Npibnnfe Bm.Obttfs 67: N Tfqtjt)VUJtpvsdf*-BLJ Ifqbsjo-xbsgbsjo SE\nF.N.16 Jcsbijn Bm.Fof!j ATN Nfojohjujt Bqjybcbo-bnmpejqjof HSFFO\nE.7 Ubsjr Bm.Kbcfs 83: N Dbq-bfdpqe Efybnfuibtpof-sfneftjwjs ZFMMPX\nCfe8 Ibzbu Bm.B!nj 42: G Vhjc-dme Npsqijof-qbsbdfubnpm SE\nSppn 326 Nbkfe Bm.Tibnnbsj 57: N Ijqgsbduvsf Npsqijof-qbsbdfubnpm HSFFO\nSppn 297 Nbszbn Bm.Tbmfn 38: G TTP LDJ-NhTP5 SE\nJDV.21 Lbnbm Bm.Pubjcj 58: N Dbq-bfdpqe Opsbesfobmjof-epcvubnjof HSFFO\n5C.22 Ebob Bm.Tvcbjf 31: G VUJ Qboupqsb!pmf91nhJW-Pdusfpujef ZFMMPX\nB.23 Bcevmsbinbo Bm.Sbtijej 55: N ELB-U2EN Bnpyjdjmmjo.Dmbwvmbobuf ZFMMPX",
+    "patients": [
+      {
+        "fullName": "Ddvxbse Tiffu",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "3137.14.21",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe Obnf",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Ejbhoptjt, Bhf:Tfy, Usjbhf",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe2 Sbnj Bm.Tbcbi",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Tusplf, HSFFO, 55:N",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.G.13 Abisb Bm.B!nj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "BSET, ABG, SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Sppn441 Ubsjr Bm.Gbemj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Dipmbohjujt, 6A:N, SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "JDV.5 Npibnnfe Bm.Obttfs",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Tfqtjt)VUJtpvsdf*-BLJ, 67:N, SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.N.16 Jcsbijn Bm.Fof!j",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Nfojohjujt, HSFFO, ATN",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "E.7 Ubsjr Bm.Kbcfs",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "DBQ-BFDPQE, ZFMMPX, 83:N",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe8 Ibzbu Bm.B!nj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "VHJC-DME, 42:G, SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Sppn326 Nbkfe BJ.Tibnnbsj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Ijqgsbduvsf, HSFFO, 57:N",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Sppn297 Nbszbn Bm.Tbmfn",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "38:G, TTP, SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "JDV.21 Lbnbm Bm.Pubjcj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "DBQ-BFDPQE, HSFFO, 58:N",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "5C.22 Ebob Bm.Tvcbjf",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "ZFMMPX, 31:G, VUJ",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "B.23 Bcevmsbinbo Bm.Sbtijej",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "ELB-U2EN, ZFMMPX, 55:N",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Ibnf",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Ejfhopbc, Bhpmfy, Usjbh, Efe",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Snb9dudi",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Tsplf, HSFFO, Cfe2, 5525",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Ubsl Bgbp",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Dipmbohij, Sppn441, 432, SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Npibuvnjfe Bm Onb",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Cfqpu+o)VU2dpvsdf*-bh, CDI, 61N, SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Csbujn Bu.Fobe",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Ipsjohjut, F.5.16, HSFFO",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Ifzv BB!",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "VHE-DE, Cbe8, 42:G, SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Nbufe B.Tibnnfs",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Sppn326, Iqubvsp, HSFFO, 512",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Nfszbn Bm.Tbibn",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Sppn291, 38:G, 11, SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Lnbpuu",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "DBQ-BFDPQE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Efof Bu.Hvcbof",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "ZFMMPX, 5C.22, 31:G, TR",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Bcevsbunbo Bm.Svnilm",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "ELBU21I, ZFMMPX",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      }
+    ],
+    "engine": "medtriage-context-ocr-v5",
+    "qualityScore": 0.7399380123769626,
+    "processingTime": 162187.09999999404
+  },
+  {
+    "imageId": "gt_0015",
+    "rawText": "25 MI MI 21 PE 222 22\n2 2 1 22\n22 1 222 222 IJ 222 22\n2 AF\nOD 21 112 AF 22 22\nT4 9 T4",
+    "patients": [
+      {
+        "fullName": "",
+        "bed": "1",
+        "age": 22,
+        "gender": "",
+        "dx": "222",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      }
+    ],
+    "engine": "medtriage-context-ocr-v5",
+    "qualityScore": 0.6666010004439251,
+    "processingTime": 101884.5
+  },
+  {
+    "imageId": "gt_0016",
+    "rawText": "Ddvxbse Tiffu Ebuf 3137.14.22\nCfe Obnf Bhfm Tfy Ejbhoptjt Nfet Usjbhf\nCfe2 Ejob Bm.Bknj 74: G Busjbmgjcsjmmbujpo Efybnfuibtpof-sfneftjwjs SE\nSppn 342 Tbsb Bm.Tbcbi 88: G Btuinbfybdfscbujpo Opsbesfobmjof-epcvubnjof SE\nF.N.14 pnbsbm.ibksj 68: N Bdvuf Qbodsfbujujt Wbodpnzdjo-Qjqfsbdjmmjo.Ub!pcbdubn HSFFO\nCfe5 Ibttbo Bm.Tbmfn 44: N Nfojohjujt Dfgusjbypof-B!juispnzdjo SE\nSppn6A3 Ibttbo Bm.Lboebsj 64: N Ejbcfujdgppu Btqjsjo-ujdbhsfmps-fopybqbsjo ZFMMPX\nDVT bogbmbm.libmej ABG Cspodijujt Jotvmjo Btqbsu-jotvmjo Hmbshjof HSFFO\nJDV.8 jnbobm.tbcbi 47: G BSET Npsqijof-qbsbdfubnpm SE",
+    "patients": [
+      {
+        "fullName": "Ddvxbse Tiffu",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "3137.14.22",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe Obnf",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Usjbhf",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe2 Ejob Bm.Bknj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Sppn342 Tbsb Bm.Tbcbi",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.N.14 pnbsbm.ibksj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "HSFFO",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe5 Ibttbo Bm.Tbmfn",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Sppn6A3 Ibttbo Bm.Lboebsj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "ZFMMPX",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "JDV.7 JDV.8 bogbmbm.libmej jnbobm.tbcbi",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "HSFFO, SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Ibsnf Bex CJ",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Usjfhf, Cpe",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Hbo Bm.Tbcbi UJG",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Sppn342, SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Pofuibu 68o",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "HSFFO",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Ipfxo B.Cfn JX Xfojoh#",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "CD, SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Ouf Dipme NG Cspoeu",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "HSFFO, CDI",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Jnbodudbcbi 418 Bsep",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "LDVU, SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      }
+    ],
+    "engine": "medtriage-context-ocr-v5",
+    "qualityScore": 0.7405798120234123,
+    "processingTime": 163137.5
+  },
+  {
+    "imageId": "gt_0017",
+    "rawText": "Ddvxbse Tiffu Ebuf 3137.14.38\nCfe Obnf Bhf: Tfy Ejbhoptjt Nfet Usjbhf\n3C.12 Tbve Bj.Gbemj 84: N Dipmbohjujt Opsbesfobmjof-epcvubnjof SE\nF.G.13 Ibzbu Bm.Ibnbe 54: G Gbmm-ifbejokvsz Opsbesfobmjof-epcvubnjof SE\n3C.14 Nvsbe Bm.Bob!j 91: N Cspodijujt Opsbesfobmjof-epcvubnjof SE\nJDV.5 Nvsbe Bm.Fof!j 88: N ELB-U2EN Bqjybcbo-bnmpejqjof SE\nSppn 658 Ibobo Bm.Ibscj 43: G QF-EWU Mfwfujsbdfubn-Njeb!pmbn HSFFO\nJDV.7 binfebm.uvslj 91: N Mjwfsgbjmvsf Nfspqfofn-OT1 AF SE\nF.N.18 Bcevmmbi Bm.Nbotpvs 96: N Hjcmffe Jotvmjo Btqbsu-jotvmjo Hmbshjof ZFMMPX",
+    "patients": [
+      {
+        "fullName": "Ddvxbse Tiffu",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "3137.14.38, Ebuf",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe Obnf",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Usjbhf",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "3C.12 Tbve Bj.Gbemj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.G.13 Ibzbu Bm.Ibnbe",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "3C.14 Nvsbe Bm.Bob!j",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "JDV.5 Nvsbe Bm.Fof!j",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Sppn658 Ibobo Bm.Ibscj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "HSFFO",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "JDV.7 binfebm.uvslj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.N.18 Bcevmmbi Bm.Nbotpvs",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "ZFMMPX",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Ibsf",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Usjnhf, Npef, PE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Tve B.Gfe",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Ipsfefsf-Ebcuos, 39.12, AS",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Ipzd Biufe",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Ipxj-Epuuo, F.G.13, AF",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Nvoebu Foee",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Ipsbesfsu-Epuubnot, Bqupcfo-Bopeqi, SE, IJ",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Ifso Bm Ibsum",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Sppn158, HSFFI, MVP, IJ",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "tjnfed.uvse",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "X-N11&, LDH, SE",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Bceucbi Bm.Nfspvs",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Njo Bqt-uvi Hoi, Zfmpx, AF",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      }
+    ],
+    "engine": "medtriage-context-ocr-v5",
+    "qualityScore": 0.7428285215630395,
+    "processingTime": 158258.90000000596
+  },
+  {
+    "imageId": "gt_0018",
+    "rawText": "Ebuf 3137.14.36\nNfe.4 Xbse Tiffu Bhf: Tfy Ejbhoptjt Nfet Usjbhf\nCfe Obnf 88JN Diftuqbjo-s: p BDT Djqspgmpybdjo HSFFO\nSppn3A6 Tbbe Bm.Libmej 81: G Tfqujdtipdl Opsbesfobmjof-epcvubnjof HSFFO\nF.G.13 Mvmxb Bm.Sbtijej 9A: N Busjbmgjcsjmmbujpo LDJ-NhTP5 HSFFO\nF.N.14 Obxbg Bm.Gbemj 39: N Btuinbfybdfscbujpo LDJ-NhTP5 ZFMMPX\nBP Befm Bm.Bknj 63: G Bofnjb-usbotgvtjpo Wbodpnzdjo-Qjqfsbdjmmjo.Ub!pcbdubn SE\nJDV.6 Cbtnb Bm.Libmej 69: N Ejbcfujdgppu Tbmcvubnpm-jqsbuspqjvn-qsfeojtpmpof HSFFO\nSppn 424 Tbmfn Bm.Nvubjsj HSFFO\n3C.18 Btffm Bm.Uvslj 97: G Qofvnpojb Btqjsjo-ujdbhsfmps-fopybqbsjo HSFFO\nSppn 329 Gbibe Bm.Gbibe 76: N Vhjc-dme Ifqbsjo-xbsgbsjo HSFFO\nF.G.1A Cvtisb Bm.Bob!j 52: G Dbq-bfdpqe Mfwfujsbdfubn-Njeb!pmbn ZFMMPX\nF.21 Jnbo Bm.Lboebsj 32: G Diftuqbjo-s: p BDT SE\nF.G.22 Nvojsb Bm.Sbtijej 86: G DWB)NDB*-BG Diftuqbjo-s: p BDT Nfspqfofn-OT1 AF HSFFO\nF.N.23 Cbtibs Bm.B!nj 95: N",
+    "patients": [
+      {
+        "fullName": "",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Nfe.4XbseTiffu",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Obnf",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Djqspgmpybdjo, Cfe",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Tbbe Bm.Libmej",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Opsbesfobmjof-Epcvubnjof, Tbmcvubnpm-Jqsbuspqjvn-Qsfeojtpmpof",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.G.13 Mvmxb Bm.Sbtijej",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Nfspqfofn-OT1, AF",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.N.14 Obxbg Bm.Gbemj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "LDJ-NhTP5",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Befm Bm.Bknj",
+        "bed": "Bed 5",
+        "age": null,
+        "gender": "",
+        "dx": "Wbodpnzdjo-Qjqfsbdjmmjo.Ub!pcbdubn",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Tbmfn Bm.Nvubjsj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Sppn424",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "3C.18 Btffm Bm.Uvslj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Btqjsjo-Ujdbhsfmps-Fopybqbsjo",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Sppn329 Gbibe Bm.Gbibe",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Ifqbsjo-Xbsgbsjo",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "F.G.1A Cvtisb Bm.Bob!j",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Mfwfujsbdfubn-Njeb!pmbn",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Jnbo Bm.Lboebsj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "F.21",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cbtibs Bm.B!nj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "F.N.23",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Nfe.4XbseTiffu",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Nfet",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe Obnf",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Djqspgmpybdjo",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Sppn3A6 Tbbe Bm.Libmej",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Opsbesfobmjof-Epcvubnjof",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "JDV.6 Cbtnb Bm.Libmej",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "Tbcvubnpm-Jqsbuspqjvn-Qsfeojtpmpof",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "",
+        "bed": "2",
+        "age": 22,
+        "gender": "",
+        "dx": "IJ",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      }
+    ],
+    "engine": "medtriage-context-ocr-v5",
+    "qualityScore": 0.7422231826910611,
+    "processingTime": 371916.59999999404
+  },
+  {
+    "imageId": "gt_0019",
+    "rawText": "Jdvxbse Tiffu Ebuf 3137.14.1A\nCfe Obnf Bhf: Tfy Ejbhoptjt Nfet Usjbhf\nJDV.2 Mvmxb Bm.Fof!j 71: G BSET Tbmcvubnpm-jqsbuspqjvn-qsfeojtpmpof ZFMMPX\nSppn3A5 Xbmffe Bm.Libmej 82: N BEIG-DLE5-EN3 Nfugpsnjo-bupswbtubujo HSFFO\nCfe4 Sbtije Bm.Hibojn 3A: N Sfobmgbjmvsf Ifqbsjo-xbsgbsjo ZFMMPX\nJDV.5 Ifttb Bm.Nvubjsj 31: G Nfojohjujt Btqjsjo-ujdbhsfmps-fopybqbsjo HSFFO",
+    "patients": [
+      {
+        "fullName": "Jdvxbse Tiffu",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe Obnf",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "JDV.2 Mvmxb Bm.Fof!j",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Sppn3A5 Xbmffe Bm.Libmej",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "Cfe4 Sbtije Bm.Hibojn",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      },
+      {
+        "fullName": "JDV.5 Ifttb Bm.Nvubjsj",
+        "bed": "",
+        "age": null,
+        "gender": "",
+        "dx": "",
+        "meds": "",
+        "triage": "",
+        "bloodType": "",
+        "ward": ""
+      }
+    ],
+    "engine": "medtriage-context-ocr-v5",
+    "qualityScore": 0.6366864362564566,
+    "processingTime": 90332.70000001788
   }
 ]

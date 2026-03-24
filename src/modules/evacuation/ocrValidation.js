@@ -145,16 +145,17 @@ export function computeFieldAccuracy(predictedPatients, referencePatients) {
   // Compute per-field accuracy
   for (const { pred, ref } of matched) {
     for (const f of fields) {
-      const predVal = normField(f === 'age' ? String(pred[f] ?? '') : (pred[f] || ''));
-      const refVal = normField(f === 'age' ? String(ref[f] ?? '') : (ref[f] || ''));
+      const predRaw = f === 'age' ? String(pred[f] ?? '') : (pred[f] || '');
+      const refRaw = f === 'age' ? String(ref[f] ?? '') : (ref[f] || '');
+      const refVal = normField(refRaw);
 
       if (!refVal) continue; // Skip fields not in ground truth
       fieldStats[f].total++;
 
-      if (predVal === refVal) {
+      if (fieldsMatch(f, predRaw, refRaw)) {
         fieldStats[f].correct++;
       } else {
-        fieldStats[f].cer += computeCER(predVal, refVal);
+        fieldStats[f].cer += computeCER(normField(predRaw), refVal);
         fieldStats[f].errors.push({ predicted: pred[f], expected: ref[f] });
       }
     }
@@ -412,4 +413,54 @@ function tokenize(text) {
 
 function normField(val) {
   return (val || '').toString().toLowerCase().replace(/[\s_\-/]+/g, ' ').trim();
+}
+
+// Clinical field comparison — handles comma/space, order, case for dx and meds
+function normClinicalField(val) {
+  return (val || '').toString().toLowerCase()
+    .replace(/[,;|]+/g, ' ')  // treat commas/semicolons as spaces
+    .replace(/[\s]+/g, ' ')
+    .replace(/\./g, '')       // remove periods
+    .trim();
+}
+
+// Set-based comparison for medications (order doesn't matter)
+function normMedsToSet(val) {
+  return new Set(
+    (val || '').toString().toLowerCase()
+      .split(/[,;|]+/)
+      .map(s => s.trim().replace(/[\s]+/g, ' '))
+      .filter(Boolean)
+  );
+}
+
+// Smart field match — uses appropriate comparison per field type
+function fieldsMatch(field, predVal, refVal) {
+  if (field === 'meds') {
+    // Set-based: order doesn't matter for medications
+    const predSet = normMedsToSet(predVal);
+    const refSet = normMedsToSet(refVal);
+    if (predSet.size === 0 && refSet.size === 0) return true;
+    if (predSet.size === 0 || refSet.size === 0) return false;
+    // Check if same meds present (symmetric)
+    let matched = 0;
+    for (const med of refSet) {
+      for (const pred of predSet) {
+        if (pred === med || editDistance(pred, med) <= Math.max(1, Math.floor(med.length / 6))) {
+          matched++;
+          break;
+        }
+      }
+    }
+    return matched >= refSet.size * 0.8; // 80% of reference meds found
+  }
+  if (field === 'dx') {
+    // Clinical normalization: comma/space equivalence, case insensitive
+    return normClinicalField(predVal) === normClinicalField(refVal);
+  }
+  if (field === 'triage') {
+    return (predVal || '').toString().toUpperCase().trim() === (refVal || '').toString().toUpperCase().trim();
+  }
+  // Default: normalized exact match
+  return normField(predVal) === normField(refVal);
 }

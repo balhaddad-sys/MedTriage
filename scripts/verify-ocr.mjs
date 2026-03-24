@@ -6,6 +6,7 @@ import { pathToFileURL } from 'node:url';
 // Bundle ocrEngine.js — mark paddleocr and onnxruntime-web as external
 // (we only test the analysis pipeline, not the OCR runtime)
 const { analyzeOcrWords } = await import(pathToFileURL(resolve('src/modules/evacuation/ocrEngine.js')).href);
+const { correctLine, correctTableRow, assessConfidence } = await import(pathToFileURL(resolve('src/modules/evacuation/shifu/index.js')).href);
 
 const requiredRuntimeAssets = [
   'public/models/ocr/det.onnx',
@@ -679,5 +680,140 @@ assert.ok(aishaSection, 'expected Aisha from female-list roster');
 assert.equal(aishaSection.gender, 'F');
 assert.equal(aishaSection.sheetStatus, 'ACTIVE');
 assert.match(aishaSection.dx || '', /weight loss/i);
+
+// Test 22: OCR-like compact tokens should be repaired into readable beds, names, triage, and raw text
+const compactOcrRoster = analyzeOcrWords([
+  word('Bed', 10, 10, 98, 40),
+  word('Name', 130, 10, 98, 50),
+  word('Age/Sex', 340, 10, 98, 70),
+  word('Diagnosis', 460, 10, 98, 90),
+  word('Meds', 650, 10, 98, 50),
+  word('Triage', 860, 10, 98, 70),
+  word('R00M556', 10, 50, 92, 95),
+  word('MansourAl-Rashidi', 130, 50, 92, 190),
+  word('25/M', 350, 50, 92, 55),
+  word('ADHF,CKD4,DM2', 460, 50, 92, 160),
+  word('Ceftriaxone,Azithromycin', 650, 50, 92, 210),
+  word('RAED', 870, 50, 92, 55),
+], 980, 180);
+
+assert.equal(compactOcrRoster.patients.length, 1, 'expected one patient from compact OCR-like tokens');
+const compactPatient = compactOcrRoster.patients[0];
+assert.match(compactPatient.fullName || '', /Mansour Al-Rashidi/i);
+assert.match(compactPatient.bed || '', /Room 556/i);
+assert.equal(compactPatient.triage, 'RED');
+assert.match(compactPatient.dx || '', /ADHF/i);
+assert.match(compactPatient.dx || '', /DM2/i);
+assert.match(compactPatient.meds || '', /Ceftriaxone/i);
+assert.match(compactPatient.meds || '', /Azithromycin/i);
+assert.match(compactOcrRoster.rawText || '', /Room 556/i);
+assert.match(compactOcrRoster.rawText || '', /Mansour Al-Rashidi/i);
+assert.match(compactOcrRoster.rawText || '', /Triage/i);
+
+// Test 23: Photo-style row fragments should merge when identity cells land on the next line
+const fragmentedPhotoRoster = analyzeOcrWords([
+  word('Bed', 10, 10, 98, 40),
+  word('Name', 130, 10, 98, 50),
+  word('Age/Sex', 340, 10, 98, 70),
+  word('Diagnosis', 460, 10, 98, 90),
+  word('Meds', 650, 10, 98, 50),
+  word('Triage', 860, 10, 98, 70),
+  word('25/M', 350, 48, 92, 55),
+  word('ADHF,CKD4,DM2', 460, 48, 92, 160),
+  word('Ceftriaxone,Azithromycin', 650, 48, 92, 210),
+  word('RED', 870, 48, 92, 55),
+  word('Room 556', 10, 72, 92, 95),
+  word('MansourAl-Rashidi', 130, 72, 92, 190),
+], 980, 180);
+
+assert.equal(fragmentedPhotoRoster.patients.length, 1, 'expected fragmented photo row to merge into one patient');
+const fragmentedPatient = fragmentedPhotoRoster.patients[0];
+assert.match(fragmentedPatient.fullName || '', /Mansour Al-Rashidi/i);
+assert.match(fragmentedPatient.bed || '', /Room 556/i);
+assert.equal(fragmentedPatient.age, 25);
+assert.equal(fragmentedPatient.gender, 'M');
+assert.equal(fragmentedPatient.triage, 'RED');
+assert.match(fragmentedPatient.dx || '', /ADHF/i);
+assert.match(fragmentedPatient.meds || '', /Azithromycin/i);
+
+// Test 24: Header-spill rows should not create ghost patients before the first real row
+const headerSpillRoster = analyzeOcrWords([
+  word('Bed', 10, 10, 98, 40),
+  word('Name', 130, 10, 98, 50),
+  word('Age/Sex', 340, 10, 98, 70),
+  word('Diagnosis', 460, 10, 98, 90),
+  word('Meds', 650, 10, 98, 50),
+  word('Triage', 860, 10, 98, 70),
+  word('Bed', 10, 48, 98, 40),
+  word('Name', 130, 48, 98, 50),
+  word('25/M', 350, 48, 92, 55),
+  word('ADHF,CKD4,DM2', 460, 48, 92, 160),
+  word('Ceftriaxone,Azithromycin', 650, 48, 92, 210),
+  word('RED', 870, 48, 92, 55),
+  word('Room 556', 10, 76, 92, 95),
+  word('MansourAl-Rashidi', 130, 76, 92, 190),
+], 980, 190);
+
+assert.equal(headerSpillRoster.patients.length, 1, 'expected header spill to stay attached to the first patient');
+const headerSpillPatient = headerSpillRoster.patients[0];
+assert.match(headerSpillPatient.fullName || '', /Mansour Al-Rashidi/i);
+assert.match(headerSpillPatient.bed || '', /Room 556/i);
+assert.equal(headerSpillPatient.age, 25);
+assert.equal(headerSpillPatient.gender, 'M');
+assert.equal(headerSpillPatient.triage, 'RED');
+assert.match(headerSpillPatient.dx || '', /ADHF/i);
+assert.match(headerSpillPatient.meds || '', /Azithromycin/i);
+
+// Test 25: Same-name partial duplicates should collapse into one patient when only one copy has a bed
+const duplicateNameRoster = analyzeOcrWords([
+  word('Bed', 10, 10, 98, 40),
+  word('Name', 130, 10, 98, 50),
+  word('Age/Sex', 340, 10, 98, 70),
+  word('Diagnosis', 460, 10, 98, 90),
+  word('Meds', 650, 10, 98, 50),
+  word('Triage', 860, 10, 98, 70),
+  word('Room 556', 10, 48, 92, 95),
+  word('MansourAl-Rashidi', 130, 48, 92, 190),
+  word('55/M', 350, 48, 92, 55),
+  word('Pneumonia', 460, 48, 92, 110),
+  word('Salbutamol', 650, 48, 92, 110),
+  word('RED', 870, 48, 92, 40),
+  word('MansourAl-Rashidi', 130, 82, 92, 190),
+  word('25/M', 350, 82, 92, 55),
+  word('ADHF,CKD4,DM2', 460, 82, 92, 160),
+  word('Ceftriaxone,Azithromycin', 650, 82, 92, 210),
+  word('RED', 870, 82, 92, 40),
+], 980, 210);
+
+assert.equal(duplicateNameRoster.patients.length, 1, 'expected same-name partial duplicate rows to merge');
+assert.match(duplicateNameRoster.patients[0].fullName || '', /Mansour Al-Rashidi/i);
+assert.match(duplicateNameRoster.patients[0].bed || '', /Room 556/i);
+
+// Test 26: Shifu status vocabulary should preserve real sheet statuses instead of forcing unrelated words
+const shifuStatus = correctLine('New', { columnType: 'Status' });
+assert.equal(shifuStatus.output, 'New', 'expected Shifu status correction to preserve "New"');
+assert.equal(assessConfidence(shifuStatus), 'accept', 'expected exact ward statuses to be accepted');
+
+// Test 27: Shifu diagnosis correction should preserve slash-delimited ward diagnoses
+const shifuSlashDiagnosis = correctLine('Hypernatremia/AKI/DVT/CAP', { columnType: 'Diagnosis' });
+assert.equal(shifuSlashDiagnosis.output, 'Hypernatremia/AKI/DVT/CAP', 'expected slash-delimited diagnoses to stay intact');
+assert.equal(assessConfidence(shifuSlashDiagnosis), 'accept', 'expected exact slash-delimited diagnoses to be accepted');
+
+// Test 28: Shifu diagnosis correction should keep common connector words inside diagnoses
+const shifuJoinedDiagnosis = correctLine('Chest infection and UTI', { columnType: 'Diagnosis' });
+assert.equal(shifuJoinedDiagnosis.output, 'Chest infection and UTI', 'expected diagnosis connector words like "and" to remain stable');
+assert.equal(assessConfidence(shifuJoinedDiagnosis), 'accept', 'expected connector-heavy diagnoses to be accepted');
+
+// Test 29: Shifu table correction should handle sheet-style rows without misclassifying status cells
+const shifuWardRow = correctTableRow({
+  Room: '16-4',
+  Patient: 'Hasan',
+  Diagnosis: 'Hypernatremia/AKI/DVT/CAP',
+  Doctor: 'Noura',
+  Status: 'New',
+});
+assert.equal(shifuWardRow.corrected.Patient.output, 'Hassan', 'expected Shifu row correction to recover common name OCR errors');
+assert.equal(shifuWardRow.corrected.Status.output, 'New', 'expected Shifu row correction to preserve status values');
+assert.equal(assessConfidence(shifuWardRow.corrected.Diagnosis), 'accept', 'expected Shifu row diagnosis to remain trusted');
 
 console.log('OCR verification passed');

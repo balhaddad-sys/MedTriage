@@ -1,10 +1,17 @@
 // Medical-Grade OCR Corrector — In-Browser Edition
-// Ported from the Python med_corrector.py (384K dictionary → top 3K + algorithmic)
+// Connected to Shifu OCR seed data for maximum coverage:
+//   - ocrSeedOCRPatterns.js: algorithmic confusion generation (150+ medical words × 41 confusion rules = 6000+ variants)
+//   - ocrSeedSemantic.js: synonym resolution for clinical concepts
+//   - DRUG_CORRECTIONS + ANATOMY_CORRECTIONS: hand-verified critical corrections
 //
-// Three correction layers:
-//   1. OCR confusable engine (l/I/1, rn/m, 0/O — algorithmic, no dictionary needed)
-//   2. Drug + diagnosis + anatomy dictionary (3K most important terms)
-//   3. Lab value plausibility checker (flags impossible values)
+// Five correction layers:
+//   1. OCR confusable engine (l/I/1, rn/m, 0/O — hardcoded high-confidence patterns)
+//   2. Shifu algorithmic corrections (generateAllOCRCorrections + PHRASE_CORRECTIONS)
+//   3. Drug + diagnosis + anatomy dictionary
+//   4. Lab value plausibility checker
+//   5. Algorithmic rn→m and 1→l degarbler for unknown words
+
+import { generateAllOCRCorrections, PHRASE_CORRECTIONS } from './ocrSeedOCRPatterns.js';
 
 // ═══════════════════════════════════════════════════════════════════
 // LAYER 1: OCR CONFUSABLE ENGINE
@@ -155,10 +162,36 @@ const ANATOMY_CORRECTIONS = {
   'thyrod': 'thyroid', 'thyrold': 'thyroid',
 };
 
-// Build unified lowercase lookup
+// Build unified lowercase lookup — merges hand-verified + Shifu algorithmic corrections
 const DICTIONARY = {};
+
+// 1. Hand-verified drug + anatomy corrections (highest priority)
 for (const [k, v] of Object.entries({ ...DRUG_CORRECTIONS, ...ANATOMY_CORRECTIONS })) {
   DICTIONARY[k.toLowerCase()] = v;
+}
+
+// 2. Shifu OCR algorithmic corrections (6000+ auto-generated from confusion rules)
+try {
+  const shifuCorrections = generateAllOCRCorrections();
+  for (const [garbled, correction] of Object.entries(shifuCorrections)) {
+    const key = garbled.toLowerCase();
+    // Don't overwrite hand-verified entries
+    if (!DICTIONARY[key] && correction.truth) {
+      DICTIONARY[key] = correction.truth.toLowerCase();
+    }
+  }
+} catch (e) {
+  console.warn('[MedCorrector] Failed to load Shifu OCR patterns:', e.message);
+}
+
+// 3. Shifu phrase corrections (multi-word patterns)
+const SHIFU_PHRASES = {};
+try {
+  for (const [garbled, correct] of Object.entries(PHRASE_CORRECTIONS)) {
+    SHIFU_PHRASES[garbled.toLowerCase()] = correct;
+  }
+} catch (e) {
+  console.warn('[MedCorrector] Failed to load Shifu phrase corrections:', e.message);
 }
 
 // ═══════════════════════════════════════════════════════════════════
@@ -207,6 +240,54 @@ const KNOWN_WORDS = new Set([
   'spontaneous','bacterial','pneumothorax','subarachnoid','hemorrhage',
   'decompensated','failure','warfarin','preeclampsia','intravascular',
   'department','supplement','environment','improvement',
+  // Shifu OCR seed words (all 150+ medical terms that get confusion variants)
+  'medication','medications','medicine','medicines','treatment','management',
+  'monitor','monitoring','monitored','minimal','minimum','maximum',
+  'membrane','murmur','muscle','muscular','movement',
+  'malignant','malignancy','metastatic','metastasis',
+  'mechanism','moderate','modified','morning','month','monthly',
+  'myocardial','myocardium','myopathy','myalgia',
+  'complete','completed','completion','complication','complications',
+  'complaint','complains','community','communication','comfortable',
+  'combination','combined','component','composition',
+  'imaging','impaired','impairment','implant','immune','immunity',
+  'immunosuppressed','immunosuppression','immunocompromised',
+  'improved','improving','improvement',
+  'inflammation','inflammatory','infiltrate','infection','infected',
+  'infectious','infusion','information','informed',
+  'symptom','symptoms','symptomatic',
+  'extremity','extremities',
+  'hemoglobin','hematocrit','hematology','hematoma',
+  'hemodialysis','hemodynamic','hemorrhage','hemorrhagic',
+  'hemolysis','hemolytic','hemostasis',
+  'pneumonia','pneumothorax','pneumonitis',
+  'bilateral','clinical','critical','normal','abnormal',
+  'stable','unstable','initial','minimal','terminal',
+  'renal','adrenal','mental','abdominal',
+  'ventilator','ventilation','ventilated',
+  'consultant','consultation','consulted',
+  'transfusion','transfused',
+  'administration','administered',
+  'anesthesia','radiology','pathology','pharmacology',
+  'rehabilitation','physiotherapy','nutrition',
+  'antibiotics','antibiotic','antifungal','antiviral',
+  'anticoagulant','anticoagulation','antiplatelet',
+  'insulin','intravenous','intramuscular','subcutaneous',
+  'reassessment','evaluation','examination',
+  'diagnostic','prognosis','prognostic',
+  'temperature','measurement','laboratory','investigation',
+  'intervention','comorbidity','comorbidities',
+  'mortality','morbidity','significant','significantly',
+  'recommendation','documentation','documented',
+  'deterioration','deteriorating','stabilization','stabilized',
+  'optimization','optimized','mobilization','mobilized',
+  'accumulation','implementation','interpretation',
+  'determination','presentation','manifestation',
+  'demonstration','consideration','classification',
+  'identification','modification','notification',
+  'verification','preparation','observation',
+  'orientation','contamination','decompensation',
+  'exacerbation',
 ]);
 
 function tryDegarble(word) {
@@ -242,8 +323,20 @@ export function correctMedicalText(text) {
   const pass1 = fixConfusables(text);
   if (pass1 !== text) corrections++;
 
+  // Pass 1.5: Shifu phrase corrections (multi-word patterns)
+  let pass1b = pass1;
+  const lowerFull = pass1b.toLowerCase();
+  for (const [garbled, correct] of Object.entries(SHIFU_PHRASES)) {
+    if (lowerFull.includes(garbled)) {
+      // Case-preserving replacement
+      const idx = lowerFull.indexOf(garbled);
+      pass1b = pass1b.substring(0, idx) + correct + pass1b.substring(idx + garbled.length);
+      corrections++;
+    }
+  }
+
   // Pass 2: Dictionary correction (word by word)
-  const words = pass1.split(/(\s+)/); // preserve whitespace
+  const words = pass1b.split(/(\s+)/); // preserve whitespace
   const result = words.map(word => {
     if (/^\s+$/.test(word)) return word; // whitespace
     const stripped = word.replace(/^[.,;:!?()[\]{}'"]+|[.,;:!?()[\]{}'"]+$/g, '');
