@@ -1,9 +1,10 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { useApp } from '../../app.jsx';
 import { colors, fonts, triageColors, triageTextColors } from '../../design/tokens.js';
 import { EvacTag } from '../../shared/Tag.jsx';
 import { ChevronDown, ChevronUp } from '../../design/icons.jsx';
-import { logTriageChange, logEvacStatusChange } from '../../data/audit.js';
+import { logTriageChange, logEvacStatusChange, logAction } from '../../data/audit.js';
+import { feedShifuCorrection } from './ocrEngine.js';
 
 const TRIAGE_LIST = ['RED', 'YELLOW', 'GREEN', 'GRAY', 'BLACK'];
 const EVAC_FLOW = ['IN_WARD', 'STAGED', 'IN_TRANSIT', 'EVACUATED'];
@@ -72,6 +73,57 @@ const tagStyle = (color) => ({
   background: color + '22', color: color,
 });
 
+// Inline editable field — tap to edit, blur/enter to save
+function EditableField({ value, field, patient, onSave, style: fieldStyle, placeholder }) {
+  const [editing, setEditing] = useState(false);
+  const [draft, setDraft] = useState(value || '');
+  const inputRef = useRef(null);
+
+  useEffect(() => { if (editing && inputRef.current) inputRef.current.focus(); }, [editing]);
+
+  const commit = useCallback(() => {
+    setEditing(false);
+    const trimmed = draft.trim();
+    if (trimmed !== (value || '').trim()) {
+      // Feed the correction into Shifu learning loop
+      if (value && patient?.ocrSource) {
+        feedShifuCorrection(field, value, trimmed);
+      }
+      onSave(field, trimmed);
+    }
+  }, [draft, value, field, patient, onSave]);
+
+  if (editing) {
+    return (
+      <input
+        ref={inputRef}
+        value={draft}
+        onChange={e => setDraft(e.target.value)}
+        onBlur={commit}
+        onKeyDown={e => { if (e.key === 'Enter') commit(); if (e.key === 'Escape') setEditing(false); }}
+        style={{
+          ...fieldStyle,
+          background: colors.bg3, border: `1px solid ${colors.blue}`,
+          borderRadius: '4px', padding: '2px 4px', outline: 'none',
+          width: '100%',
+        }}
+        placeholder={placeholder}
+        onClick={e => e.stopPropagation()}
+      />
+    );
+  }
+
+  return (
+    <span
+      style={{ ...fieldStyle, cursor: 'pointer', borderBottom: `1px dashed ${colors.border}` }}
+      onClick={e => { e.stopPropagation(); setEditing(true); setDraft(value || ''); }}
+      title="Tap to edit"
+    >
+      {value || <span style={{ color: colors.text3, fontStyle: 'italic' }}>{placeholder || '—'}</span>}
+    </span>
+  );
+}
+
 export default function PatientCard({ patient, forceExpand, onExpanded }) {
   const { updatePatient, removePatient } = useApp();
   const [expanded, setExpanded] = useState(false);
@@ -106,6 +158,12 @@ export default function PatientCard({ patient, forceExpand, onExpanded }) {
     updatePatient({ ...patient, evac: status, evacTime: new Date().toISOString() });
   }, [patient, updatePatient]);
 
+  const saveField = useCallback(async (field, value) => {
+    const updated = { ...patient, [field]: value };
+    await updatePatient(updated);
+    await logAction('EDIT_FIELD', 'patient', patient.id, { field, oldValue: patient[field], newValue: value });
+  }, [patient, updatePatient]);
+
   const p = patient;
 
   return (
@@ -123,14 +181,19 @@ export default function PatientCard({ patient, forceExpand, onExpanded }) {
         <div style={styles.body}>
           <div style={styles.row}>
             <div>
-              <span style={{ ...styles.name, ...(p.fullName ? {} : { color: colors.amber }) }}>{p.fullName || 'Name not captured'}</span>
+              <EditableField value={p.fullName} field="fullName" patient={p} onSave={saveField}
+                style={{ ...styles.name, ...(p.fullName ? {} : { color: colors.amber }) }}
+                placeholder="Tap to add name" />
               <span style={styles.ageGender}>{p.age}{p.gender ? `/${p.gender}` : ''}</span>
             </div>
             {expanded ? <ChevronUp size={16} color={colors.text3} /> : <ChevronDown size={16} color={colors.text3} />}
           </div>
           <div style={styles.row}>
-            <span style={{ ...styles.bed, ...(p.bed ? {} : { color: colors.amber }) }}>{p.bed || 'Bed not captured'}</span>
-            <span style={styles.dx}>{p.dx || ''}</span>
+            <EditableField value={p.bed} field="bed" patient={p} onSave={saveField}
+              style={{ ...styles.bed, ...(p.bed ? {} : { color: colors.amber }) }}
+              placeholder="Bed" />
+            <EditableField value={p.dx} field="dx" patient={p} onSave={saveField}
+              style={styles.dx} placeholder="Diagnosis" />
           </div>
           <div style={styles.tags}>
             <EvacTag status={p.evac || 'IN_WARD'} />
@@ -181,11 +244,13 @@ export default function PatientCard({ patient, forceExpand, onExpanded }) {
             </div>
             <div style={{ ...styles.field, gridColumn: '1 / -1' }}>
               <span style={styles.fieldLabel}>Medications</span>
-              <span style={styles.fieldValue}>{p.meds || '—'}</span>
+              <EditableField value={p.meds} field="meds" patient={p} onSave={saveField}
+                style={styles.fieldValue} placeholder="Medications" />
             </div>
             <div style={{ ...styles.field, gridColumn: '1 / -1' }}>
               <span style={styles.fieldLabel}>Notes</span>
-              <span style={styles.fieldValue}>{p.notes || '—'}</span>
+              <EditableField value={p.notes} field="notes" patient={p} onSave={saveField}
+                style={styles.fieldValue} placeholder="Notes" />
             </div>
           </div>
 

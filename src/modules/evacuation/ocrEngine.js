@@ -5155,6 +5155,27 @@ export async function recordPatientCorrection(original, corrected) {
 export function getLearningStats() {
   return shifuEngine ? shifuEngine.getStats() : { totalCorrections: 0 };
 }
+
+/**
+ * Feed a single field correction from PatientCard inline editing.
+ * Maps field names to Shifu column types for context-aware learning.
+ */
+export async function feedShifuCorrection(field, ocrValue, correctedValue) {
+  if (!ocrValue || ocrValue === correctedValue) return;
+  const engine = await getShifuEngine();
+  const columnMap = { fullName: 'Patient', dx: 'Diagnosis', bed: 'Room', meds: 'Medication', notes: 'Status' };
+  const columnType = columnMap[field] || field;
+  const ocrRow = { [columnType]: ocrValue };
+  const confirmedRow = { [columnType]: correctedValue };
+  engine.learn(ocrRow, confirmedRow);
+  console.log(`[Shifu] Learned: ${field} "${ocrValue}" → "${correctedValue}"`);
+  if (engine.correctionCount % 10 === 0) {
+    try {
+      const { getFirestore } = await import('firebase/firestore');
+      await saveShifu(getFirestore(), engine);
+    } catch {}
+  }
+}
 let contextOcrInitPromise = null;
 let arabicInitPromise = null;
 let detBufferCached = null;
