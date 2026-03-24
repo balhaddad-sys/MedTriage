@@ -7,6 +7,7 @@ import { processPatientListImage } from './ocrEngine.js';
 import { logAction } from '../../data/audit.js';
 import { saveTrainingSample, getTrainingStats, exportTrainingJSON, exportTrainingCSV } from './ocrDataCollector.js';
 import { runLearningCycle, getLearningStats } from './ocrLearner.js';
+import { saveDocument, generateThumbnail } from './documentStore.js';
 import { validatePatient, assessOcrImportReadiness, collectPatientSafetyFlags } from './ocrPatientSchema.js';
 
 const TRIAGE_LIST = ['RED', 'YELLOW', 'GREEN', 'GRAY', 'BLACK'];
@@ -492,6 +493,47 @@ export default function OCRScanner({ onClose, onImport }) {
       // Run learning cycle after saving — models update for next scan
       runLearningCycle();
     }).catch(e => console.warn('[OCR-DATA] Save failed:', e));
+
+    // Save to Document Library for persistent learning tracking
+    (async () => {
+      try {
+        const thumbnail = imageFileRef.current
+          ? await generateThumbnail(imageFileRef.current)
+          : null;
+        // Count fields that were edited vs verified as-is
+        const fieldsEdited = toImport.filter(p => p.ocrMeta?.manuallyReviewed).length;
+        const fieldsVerified = toImport.length - fieldsEdited;
+        await saveDocument({
+          id: crypto.randomUUID(),
+          thumbnail,
+          rawText: result.rawText || '',
+          patients: toImport.map(p => ({
+            fullName: p.fullName, bed: p.bed, triage: p.triage, dx: p.dx,
+          })),
+          ward: auth?.ward?.name || '',
+          label: `Ward ${auth?.ward?.name || '?'} — ${toImport.length} patient${toImport.length !== 1 ? 's' : ''}`,
+          ocrMeta: {
+            engine: result.engine,
+            backend: result.backend,
+            strategy: result.strategy,
+            qualityScore: result.qualityScore,
+            qualityBand: result.qualityBand,
+          },
+          learningStats: {
+            correctionsApplied: 1,
+            fieldsVerified,
+            fieldsEdited,
+            confusionPairsFound: [],
+            accuracyScore: toImport.length > 0
+              ? Math.round((fieldsVerified / toImport.length) * 100)
+              : null,
+            learnedWords: [],
+          },
+        });
+      } catch (e) {
+        console.warn('[DocLibrary] Save failed:', e);
+      }
+    })();
 
     onImport?.(toImport.length);
     onClose();

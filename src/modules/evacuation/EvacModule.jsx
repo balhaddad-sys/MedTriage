@@ -1,12 +1,13 @@
 import React, { useState, useMemo, useCallback, useEffect, useRef } from 'react';
 import { useApp } from '../../app.jsx';
 import { colors, fonts, triageColors, evacColors } from '../../design/tokens.js';
-import { PlusIcon, SearchIcon, SettingsIcon, CameraIcon, NfcIcon, CheckIcon } from '../../design/icons.jsx';
+import { PlusIcon, SearchIcon, SettingsIcon, CameraIcon, NfcIcon, CheckIcon, BookIcon } from '../../design/icons.jsx';
 import PatientCard from './PatientCard.jsx';
 import QuickAdd from './QuickAdd.jsx';
 import CommandCenter from './CommandCenter.jsx';
 import OCRScanner from './OCRScanner.jsx';
 import NFCScanner from './NFCScanner.jsx';
+import DocumentLibrary from './DocumentLibrary.jsx';
 import Modal from '../../shared/Modal.jsx';
 import { scanNFC, getNfcPlatformInfo, findPatientByNfcUid } from './nfcReader.js';
 
@@ -62,6 +63,7 @@ export default function EvacModule() {
   const [showCommand, setShowCommand] = useState(false);
   const [showOCR, setShowOCR] = useState(false);
   const [showNFC, setShowNFC] = useState(false);
+  const [showLibrary, setShowLibrary] = useState(false);
   const [nfcFoundPatient, setNfcFoundPatient] = useState(null);
   const [expandedPatientId, setExpandedPatientId] = useState(null);
   const nfcAbortRef = useRef(null);
@@ -212,6 +214,12 @@ export default function EvacModule() {
         }} title="Scan Civil ID">
           <NfcIcon size={18} color={colors.text2} />
         </button>
+        <button onClick={() => setShowLibrary(true)} style={{
+          background: colors.bg2, border: `1px solid ${colors.border}`,
+          borderRadius: '8px', padding: '10px', cursor: 'pointer',
+        }} title="Document Library">
+          <BookIcon size={18} color={colors.text2} />
+        </button>
         {auth?.isAdmin && (
           <button onClick={() => setShowCommand(true)} style={{
             background: colors.bg2, border: `1px solid ${colors.border}`,
@@ -275,6 +283,11 @@ export default function EvacModule() {
       {showCommand && <CommandCenter onClose={() => setShowCommand(false)} />}
       {showOCR && <OCRScanner onClose={() => setShowOCR(false)} />}
       {showNFC && <NFCScanner onClose={() => setShowNFC(false)} />}
+      {showLibrary && (
+        <Modal title="Document Library" onClose={() => setShowLibrary(false)}>
+          <DocumentLibrary />
+        </Modal>
+      )}
 
       {/* NFC found patient popup — shown when a known card is tapped */}
       {nfcFoundPatient && (
