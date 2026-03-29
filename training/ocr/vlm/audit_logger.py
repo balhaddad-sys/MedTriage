@@ -45,6 +45,7 @@ class AuditLogger:
 
     def _init_db(self):
         conn = sqlite3.connect(str(self.db_path))
+        conn.execute("PRAGMA journal_mode=WAL")
         conn.executescript(self.SCHEMA)
         conn.close()
 
